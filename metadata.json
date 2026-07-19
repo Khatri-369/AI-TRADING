@@ -1,0 +1,6 @@
+{
+  "name": "Global Markets Command Center",
+  "description": "A real-time financial intelligence dashboard with live stock, commodity, crypto tracking and Gemini-powered signal analysis.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
