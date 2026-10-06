@@ -1,0 +1,47 @@
+import type { Asset } from './types';
+
+// This is an instrument directory, never a price/forecast fallback.
+export const ASSETS: Asset[] = [
+  { symbol: 'AAPL', name: 'Apple', category: 'us', currency: 'USD', sector: 'Technology' },
+  { symbol: 'MSFT', name: 'Microsoft', category: 'us', currency: 'USD', sector: 'Technology' },
+  { symbol: 'NVDA', name: 'NVIDIA', category: 'us', currency: 'USD', sector: 'Technology' },
+  { symbol: 'TSLA', name: 'Tesla', category: 'us', currency: 'USD', sector: 'Automotive' },
+  { symbol: 'AMZN', name: 'Amazon', category: 'us', currency: 'USD', sector: 'Consumer discretionary' },
+  { symbol: 'GOOGL', name: 'Alphabet', category: 'us', currency: 'USD', sector: 'Communication' },
+  { symbol: 'META', name: 'Meta Platforms', category: 'us', currency: 'USD', sector: 'Communication' },
+  { symbol: 'SPY', name: 'SPDR S&P 500 ETF', category: 'us', currency: 'USD', sector: 'ETF' },
+  { symbol: 'NIFTY50', name: 'NIFTY 50', category: 'india', currency: 'INR', sector: 'Index' },
+  { symbol: 'BANKNIFTY', name: 'NIFTY Bank', category: 'india', currency: 'INR', sector: 'Index' },
+  { symbol: 'SENSEX', name: 'BSE SENSEX', category: 'india', currency: 'INR', sector: 'Index' },
+  { symbol: 'RELIANCE', name: 'Reliance Industries', category: 'india', currency: 'INR', sector: 'Energy' },
+  { symbol: 'TCS', name: 'Tata Consultancy Services', category: 'india', currency: 'INR', sector: 'IT' },
+  { symbol: 'HDFCBANK', name: 'HDFC Bank', category: 'india', currency: 'INR', sector: 'Banking' },
+  { symbol: 'INFY', name: 'Infosys', category: 'india', currency: 'INR', sector: 'IT' },
+  { symbol: 'ICICIBANK', name: 'ICICI Bank', category: 'india', currency: 'INR', sector: 'Banking' },
+  { symbol: 'BHARTIARTL', name: 'Bharti Airtel', category: 'india', currency: 'INR', sector: 'Telecom' },
+  { symbol: 'SBIN', name: 'State Bank of India', category: 'india', currency: 'INR', sector: 'Banking' },
+  { symbol: 'LICI', name: 'Life Insurance Corporation', category: 'india', currency: 'INR', sector: 'Insurance' },
+  { symbol: 'HINDUNILVR', name: 'Hindustan Unilever', category: 'india', currency: 'INR', sector: 'FMCG' },
+  { symbol: 'ITC', name: 'ITC', category: 'india', currency: 'INR', sector: 'FMCG' },
+  { symbol: 'LT', name: 'Larsen & Toubro', category: 'india', currency: 'INR', sector: 'Industrials' },
+  { symbol: 'BAJFINANCE', name: 'Bajaj Finance', category: 'india', currency: 'INR', sector: 'Financial services' },
+  { symbol: 'HCLTECH', name: 'HCL Technologies', category: 'india', currency: 'INR', sector: 'IT' },
+  { symbol: 'M&M', name: 'Mahindra & Mahindra', category: 'india', currency: 'INR', sector: 'Automotive' },
+  { symbol: 'SUNPHARMA', name: 'Sun Pharmaceutical', category: 'india', currency: 'INR', sector: 'Pharma' },
+  { symbol: 'TATAMOTORS', name: 'Tata Motors', category: 'india', currency: 'INR', sector: 'Automotive' },
+  { symbol: 'NTPC', name: 'NTPC', category: 'india', currency: 'INR', sector: 'Utilities' },
+  { symbol: 'TITAN', name: 'Titan Company', category: 'india', currency: 'INR', sector: 'Consumer discretionary' },
+  { symbol: 'ULTRACEMCO', name: 'UltraTech Cement', category: 'india', currency: 'INR', sector: 'Materials' },
+  { symbol: 'POWERGRID', name: 'Power Grid Corporation', category: 'india', currency: 'INR', sector: 'Utilities' },
+  { symbol: 'BTC', name: 'Bitcoin', category: 'crypto', currency: 'USD' },
+  { symbol: 'ETH', name: 'Ethereum', category: 'crypto', currency: 'USD' },
+  { symbol: 'BNB', name: 'BNB', category: 'crypto', currency: 'USD' },
+  { symbol: 'SOL', name: 'Solana', category: 'crypto', currency: 'USD' },
+  { symbol: 'XRP', name: 'XRP', category: 'crypto', currency: 'USD' },
+  { symbol: 'XAU', name: 'Gold · troy ounce', category: 'commodities', currency: 'USD' },
+  { symbol: 'XAG', name: 'Silver · troy ounce', category: 'commodities', currency: 'USD' },
+  { symbol: 'USD/INR', name: 'USD / INR reference rate', category: 'forex', currency: 'INR' },
+];
+
+export const ASSET_BY_SYMBOL = new Map(ASSETS.map((asset) => [asset.symbol, asset]));
+export const HISTORY_RANGES = ['1D', '5D', '1M', '3M', '6M', '1Y'] as const;

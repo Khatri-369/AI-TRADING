@@ -1,81 +1,36 @@
+export type { Asset, Quote, MarketSession, Overview, NewsArticle, NewsResponse, HistoryResponse, ProviderStatus } from '../../shared/types';
+
 export type ThemeType = 'midnight' | 'cyberpunk' | 'emerald' | 'terminal' | 'ocean';
-
-export interface ThemeColors {
-  name: string;
-  bg: string;
-  border: string;
-  cardBg: string;
-  textPrimary: string;
-  textSecondary: string;
-  accent: string;
-  positiveBg: string;
-  positiveText: string;
-  negativeBg: string;
-  negativeText: string;
-  neutralBg: string;
-  neutralText: string;
-  fontFamily: string;
-  glow: string;
-}
-
-export interface LivePrice {
-  symbol: string;
-  name: string;
-  priceUSD: number;
-  priceINR: number;
-  changePercent: number;
-  lastUpdated: Date;
-  status: 'live' | 'simulated' | 'loading' | 'error';
-  isGaining?: boolean;
-  high?: number;
-  low?: number;
-  volume?: number;
-}
-
-export interface AISignal {
+export type ThemeColors = {
+  name: string; bg: string; border: string; cardBg: string; textPrimary: string;
+  textSecondary: string; accent: string; positiveBg: string; positiveText: string;
+  negativeBg: string; negativeText: string; neutralBg: string; neutralText: string;
+  fontFamily: string; glow: string;
+};
+export type Tab = 'overview' | 'equities' | 'commodities' | 'crypto' | 'news';
+export type Engine = 'gemini' | 'finbert';
+export type HistoryRange = '1D' | '5D' | '1M' | '3M' | '6M' | '1Y';
+export interface AIAnalysis {
   sentiment: 'Positive' | 'Negative' | 'Neutral';
   signal: 'Buy' | 'Sell' | 'Hold';
   confidence: number;
   rationale: string;
-  affected_assets: string[];
-  timestamp: Date;
-  probabilities?: {
-    positive: number;
-    negative: number;
-    neutral: number;
-  };
-  engine?: 'finbert' | 'gemini';
+  risks: string[];
+  affectedAssets: string[];
+  engine: string;
+  engineStatus: 'available';
+  generatedAt: string;
+  cached: boolean;
 }
-
-export interface NewsItem {
-  id: string;
-  headline: string;
-  source: string;
-  datetime: Date;
-  region: string;
-  affected_assets: string[];
-  analysis?: AISignal;
-  isAnalyzing?: boolean;
+export interface ScenarioResult {
+  scenario: string;
+  summary: string;
+  impacts: Array<{ symbol: string; direction: 'up' | 'down' | 'mixed'; estimatedChangePercent: number | null; rationale: string }>;
+  risks: string[];
+  engine: string;
+  engineStatus: 'available';
+  generatedAt: string;
+  hypothetical: true;
+  cached: boolean;
 }
-
-export interface DealFlow {
-  id: string;
-  from: string;
-  to: string;
-  asset: string;
-  value: string;
-  sentiment: 'Positive' | 'Negative' | 'Neutral';
-  coords: {
-    from: { x: number; y: number };
-    to: { x: number; y: number };
-  };
-}
-
-export interface CountryData {
-  name: string;
-  code: string;
-  netCommodityFlow: string;
-  btcTrend: 'up' | 'down' | 'flat';
-  buyerSellerStatus: 'buyer' | 'seller' | 'neutral';
-  recentNews: string[];
-}
+export interface AnalysisEntry { title: string; result?: AIAnalysis; loading: boolean; error?: string }

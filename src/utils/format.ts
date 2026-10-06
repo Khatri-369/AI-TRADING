@@ -1,0 +1,12 @@
+export function formatPrice(value: number | null, currency: string) {
+  if (value === null || !Number.isFinite(value)) return 'Unavailable';
+  if (currency === 'POINTS') return `${new Intl.NumberFormat('en-IN', { maximumFractionDigits: 2 }).format(value)} pts`;
+  try { return new Intl.NumberFormat(currency === 'INR' ? 'en-IN' : 'en-US', { style: 'currency', currency, minimumFractionDigits: 2, maximumFractionDigits: value < 1 ? 4 : 2 }).format(value); }
+  catch { return `${value.toLocaleString()} ${currency}`; }
+}
+export const formatPercent = (value: number | null) => value === null ? 'Change unavailable' : `${value > 0 ? '+' : ''}${value.toFixed(2)}%`;
+export const changeClass = (value: number | null) => value === null || value === 0 ? 'text-slate-400' : value > 0 ? 'text-emerald-400' : 'text-rose-400';
+export function formatTime(value: string | null | undefined) {
+  if (!value || !Number.isFinite(Date.parse(value))) return 'Not reported';
+  return new Date(value).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', timeZoneName: 'short' });
+}

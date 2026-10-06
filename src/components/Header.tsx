@@ -1,211 +1,42 @@
-import React, { useState, useEffect } from 'react';
-import { Globe, Settings, Search, SunMoon, ShieldAlert, Cpu, LayoutDashboard, Coins, Newspaper, TrendingUp } from 'lucide-react';
-import { ThemeType, ThemeColors } from '../types/market';
+import { useEffect, useState } from 'react';
+import { Globe2, Settings, Search, LayoutDashboard, TrendingUp, Coins, Cpu, Newspaper } from 'lucide-react';
+import type { Tab, ThemeType } from '../types/market';
 import { THEMES } from '../utils/themes';
 
-interface HeaderProps {
-  currentTheme: ThemeType;
-  setTheme: (theme: ThemeType) => void;
-  colors: ThemeColors;
-  searchTerm: string;
-  setSearchTerm: (term: string) => void;
-  isSettingsOpen: boolean;
-  toggleSettings: () => void;
-  lastUpdated: Date;
-  activeTab: 'overview' | 'equities' | 'commodities' | 'crypto' | 'news';
-  setActiveTab: (tab: 'overview' | 'equities' | 'commodities' | 'crypto' | 'news') => void;
-}
-
-export default function Header({
-  currentTheme,
-  setTheme,
-  colors,
-  searchTerm,
-  setSearchTerm,
-  isSettingsOpen,
-  toggleSettings,
-  lastUpdated,
-  activeTab,
-  setActiveTab
-}: HeaderProps) {
-  const [clocks, setClocks] = useState({
-    est: '',
-    ist: ''
-  });
-
-  useEffect(() => {
-    const updateClocks = () => {
-      const now = new Date();
-      
-      const formatOptions = (timeZone: string) => {
-        return now.toLocaleTimeString('en-US', {
-          timeZone,
-          hour12: false,
-          hour: '2-digit',
-          minute: '2-digit',
-          second: '2-digit'
-        });
-      };
-
-      setClocks({
-        est: formatOptions('America/New_York') + ' EST',
-        ist: formatOptions('Asia/Kolkata') + ' IST'
-      });
-    };
-
-    updateClocks();
-    const interval = setInterval(updateClocks, 1000);
-    return () => clearInterval(interval);
-  }, []);
-
-  return (
-    <header className={`sticky top-0 z-50 border-b ${colors.border} bg-gradient-to-r from-slate-950 via-slate-900/95 to-slate-950 backdrop-blur-xl transition-all duration-300 shadow-lg shadow-indigo-500/5`}>
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex flex-col lg:flex-row justify-between items-center gap-4">
-        
-        {/* Left: Brand Identity */}
-        <div className="flex items-center gap-4">
-          <div className="p-3 bg-gradient-to-br from-indigo-500/20 to-purple-500/20 border border-indigo-500/30 rounded-xl shadow-lg shadow-indigo-500/10 animate-pulse">
-            <Globe className={`w-7 h-7 ${colors.accent}`} />
-          </div>
-          <div>
-            <h1 className="text-xl font-extrabold tracking-tight bg-gradient-to-r from-white via-indigo-200 to-purple-300 bg-clip-text text-transparent flex items-center gap-2">
-              GLOBAL MARKETS COMMAND CENTER
-            </h1>
-            <div className="flex items-center gap-2 mt-1 text-xs text-slate-400">
-              <span className="inline-flex items-center gap-1.5 px-2 py-0.5 bg-emerald-500/10 border border-emerald-500/20 rounded-full">
-                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" /> Live Terminal
-              </span>
-              <span className="text-slate-600">•</span>
-              <span className="text-slate-500">Updated: {lastUpdated.toLocaleTimeString()}</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Middle: Live Clocks */}
-        <div className="hidden xl:flex items-center gap-4 bg-gradient-to-r from-slate-900/80 to-slate-800/80 px-5 py-2.5 rounded-full border border-slate-700/50 shadow-lg">
-          <div className="text-center">
-            <div className="text-[10px] uppercase tracking-widest text-slate-500 font-bold">New York</div>
-            <div className="text-sm font-mono font-bold text-slate-300">{clocks.est}</div>
-          </div>
-          <div className="h-6 w-[1px] bg-gradient-to-b from-transparent via-slate-600 to-transparent" />
-          <div className="text-center">
-            <div className="text-[10px] uppercase tracking-widest text-slate-500 font-bold">Mumbai</div>
-            <div className="text-sm font-mono font-bold text-indigo-400">{clocks.ist}</div>
-          </div>
-        </div>
-
-        {/* Right: Actions, Search & Customizations */}
-        <div className="flex items-center gap-3 w-full lg:w-auto">
-          
-          {/* Universal Symbol Search */}
-          <div className="relative w-full sm:w-48 lg:w-64 flex-shrink-0">
-            <Search className="absolute left-3 top-2.5 w-4 h-4 text-slate-500" />
-            <input
-              type="text"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Search symbols..."
-              className="w-full bg-slate-900/80 border border-slate-700/50 hover:border-indigo-500/50 focus:border-indigo-500 rounded-xl py-2 pl-10 pr-4 text-sm focus:outline-none transition-all duration-300 font-mono placeholder:text-slate-500 shadow-inner"
-            />
-          </div>
-
-          {/* Theme Selector */}
-          <div className="hidden sm:flex items-center gap-2 bg-gradient-to-r from-slate-900/80 to-slate-800/80 border border-slate-700/50 rounded-xl px-3 py-2 shadow-lg flex-shrink-0">
-            <SunMoon className="w-4 h-4 text-indigo-400" />
-            <select
-              value={currentTheme}
-              onChange={(e) => setTheme(e.target.value as ThemeType)}
-              className="bg-transparent border-none text-sm focus:ring-0 font-medium text-slate-300 outline-none cursor-pointer"
-            >
-              {Object.entries(THEMES).map(([key, value]) => (
-                <option key={key} value={key} className="bg-slate-950 text-slate-300">
-                  {value.name}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* Settings Trigger */}
-          <button
-            onClick={toggleSettings}
-            className={`p-2.5 rounded-xl border flex items-center justify-center transition-all duration-300 shadow-lg flex-shrink-0 ${
-              isSettingsOpen
-                ? 'bg-gradient-to-br from-indigo-500/20 to-purple-500/20 border-indigo-500/40 text-indigo-400 shadow-indigo-500/10'
-                : 'bg-slate-900/80 border-slate-700/50 hover:border-indigo-500/50 text-slate-400 hover:text-slate-200 hover:bg-slate-800/80'
-            }`}
-            title="Configure API Connections"
-          >
-            <Settings className="w-5 h-5" />
-          </button>
-        </div>
+const tabs = [
+  { id: 'overview', label: 'Command Cockpit', icon: LayoutDashboard },
+  { id: 'equities', label: 'Global Equities', icon: TrendingUp },
+  { id: 'commodities', label: 'Metals & Forex', icon: Coins },
+  { id: 'crypto', label: 'Digital Assets', icon: Cpu },
+  { id: 'news', label: 'AI Signals & News', icon: Newspaper },
+] as const;
+interface Props { theme: ThemeType; onTheme: (theme: ThemeType) => void; search: string; onSearch: (value: string) => void; tab: Tab; onTab: (tab: Tab) => void; settingsOpen: boolean; onSettings: () => void }
+export default function Header({ theme, onTheme, search, onSearch, tab, onTab, settingsOpen, onSettings }: Props) {
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => { const timer = setInterval(() => setNow(new Date()), 30_000); return () => clearInterval(timer); }, []);
+  return <header className="border-b border-slate-800/80 bg-slate-950/95">
+    <a href="#main-content" className="skip-link">Skip to content</a>
+    <div className="mx-auto flex max-w-[1440px] flex-wrap items-center justify-between gap-5 px-4 py-5 sm:px-6 lg:px-8">
+      <div className="flex min-w-0 items-center gap-3">
+        <div className="rounded-xl border border-indigo-500/30 bg-gradient-to-br from-indigo-500/20 to-purple-500/15 p-3"><Globe2 className="h-6 w-6 text-indigo-400" /></div>
+        <div className="min-w-0"><h1 className="text-sm font-extrabold tracking-wide text-slate-100 sm:text-lg">GLOBAL MARKETS <span className="text-indigo-300">COMMAND CENTER</span></h1><p className="mt-1 text-xs text-slate-400">Market intelligence · source transparency · AI research</p></div>
       </div>
-
-      {/* Dynamic Tab Navigation */}
-      <nav className="bg-gradient-to-r from-slate-950/80 via-slate-900/60 to-slate-950/80 border-t border-slate-800/50 px-4 overflow-x-auto scrollbar-none">
-        <div className="max-w-7xl mx-auto flex gap-2 md:gap-6 py-3 min-w-max md:justify-center">
-          
-          <button
-            onClick={() => setActiveTab('overview')}
-            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold transition-all duration-300 ${
-              activeTab === 'overview'
-                ? 'bg-gradient-to-r from-indigo-500/20 to-purple-500/20 border border-indigo-500/40 text-indigo-400 shadow-lg shadow-indigo-500/10'
-                : 'border border-transparent text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
-            }`}
-          >
-            <LayoutDashboard className="w-4 h-4" />
-            <span>Command Cockpit</span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab('equities')}
-            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold transition-all duration-300 ${
-              activeTab === 'equities'
-                ? 'bg-gradient-to-r from-indigo-500/20 to-purple-500/20 border border-indigo-500/40 text-indigo-400 shadow-lg shadow-indigo-500/10'
-                : 'border border-transparent text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
-            }`}
-          >
-            <TrendingUp className="w-4 h-4" />
-            <span>Global Equities</span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab('commodities')}
-            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold transition-all duration-300 ${
-              activeTab === 'commodities'
-                ? 'bg-gradient-to-r from-indigo-500/20 to-purple-500/20 border border-indigo-500/40 text-indigo-400 shadow-lg shadow-indigo-500/10'
-                : 'border border-transparent text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
-            }`}
-          >
-            <Coins className="w-4 h-4" />
-            <span>Spot Commodities</span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab('crypto')}
-            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold transition-all duration-300 ${
-              activeTab === 'crypto'
-                ? 'bg-gradient-to-r from-indigo-500/20 to-purple-500/20 border border-indigo-500/40 text-indigo-400 shadow-lg shadow-indigo-500/10'
-                : 'border border-transparent text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
-            }`}
-          >
-            <Cpu className="w-4 h-4" />
-            <span>Digital Assets</span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab('news')}
-            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold transition-all duration-300 ${
-              activeTab === 'news'
-                ? 'bg-gradient-to-r from-indigo-500/20 to-purple-500/20 border border-indigo-500/40 text-indigo-400 shadow-lg shadow-indigo-500/10'
-                : 'border border-transparent text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
-            }`}
-          >
-            <Newspaper className="w-4 h-4" />
-            <span>AI Signals & News</span>
-          </button>
-
-        </div>
-      </nav>
-    </header>
-  );
+      <div className="hidden items-center gap-5 text-xs xl:flex">
+        {[['New York', 'America/New_York'], ['Mumbai', 'Asia/Kolkata']].map(([city, timezone]) => <div key={city}><span className="block text-[10px] uppercase tracking-widest text-slate-400">{city}</span><span className="font-mono text-slate-300">{now.toLocaleTimeString('en-US', { timeZone: timezone, hour: '2-digit', minute: '2-digit', timeZoneName: 'short', hour12: false })}</span></div>)}
+      </div>
+      <div className="flex w-full min-w-0 items-center gap-2 lg:w-auto">
+        <label className="relative min-w-0 flex-1 lg:w-52"><span className="sr-only">Search assets and news</span><Search className="absolute left-3 top-3 h-4 w-4 text-slate-400" /><input value={search} onChange={event => onSearch(event.target.value)} type="search" placeholder="Search assets or news…" className="field pl-9" /></label>
+        <button className={`icon-button ${settingsOpen ? 'border-indigo-400 text-indigo-300' : ''}`} onClick={onSettings} aria-label="Provider settings" aria-expanded={settingsOpen} aria-controls="provider-settings"><Settings className="h-5 w-5" /></button>
+        <label className="hidden sm:block"><span className="sr-only">Color theme</span><select className="field max-w-40" value={theme} onChange={event => onTheme(event.target.value as ThemeType)}>{Object.entries(THEMES).map(([value, item]) => <option key={value} value={value}>{item.name}</option>)}</select></label>
+      </div>
+    </div>
+    <nav className="mx-auto max-w-[1440px] overflow-x-auto px-4 sm:px-6 lg:px-8" aria-label="Dashboard sections">
+      <div role="tablist" aria-label="Market categories" className="flex w-max gap-2 pb-3 sm:gap-3">
+        {tabs.map(({ id, label, icon: Icon }, index) => <button key={id} id={`tab-${id}`} role="tab" aria-selected={tab === id} aria-controls={`panel-${id}`} tabIndex={tab === id ? 0 : -1} onClick={() => onTab(id)} onKeyDown={event => {
+          const next = event.key === 'ArrowRight' ? (index + 1) % tabs.length : event.key === 'ArrowLeft' ? (index + tabs.length - 1) % tabs.length : event.key === 'Home' ? 0 : event.key === 'End' ? tabs.length - 1 : null;
+          if (next !== null) { event.preventDefault(); onTab(tabs[next].id); document.getElementById(`tab-${tabs[next].id}`)?.focus(); }
+        }} className={`flex items-center gap-2 rounded-xl border px-4 py-3 text-xs font-semibold transition sm:text-sm ${tab === id ? 'border-indigo-500/40 bg-gradient-to-r from-indigo-500/20 to-purple-500/15 text-indigo-200' : 'border-transparent text-slate-400 hover:bg-slate-800/50 hover:text-slate-100'}`}><Icon className="h-4 w-4" />{label}</button>)}
+      </div>
+    </nav>
+  </header>;
 }
