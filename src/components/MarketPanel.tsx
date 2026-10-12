@@ -1,7 +1,8 @@
 import { useState } from 'react';
-import { BarChart3 } from 'lucide-react';
+import { BarChart3, LayoutGrid, List, Loader2 } from 'lucide-react';
 import type { Quote } from '../types/market';
-import { changeClass, formatPercent, formatPrice } from '../utils/format';
+import { changeClass, formatPercent, formatPrice, formatTime } from '../utils/format';
+import StatusBadge from './StatusBadge';
 import QuoteCard from './QuoteCard';
 import { Empty, Loading } from './Feedback';
 
@@ -13,6 +14,7 @@ interface Props {
   onSelect: (quote: Quote) => void;
   layout?: 'table' | 'cards';
   sectors?: boolean;
+  allowLayoutSwitch?: boolean;
 }
 
 export default function MarketPanel({
@@ -23,9 +25,11 @@ export default function MarketPanel({
   onSelect,
   layout = 'table',
   sectors = false,
+  allowLayoutSwitch = true,
 }: Props) {
   const [filter, setFilter] = useState('all');
   const [sector, setSector] = useState('all');
+  const [currentLayout, setCurrentLayout] = useState<'table' | 'cards'>(layout);
 
   const visible = quotes.filter(
     (quote) =>
@@ -35,137 +39,235 @@ export default function MarketPanel({
       (sector === 'all' || quote.sector === sector)
   );
 
-  const sectorOptions = [...new Set(quotes.flatMap((quote) => (quote.sector ? [quote.sector] : [])))];
+  const sectorOptions = [
+    ...new Set(quotes.flatMap((quote) => (quote.sector ? [quote.sector] : []))),
+  ];
 
   const getSessionBadge = (state: string) => {
     switch (state) {
       case 'OPEN':
         return (
-          <span className="inline-flex items-center gap-1 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-semibold text-emerald-300">
-            <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
+          <span className="inline-flex items-center gap-1 rounded border border-[var(--gain-border)] bg-[var(--gain-bg)] px-1.5 py-0.5 text-[10px] font-semibold text-[var(--gain-text)]">
+            <span className="h-1.5 w-1.5 rounded-full bg-[var(--gain-text)]" />
             OPEN
           </span>
         );
       case 'PRE-MARKET':
         return (
-          <span className="inline-flex items-center gap-1 rounded-full border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-[10px] font-semibold text-amber-300">
+          <span className="inline-flex items-center gap-1 rounded border border-[var(--delayed-border)] bg-[var(--delayed-bg)] px-1.5 py-0.5 text-[10px] font-semibold text-[var(--delayed-text)]">
             PRE-MKT
           </span>
         );
       case 'AFTER-HOURS':
         return (
-          <span className="inline-flex items-center gap-1 rounded-full border border-indigo-500/30 bg-indigo-500/10 px-2 py-0.5 text-[10px] font-semibold text-indigo-300">
+          <span className="inline-flex items-center gap-1 rounded border border-[var(--cached-border)] bg-[var(--cached-bg)] px-1.5 py-0.5 text-[10px] font-semibold text-[var(--cached-text)]">
             AFTER-HRS
           </span>
         );
       default:
         return (
-          <span className="inline-flex items-center gap-1 rounded-full border border-slate-700 bg-slate-800/60 px-2 py-0.5 text-[10px] font-medium text-slate-400">
-            CLOSED
+          <span className="inline-flex items-center gap-1 rounded border border-[var(--border-subtle)] bg-[var(--bg-subtle)] px-1.5 py-0.5 text-[10px] font-medium text-[var(--text-muted)]">
+            {state}
           </span>
         );
     }
   };
 
   return (
-    <section className="panel">
-      <div className="mb-5 flex flex-wrap items-center justify-between gap-4">
+    <section className="panel" aria-label={title}>
+      {/* Panel Header & Controls */}
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-[var(--border-subtle)] pb-3.5">
         <div>
-          <h2 className="section-heading">
-            <BarChart3 className="h-5 w-5 text-indigo-400" />
-            {title}
+          <h2 className="section-heading text-base">
+            <BarChart3 className="h-4 w-4 text-[var(--accent-primary)]" />
+            <span>{title}</span>
+            <span className="ml-1 text-xs font-normal text-[var(--text-muted)]">
+              ({visible.length} of {quotes.length})
+            </span>
           </h2>
-          <p className="mt-1 text-xs text-slate-400">{description}</p>
+          <p className="mt-0.5 text-xs text-[var(--text-secondary)]">{description}</p>
         </div>
-        <div className="flex flex-wrap gap-2">
+
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Active telemetry updating indicator */}
+          {loading && quotes.length > 0 && (
+            <div
+              className="flex items-center gap-1.5 rounded-md border border-[var(--accent-border)] bg-[var(--accent-subtle)] px-2 py-1 text-[11px] font-semibold text-[var(--accent-text)]"
+              role="status"
+              aria-live="polite"
+            >
+              <Loader2 className="h-3 w-3 animate-spin text-[var(--accent-primary)]" />
+              <span>Updating…</span>
+            </div>
+          )}
+
+          {/* Movement Filter */}
           <label>
             <span className="sr-only">{title} movement filter</span>
-            <select className="field text-xs py-1.5" value={filter} onChange={(e) => setFilter(e.target.value)}>
-              <option value="all">All Assets</option>
-              <option value="gainers">Gainers</option>
-              <option value="losers">Losers</option>
+            <select
+              className="field h-8 py-1 text-xs"
+              value={filter}
+              onChange={(e) => setFilter(e.target.value)}
+            >
+              <option value="all">All Movements</option>
+              <option value="gainers">Gainers Only</option>
+              <option value="losers">Decliners Only</option>
             </select>
           </label>
+
+          {/* Sector Filter */}
           {sectors && sectorOptions.length > 0 && (
             <label>
-              <span className="sr-only">Sector</span>
-              <select className="field text-xs py-1.5" value={sector} onChange={(e) => setSector(e.target.value)}>
+              <span className="sr-only">Sector filter</span>
+              <select
+                className="field h-8 py-1 text-xs"
+                value={sector}
+                onChange={(e) => setSector(e.target.value)}
+              >
                 <option value="all">All Sectors</option>
                 {sectorOptions.map((v) => (
-                  <option key={v}>{v}</option>
+                  <option key={v} value={v}>
+                    {v}
+                  </option>
                 ))}
               </select>
             </label>
+          )}
+
+          {/* Layout Toggle */}
+          {allowLayoutSwitch && (
+            <div className="hidden sm:inline-flex rounded-md border border-[var(--border-default)] p-0.5" role="group" aria-label="Layout view">
+              <button
+                type="button"
+                onClick={() => setCurrentLayout('table')}
+                aria-pressed={currentLayout === 'table'}
+                className={`rounded p-1 text-xs transition ${
+                  currentLayout === 'table'
+                    ? 'bg-[var(--accent-primary)] text-white'
+                    : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'
+                }`}
+                title="Table view"
+              >
+                <List className="h-3.5 w-3.5" />
+                <span className="sr-only">Table view</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setCurrentLayout('cards')}
+                aria-pressed={currentLayout === 'cards'}
+                className={`rounded p-1 text-xs transition ${
+                  currentLayout === 'cards'
+                    ? 'bg-[var(--accent-primary)] text-white'
+                    : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'
+                }`}
+                title="Cards view"
+              >
+                <LayoutGrid className="h-3.5 w-3.5" />
+                <span className="sr-only">Cards view</span>
+              </button>
+            </div>
           )}
         </div>
       </div>
 
       {loading && !quotes.length ? (
-        <Loading />
+        <Loading label={`Loading ${title}…`} />
       ) : !visible.length ? (
-        <Empty title="No matching assets" detail="Try selecting another filter or sector." />
-      ) : layout === 'cards' ? (
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+        <Empty
+          title="No matching instruments"
+          detail="Adjust your movement or sector filter to view quotes."
+        />
+      ) : currentLayout === 'cards' ? (
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {visible.map((quote) => (
             <QuoteCard key={quote.symbol} quote={quote} onSelect={onSelect} />
           ))}
         </div>
       ) : (
-        <div className="-mx-2 overflow-x-auto rounded-xl border border-slate-800/80 bg-slate-950/40">
-          <table className="w-full min-w-[640px] text-left text-sm">
-            <thead>
-              <tr className="border-b border-slate-800 text-[10px] uppercase tracking-wider text-slate-400 bg-slate-900/40">
-                <th scope="col" className="px-4 py-3">Asset</th>
-                <th scope="col" className="px-4 py-3">Price</th>
-                <th scope="col" className="px-4 py-3">24h Change</th>
-                <th scope="col" className="px-4 py-3">Volume</th>
-                <th scope="col" className="px-4 py-3">Market</th>
-                <th scope="col" className="px-4 py-3 text-right">Action</th>
+        /* Dense Analytical Table View */
+        <div
+          tabIndex={0}
+          role="region"
+          aria-label={`${title} quotes table`}
+          className="overflow-x-auto rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)]"
+        >
+          <table className="w-full min-w-[620px] text-left text-xs">
+            <thead className="border-b border-[var(--border-subtle)] bg-[var(--bg-surface-elevated)] text-[10px] uppercase tracking-wider text-[var(--text-muted)]">
+              <tr>
+                <th scope="col" className="px-3.5 py-2.5 font-semibold">Instrument</th>
+                <th scope="col" className="px-3.5 py-2.5 font-semibold">Price</th>
+                <th scope="col" className="px-3.5 py-2.5 font-semibold">Session Change</th>
+                <th scope="col" className="px-3.5 py-2.5 font-semibold">24h Volume</th>
+                <th scope="col" className="px-3.5 py-2.5 font-semibold">Market State</th>
+                <th scope="col" className="px-3.5 py-2.5 font-semibold text-right">Details</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-800/50">
+            <tbody className="divide-y divide-[var(--border-subtle)]">
               {visible.map((quote) => (
-                <tr key={quote.symbol} className="transition hover:bg-slate-800/30">
-                  <th scope="row" className="px-4 py-3.5 font-normal">
+                <tr
+                  key={quote.symbol}
+                  className="transition hover:bg-[var(--bg-surface-hover)]"
+                >
+                  <th scope="row" className="px-3.5 py-3 font-normal">
                     <button
-                      className="text-left font-bold text-slate-100 hover:text-indigo-300 transition"
+                      type="button"
+                      className="text-left font-bold text-[var(--text-primary)] hover:text-[var(--accent-text)] transition"
                       onClick={() => onSelect(quote)}
                     >
                       {quote.symbol}
                     </button>
-                    <span className="block text-xs text-slate-400 truncate max-w-[180px]">{quote.name}</span>
+                    <span className="block max-w-[190px] truncate text-[11px] text-[var(--text-muted)]">
+                      {quote.name}
+                    </span>
+                    {quote.sector && (
+                      <span className="inline-block mt-0.5 text-[10px] text-[var(--text-muted)]">
+                        {quote.sector}
+                      </span>
+                    )}
                   </th>
-                  <td className="whitespace-nowrap px-4 py-3.5 font-mono font-semibold text-slate-100">
+                  <td className="whitespace-nowrap px-3.5 py-3 font-mono font-semibold tabular-nums text-[var(--text-primary)]">
                     {formatPrice(quote.price, quote.currency)}
                   </td>
-                  <td className={`whitespace-nowrap px-4 py-3.5 font-mono ${changeClass(quote.changePercent)}`}>
-                    <span className="font-semibold">
+                  <td className={`whitespace-nowrap px-3.5 py-3 font-mono tabular-nums ${changeClass(quote.changePercent)}`}>
+                    <span>
                       {quote.changePercent === null ? '—' : formatPercent(quote.changePercent)}
                     </span>
                     {quote.change !== null && (
-                      <span className="block text-[11px] opacity-80">
+                      <span className="block text-[10px] opacity-75">
                         {quote.change > 0 ? '+' : ''}
                         {quote.change.toLocaleString(undefined, { maximumFractionDigits: 2 })}
                       </span>
                     )}
                   </td>
-                  <td className="px-4 py-3.5 font-mono text-xs text-slate-300">
+                  <td className="whitespace-nowrap px-3.5 py-3 font-mono tabular-nums text-[var(--text-secondary)]">
                     {quote.volume === null ? (
-                      <span className="text-slate-500">—</span>
+                      <span className="text-[var(--text-muted)]">—</span>
                     ) : (
                       Number(quote.volume).toLocaleString(undefined, { notation: 'compact' })
                     )}
                   </td>
-                  <td className="px-4 py-3.5">
-                    {getSessionBadge(quote.session.state)}
+                  <td className="px-3.5 py-3">
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      {getSessionBadge(quote.session.state)}
+                      <StatusBadge status={quote.status} cached={quote.cached} />
+                    </div>
+                    <p className="mt-1 text-[10px] text-[var(--text-muted)]">
+                      {quote.provider} · {formatTime(quote.asOf)}
+                    </p>
+                    {quote.error && (
+                      <p className="mt-1 max-w-[200px] text-[10px] text-[var(--delayed-text)]">
+                        {quote.error}
+                      </p>
+                    )}
                   </td>
-                  <td className="px-4 py-3.5 text-right">
+                  <td className="px-3.5 py-3 text-right">
                     <button
-                      className="rounded-lg bg-slate-800 hover:bg-indigo-600/30 text-indigo-300 hover:text-indigo-200 border border-slate-700/60 px-3 py-1 text-xs font-semibold transition"
+                      type="button"
+                      className="button-secondary text-[11px] py-1 px-2.5"
                       onClick={() => onSelect(quote)}
                       aria-label={`View ${quote.symbol} details`}
                     >
-                      Details
+                      Research
                     </button>
                   </td>
                 </tr>

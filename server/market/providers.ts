@@ -129,6 +129,7 @@ export class MarketProviders {
           if (entry.segment === 'NSE_EQ' && entry.instrument_type === 'EQ' && ASSETS.some((asset) => asset.category === 'india' && asset.symbol === entry.trading_symbol)) {
             directory.set(entry.trading_symbol, entry.instrument_key);
           }
+          if (entry.segment === 'BSE_EQ' && ASSETS.some(asset => asset.symbol === `${entry.trading_symbol}.BSE`)) directory.set(`${entry.trading_symbol}.BSE`, entry.instrument_key);
           for (const [symbol, definition] of Object.entries(INDIA_INDICES)) {
             if (entry.segment === definition.segment && [entry.name, entry.trading_symbol].some((name) => name.toLowerCase() === definition.name.toLowerCase())) directory.set(symbol, entry.instrument_key);
           }

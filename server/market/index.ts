@@ -26,14 +26,36 @@ export class MarketService {
   private observed = new Map<string, { status: string; message: string }>();
   private providers: MarketProviders;
   private upstoxWs: UpstoxWebSocketClient;
+  private listeners = new Set<(quote: Quote) => void>();
+  private streamQuotes = new Map<string, Quote>();
+  private instrumentSymbols = new Map<string, string>();
+  private sessions = new Map<string, MarketSession>();
+  private streamStarting: Promise<void> | null = null;
 
   constructor(env: MarketEnvironment = process.env, fetcher: Fetcher = fetch) {
     this.providers = new MarketProviders(env, fetcher);
-    this.upstoxWs = new UpstoxWebSocketClient(env.UPSTOX_ANALYTICS_TOKEN);
-    if (env.UPSTOX_ANALYTICS_TOKEN) {
-      void this.upstoxWs.start();
-    }
+    this.upstoxWs = new UpstoxWebSocketClient(env.UPSTOX_ANALYTICS_TOKEN, tick => {
+      const symbol = this.instrumentSymbols.get(tick.instrumentKey);
+      const asset = symbol ? ASSET_BY_SYMBOL.get(symbol) : undefined;
+      if (!asset) return;
+      const session = this.sessions.get(asset.symbol) ?? marketSession('india');
+      const quote: Quote = { ...asset, price: tick.lastPrice, change: tick.change, changePercent: tick.changePercent, volume: null, asOf: tick.timestamp, fetchedAt: new Date().toISOString(), provider: 'upstox', cached: false, status: quoteFreshness(asset, tick.timestamp, session), session };
+      this.streamQuotes.set(asset.symbol, quote);
+      for (const listener of this.listeners) listener(quote);
+    });
   }
+
+  subscribe(listener: (quote: Quote) => void) {
+    this.listeners.add(listener);
+    if (!this.streamStarting && this.providers.env.UPSTOX_ANALYTICS_TOKEN) {
+      this.streamStarting = this.providers.indiaInstruments().then(async instruments => {
+        this.instrumentSymbols = new Map([...instruments].map(([symbol, key]) => [key, symbol]));
+        if (this.listeners.size) await this.upstoxWs.start([...instruments.values()]);
+      }).catch(() => { /* Health and REST quote errors expose provider failure without secrets. */ }).finally(() => { this.streamStarting = null; });
+    }
+    return () => { this.listeners.delete(listener); if (!this.listeners.size) this.stopStreaming(); };
+  }
+  stopStreaming() { this.upstoxWs.stop(); this.streamQuotes.clear(); }
 
   private providerFor(asset: Asset): string {
     return ({ us: 'finnhub', india: 'upstox', crypto: 'coingecko', commodities: this.providers.metalsProvider, forex: 'frankfurter' })[asset.category];
@@ -70,7 +92,8 @@ export class MarketService {
     groups.forEach((group, index) => {
       const result = results[index];
       for (const asset of group.assets) {
-        const session = asset.category === 'india' ? (asset.symbol === 'SENSEX' ? bse : nse) ?? marketSession('india') : marketSession(asset.category);
+        const session = asset.category === 'india' ? (asset.symbol === 'SENSEX' || asset.symbol.endsWith('.BSE') ? bse : nse) ?? marketSession('india') : marketSession(asset.category);
+        this.sessions.set(asset.symbol, session);
         if (result.status === 'rejected') {
           bySymbol.set(asset.symbol, { ...this.unavailable(asset, errorMessage(result.reason)), session });
           continue;
@@ -80,12 +103,17 @@ export class MarketService {
           : { ...this.unavailable(asset, 'Provider returned no valid quote or current instrument mapping for this symbol'), session });
       }
     });
-    const quotes = assets.map((asset) => bySymbol.get(asset.symbol)!);
+    const quotes = assets.map((asset) => {
+      const rest = bySymbol.get(asset.symbol)!;
+      const tick = this.streamQuotes.get(asset.symbol);
+      if (!tick || Date.now() - Date.parse(tick.fetchedAt!) > 60_000 || Date.parse(tick.asOf!) < Date.parse(rest.asOf ?? '1970-01-01')) return rest;
+      return { ...tick, volume: rest.volume, session: rest.session, status: quoteFreshness(asset, tick.asOf!, rest.session) };
+    });
     for (const provider of new Set(quotes.map((quote) => quote.provider))) {
       const subset = quotes.filter((quote) => quote.provider === provider);
       const failures = subset.filter((quote) => quote.error || quote.status === 'unavailable' || quote.status === 'stale');
       this.observed.set(provider, failures.length
-        ? { status: failures.length === subset.length ? 'unavailable' : 'partial', message: failures[0].error ?? 'Provider source timestamps are stale' }
+        ? { status: failures.length === subset.length ? 'unavailable' : 'partial', message: `${failures.map(quote => quote.symbol).join(', ')}: ${failures[0].error ?? 'Provider source timestamps are stale'}` }
         : { status: 'connected', message: `Validated provider response; latest check ${new Date().toISOString()}` });
     }
     return { quotes, generatedAt: new Date().toISOString() };

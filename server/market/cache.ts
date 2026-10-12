@@ -43,7 +43,7 @@ export class DataCache<T> {
         this.failures.set(key, { until: this.now() + 60_000, message });
         while (this.failures.size > this.capacity) this.failures.delete(this.failures.keys().next().value!);
         if (previous && this.now() - previous.fetched < ttl + staleFor) return fromCache(true, message);
-        throw new Error(message);
+        throw new Error(message, { cause: error });
       } finally {
         this.pending.delete(key);
       }

@@ -14,6 +14,8 @@ export const ASSETS: Asset[] = [
   { symbol: 'BANKNIFTY', name: 'NIFTY Bank', category: 'india', currency: 'INR', sector: 'Index' },
   { symbol: 'SENSEX', name: 'BSE SENSEX', category: 'india', currency: 'INR', sector: 'Index' },
   { symbol: 'RELIANCE', name: 'Reliance Industries', category: 'india', currency: 'INR', sector: 'Energy' },
+  { symbol: 'RELIANCE.BSE', name: 'Reliance Industries · BSE', category: 'india', currency: 'INR', sector: 'Energy' },
+  { symbol: 'TCS.BSE', name: 'Tata Consultancy Services · BSE', category: 'india', currency: 'INR', sector: 'IT' },
   { symbol: 'TCS', name: 'Tata Consultancy Services', category: 'india', currency: 'INR', sector: 'IT' },
   { symbol: 'HDFCBANK', name: 'HDFC Bank', category: 'india', currency: 'INR', sector: 'Banking' },
   { symbol: 'INFY', name: 'Infosys', category: 'india', currency: 'INR', sector: 'IT' },

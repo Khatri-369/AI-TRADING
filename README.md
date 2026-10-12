@@ -1,188 +1,102 @@
-<div align="center">
+# Global Markets Command Center
 
-# 🌍 Global Markets Command Center
+React/TypeScript market-intelligence dashboard with an Express backend. Quotes, news and charts come from providers; absent or failing sources produce unavailable/stale states. There are no generated prices, fabricated news stories, trading orders or simulated live feeds.
 
-**Production-Quality Real-Data Financial Market Intelligence Platform**
+## Run locally
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
-[![Node: >=22](https://img.shields.io/badge/Node->=22.14-green.svg)](https://nodejs.org/)
-[![React](https://img.shields.io/badge/React-19.0-61DAFB?logo=react)](https://reactjs.org/)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.8-3178C6?logo=typescript)](https://www.typescriptlang.org/)
-[![Vite](https://img.shields.io/badge/Vite-6.2-646CFF?logo=vite)](https://vitejs.dev/)
-[![Tests](https://img.shields.io/badge/Tests-28%20Passing-success.svg)](https://nodejs.org/api/test.html)
+Requires Node.js 22.14+ and npm.
 
-A professional, audit-grade market intelligence application combining genuine real-time financial market feeds with server-side AI sentiment reasoning and scenario simulation. No synthetic prices, fabricated volumes, or mock news headlines.
-
-</div>
-
----
-
-## 🏛️ System Architecture
-
-The application is structured into decoupled, maintainable layers:
-
-```
-AI TRADING/
-├── server/                      # Production Express backend
-│   ├── app.ts                  # Route definitions, rate limiting, and security headers
-│   ├── config.ts               # Environment validation & secrets hygiene
-│   ├── ai/                     # Multi-engine AI analysis pipelines
-│   │   ├── index.ts            # Gemini & FinBERT dispatchers
-│   │   ├── schemas.ts          # Zod validation schemas for AI responses
-│   │   ├── cache.ts            # LRU cache for inference deduplication
-│   │   └── ai.test.ts          # Automated unit & contract tests for AI
-│   ├── market/                 # Real market data providers & feeds
-│   │   ├── index.ts            # Consolidated MarketService orchestrator
-│   │   ├── providers.ts        # Finnhub, CoinGecko, Frankfurter, Upstox, GoldAPI
-│   │   ├── websocket.ts        # Upstox V3 Market Data Feed WebSocket client
-│   │   ├── MarketDataFeed.proto# Protocol Buffer schema for Upstox feed
-│   │   ├── sessions.ts         # NYSE / NSE / BSE market clocks & holiday schedules
-│   │   ├── cache.ts            # Bounded LRU cache with stale-while-revalidate
-│   │   └── http.ts             # Safe fetcher with timeouts, sanitization, and parsing
-│   └── tests/                  # Integration tests
-│       └── app.test.ts         # Server contract, security & health tests
-├── shared/                     # Universally shared domain definitions
-│   ├── assets.ts               # Tracked equities, indices, crypto, forex, commodities
-│   └── types.ts                # TypeScript interfaces shared between frontend & backend
-├── src/                        # Modern React frontend
-│   ├── components/             # Focused UI components
-│   │   ├── Header.tsx          # Navigation, clock, search & theme controls
-│   │   ├── TickerTape.tsx      # High-performance ticker marquee
-│   │   ├── MarketPanel.tsx     # Filterable quote tables and cards
-│   │   ├── QuoteCard.tsx       # Individual asset card with status badge
-│   │   ├── AssetDetail.tsx     # Comprehensive deep-dive drawer with interactive charts
-│   │   ├── NewsSignalFeed.tsx  # Genuine financial news with AI sentiment badges
-│   │   ├── ScenarioSimulator.tsx # Hypothetical macro event impact simulator
-│   │   ├── SettingsPanel.tsx   # Live provider connectivity and status dashboard
-│   │   ├── StatusBadge.tsx     # Visual indicator of data freshness
-│   │   └── Feedback.tsx        # Accessible loading skeletons and error states
-│   ├── hooks/                  # Clean data-fetching and polling hooks
-│   │   ├── useMarketData.ts    # Polling & cache hook for quotes and news
-│   │   ├── useAIAnalysis.ts    # On-demand AI inference trigger with local caching
-│   │   └── usePolling.ts       # Tab-visibility-aware polling manager
-│   ├── services/
-│   │   └── api.ts              # Strongly typed backend API client
-│   ├── utils/
-│   │   ├── format.ts           # Number, currency, and date formatting
-│   │   └── themes.ts           # Sleek financial terminal color themes
-│   ├── types/
-│   │   └── market.ts           # Frontend component types
-│   ├── App.tsx                 # Root dashboard layout & error boundaries
-│   └── index.css               # Design system & utility classes
-├── server.ts                   # Application entrypoint (Vite middleware in dev, static in prod)
-├── Dockerfile                  # Multi-stage production container build
-├── .env.example                # Documented configuration template
-└── package.json                # Project dependencies and scripts
+```sh
+npm ci
 ```
 
----
+Copy `.env.example` to `.env`, fill only the providers you use, then:
 
-## 📡 Live Market Data Providers
-
-| Category | Primary Provider | Free Key Needed? | Fallback / Notes |
-| :--- | :--- | :--- | :--- |
-| **US Equities** | Finnhub API | **Yes** (`FINNHUB_API_KEY`) | Free personal tier from [finnhub.io](https://finnhub.io/). |
-| **Indian Equities & Indices** | Upstox API v3 | **Optional** (`UPSTOX_ANALYTICS_TOKEN`) | Free read-only 1-year Analytics Token from [developer.upstox.com](https://developer.upstox.com/). Reports `UNCONFIGURED` when missing. |
-| **Upstox WebSocket Feed** | Upstox Protobuf WS | **Optional** (`UPSTOX_ANALYTICS_TOKEN`) | Subscribes to NSE/BSE feeds using `MarketDataFeed.proto`. |
-| **Cryptocurrency** | CoinGecko API | **No** (Public endpoint) | Optional `COINGECKO_DEMO_API_KEY` for higher rate limits. |
-| **Spot Metals (Gold & Silver)**| GoldAPI.io / Gold-API | **No** (Automatic fallback) | Uses GoldAPI.io if `GOLD_API_KEY` is present; falls back to free public gold-api.com. |
-| **Foreign Exchange (USD/INR)**| Frankfurter | **No** (Public reference) | ECB-backed daily reference rate. Clearly marked as delayed reference rate. |
-| **Financial News** | Finnhub News | **Yes** (`FINNHUB_API_KEY`) | Live verified headlines directly linked to publisher sources. |
-
----
-
-## 🤖 Dual AI Engine Pipeline
-
-1. **Google Gemini (Default)**:
-   - Uses `GEMINI_API_KEY` server-side via the `@google/genai` SDK.
-   - Synthesizes market news, price context, and asset category into actionable Buy/Sell/Hold analytical sentiment with explicit confidence and rationale.
-2. **FinBERT (Hugging Face)**:
-   - Uses `HUGGINGFACE_API_KEY` (or `HF_TOKEN`) server-side to query `ProsusAI/finbert` on Hugging Face Serverless Inference.
-   - Measures pure NLP financial sentiment without pretending to predict future price direction.
-   - If key or model is unavailable, reports explicit `unavailable` status — never falls back to labeling Gemini as FinBERT.
-
----
-
-## 🔒 Security & Data Transparency
-
-- **Zero Client-Side Secrets**: All third-party provider keys stay strictly on the server. No `VITE_*` secrets exist in frontend bundles.
-- **Data Freshness Badges**: Every quote clearly indicates its provenance:
-  - `LIVE`: Verified real-time from provider within session hours.
-  - `DELAYED`: Valid feed observation older than 2 minutes.
-  - `CACHED`: Bounded server memory cache hit.
-  - `STALE`: Outdated source timestamp.
-  - `UNAVAILABLE`: Provider failed or rate-limited.
-  - `UNCONFIGURED`: Optional key has not yet been supplied.
-- **Production AI Protection**: When deployed with `NODE_ENV=production`, AI endpoints require `AI_ACCESS_TOKEN` in the `Authorization: Bearer <token>` header to prevent unauthorized quota drain.
-
----
-
-## 🚀 Quick Start
-
-### 1. Prerequisites
-- **Node.js**: v22.14.0 or later
-- **npm**: v10+
-
-### 2. Installation
-```bash
-git clone https://github.com/Khatri-369/AI-TRADING.git
-cd AI-TRADING
-npm install
-```
-
-### 3. Environment Configuration
-Copy the sample environment file:
-```bash
-cp .env.example .env
-```
-Edit `.env` and add your keys:
-```env
-GEMINI_API_KEY=your_gemini_api_key
-FINNHUB_API_KEY=your_finnhub_api_key
-HUGGINGFACE_API_KEY=your_huggingface_token
-# Optional:
-UPSTOX_ANALYTICS_TOKEN=your_upstox_token
-```
-
-### 4. Running the Development Server
-```bash
+```sh
 npm run dev
 ```
-Open [http://localhost:3000](http://localhost:3000) in your browser.
 
----
+Open http://localhost:3000. Restart the backend after editing `.env` (Vite hot reload covers frontend edits only). `PORT` and `HOST` are configurable.
 
-## 🧪 Testing & Quality Assurance
-
-Run the comprehensive 28-test automated test suite:
-```bash
-npm test
-```
-Run type-checking:
-```bash
+```sh
 npm run lint
-```
-Build the production bundle:
-```bash
+npm test
 npm run build
-```
-Run in production mode:
-```bash
 npm start
 ```
 
----
+The production bundle is `dist/server.js`; the frontend is `dist/client`. `npm start` selects production mode without requiring platform-specific environment syntax. SPA deep links are supported. `/api/health` reports process health and sanitized provider observations; configured does not mean a live request has succeeded.
 
-## 🐳 Docker Deployment
+## Providers and credentials
 
-The application includes an optimized multi-stage `Dockerfile`:
-```bash
-docker build -t ai-trading-platform .
-docker run -p 3000:3000 --env-file .env ai-trading-platform
+- **Upstox:** `UPSTOX_ANALYTICS_TOKEN`, the one-year read-only Analytics Token from [Developer Apps](https://account.upstox.com/developer/apps). No OAuth login/refresh flow and no order placement. Supports official instrument masters, batched NSE/BSE quotes, NIFTY 50, BANK NIFTY, SENSEX, market status and historical candles. `.BSE` suffixes distinguish BSE listings. The backend authorizes and decodes the V3 Protobuf WebSocket and sends normalized observations to browsers through SSE. Credentials and authorized WebSocket URLs never reach the browser. Missing tokens report `UNCONFIGURED`. Expired/invalid tokens produce provider errors. [Analytics Token documentation](https://upstox.com/developer/api-documentation/analytics-token/).
+- **Finnhub:** `FINNHUB_API_KEY` for eight US instruments and financial news. The free personal tier covers quotes/news; historical candles depend on account entitlement. [Documentation](https://finnhub.io/docs/api).
+- **CoinGecko:** public API for BTC, ETH, BNB, SOL and XRP; optional `COINGECKO_DEMO_API_KEY`. Prices are USD, changes and notional USD volume cover 24 hours. Historical range availability/rate limits depend on the plan. [Documentation](https://docs.coingecko.com/).
+- **Metals:** public [Gold-API](https://gold-api.com/) by default, USD/troy ounce for gold and silver. Optional `GOLD_API_KEY` chooses GoldAPI.io. No metals history is implemented. Missing daily changes stay blank. Selecting GoldAPI does not silently fall back to another source after failure.
+- **Forex:** public [Frankfurter](https://frankfurter.dev/) USD/INR daily reference rates and daily history. These are delayed reference observations, not live tradable FX quotes. No API key.
+- **Gemini:** `GEMINI_API_KEY`, optional `GEMINI_MODEL` (default `gemini-3.5-flash-lite`, verified with the configured account). On-demand structured sentiment and separate hypothetical scenarios. Model availability, quota and free-tier eligibility vary by account. Unavailable/timeout responses are explicit.
+- **FinBERT:** `HUGGINGFACE_API_KEY` with Inference Providers access. Calls genuine `ProsusAI/finbert`; never falls back to Gemini or keywords. Requires available account credits/model service. Engine status is unavailable on failure.
+
+## Architecture
+
+- `server.ts`: startup, Vite development middleware, production static serving and shutdown.
+- `server/app.ts`, `server/config.ts`: validated routes, configuration, safe errors, Helmet and rate limits.
+- `server/market/`: replaceable provider adapters, bounded caches, source freshness, sessions, Upstox WebSocket and SSE fan-out.
+- `server/market/feedSchema.ts`: generated TypeScript schema from the checked-in official `MarketDataFeed.proto`. Bundled into production; no runtime schema download/path dependency.
+- `server/ai/`: validated Gemini/FinBERT clients, prompts, bounded request/result caching.
+- `shared/`: typed API contracts and instrument directory (names/symbols, never prices).
+- `src/services/`, `src/hooks/`, `src/components/`: same-origin API client, polling/stream lifecycle, accessible dashboard, charts, provider settings, news and scenario UI.
+
+## API
+
+- `GET /api/health`
+- `GET /api/markets/overview`
+- `GET /api/markets/us`, `/india`, `/crypto`, `/commodities`, `/forex`
+- `GET /api/markets/history/:symbol?range=1D|5D|1M|3M|6M|1Y` (URL-encode symbols such as USD/INR)
+- `GET /api/stream/live-ticks` (SSE; normalized Upstox observations)
+- `GET /api/news`
+- `POST /api/ai/analyze` with `{ "headline": "...", "engine": "gemini" }` and optional known `symbol`
+- `POST /api/ai/scenario` with `{ "scenario": "..." }`
+
+Production AI requires `Authorization: Bearer <AI_ACCESS_TOKEN>`. This application access token is not an API provider secret; the Settings input holds it in memory only. AI is disabled in production when the token is empty. Development AI remains usable locally. No provider keys are accepted in request bodies or UI inputs.
+
+## Refresh and correctness
+
+Browser overview polling runs every 60 seconds after the preceding request completes; news every five minutes. Hidden tabs cancel polling and close SSE. One Upstox connection is shared across active SSE clients, with bounded exponential reconnect and heartbeats. Slow clients are disconnected. No stream is created merely by importing a module or running tests.
+
+Backend cache TTLs: crypto 60 seconds; equities 60 seconds during sessions, 30 minutes closed; public metals 60 seconds; GoldAPI 24 hours by default; forex six hours; news five minutes; intraday history five minutes, other history one hour. Source timestamps never advance when a refresh fails. Concurrent identical requests share work. Failures cool down for 60 seconds; retained data is explicitly stale and has a bounded retention window. AI caches identical evidence for ten minutes (analysis) or five minutes (scenarios).
+
+Quotes expose provider, source time, fetched time, cache flag and data status. Closed-session observations are delayed, never live. US schedule uses New York DST and published NYSE 2026–2028 holidays/early closes; unexpected halts are not tracked. Indian sessions use Upstox, with a clearly described weekday estimate if unavailable. Crypto is 24/7. Metals session is unknown; forex is daily reference data.
+
+## Tests and live verification
+
+`npm test` uses controlled test fixtures only in test files and never spends provider quota. Browser tests require a running server and Microsoft Edge installed:
+
+```sh
+npm run test:browser
 ```
 
----
+`playwright.config.ts` can be changed to an installed Chromium channel. Tests cover desktop navigation/search/refresh/settings, real Indian charts, mobile overflow and runtime errors. Screenshots go to gitignored `test-results/`.
 
-## ⚖️ Financial Disclaimer
+To explicitly spend a small number of read-only provider requests and verify configured credentials:
 
-*The analysis, sentiment ratings, Buy/Sell/Hold recommendations, and scenario simulations generated by this application are for informational and educational purposes only. They do not constitute personalized financial, investment, legal, or tax advice. Market data may be delayed. Always perform your own independent due diligence before executing trades.*
+```sh
+npm run verify:live
+npm run verify:live -- --ai
+```
+
+The second command additionally makes small AI requests. Neither logs secrets. Successful WebSocket snapshots outside market hours do not establish that changing intraday ticks have been observed.
+
+## Production deployment
+
+Deploy to a persistent Node host, using `npm ci`, `npm run build`, then `npm start`. Configure environment secrets on the server and use HTTPS through a reverse proxy. Allow SSE streaming without proxy buffering. Set `TRUST_PROXY_HOPS` to the exact trusted proxy count, never blindly enable proxy trust. Caches/rate limits are per process; multiple replicas need shared quotas/rate limiting and coordination of Upstox connection limits.
+
+A multi-stage `Dockerfile` is included (`docker build -t market-command-center .`; `docker run --env-file .env -p 3000:3000 market-command-center`). The container runs as a non-root user. Docker execution has not been verified in this workspace. CI runs install, typecheck, tests and build.
+
+## Limitations
+
+TATAMOTORS is retained as a requested symbol but is unavailable if absent from the provider's current instrument directory. It is never mapped to a different company automatically. Historical endpoints may exclude today's unfinished session; chart timestamps show the actual coverage. Upstox index/stock coverage and entitlements remain provider-controlled. Missing candle data is never interpolated into fake history. Metals charts are unavailable. There are no fake geopolitical maps, fear/greed scores or automatic AI calls on render.
+
+Market-data licenses and redistribution rights depend on your provider agreement. Verify commercial/public redistribution permissions before deployment. This project does not claim a license to redistribute provider data.
+
+AI-generated signals are informational and are not financial advice. Market data may be delayed. Users should independently verify information before making investment decisions.

@@ -1,194 +1,98 @@
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import protobuf from 'protobufjs';
 import WebSocket from 'ws';
-import type { SourceQuote } from './providers';
+import { z } from 'zod';
+import schema from './feedSchema';
+import { validTime } from './http';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
-export type WebSocketStatus = 'unconfigured' | 'connecting' | 'connected' | 'reconnecting' | 'disconnected' | 'error';
-
-export interface UpstoxFeedUpdate {
-  instrumentKey: string;
-  lastPrice: number;
-  closePrice?: number;
-  change?: number;
-  changePercent?: number;
-  timestamp: string;
+export const FeedResponse = protobuf.Root.fromJSON(schema).lookupType('com.upstox.marketdatafeederv3udapi.rpc.proto.FeedResponse');
+const ltpcSchema = z.object({ ltp: z.number().finite().positive(), cp: z.number().finite().nonnegative().optional(), ltt: z.union([z.string(), z.number()]) });
+const frameSchema = z.object({ feeds: z.record(z.string(), z.unknown()).optional() });
+export interface UpstoxFeedUpdate { instrumentKey: string; lastPrice: number; change: number | null; changePercent: number | null; timestamp: string }
+export function decodeTicks(bytes: Uint8Array): UpstoxFeedUpdate[] {
+  const frame = frameSchema.parse(FeedResponse.toObject(FeedResponse.decode(bytes), { longs: String, enums: String }));
+  const ticks: UpstoxFeedUpdate[] = [];
+  for (const [instrumentKey, feed] of Object.entries(frame.feeds ?? {})) {
+    const parsed = z.object({ ltpc: ltpcSchema }).safeParse(feed);
+    if (!parsed.success) continue;
+    const { ltp, cp, ltt } = parsed.data.ltpc;
+    try { ticks.push({ instrumentKey, lastPrice: ltp, change: cp ? ltp - cp : null, changePercent: cp ? (ltp - cp) / cp * 100 : null, timestamp: validTime(Number(ltt), true) }); }
+    catch { /* Invalid source timestamps must not become current timestamps. */ }
+  }
+  return ticks;
 }
-
 export class UpstoxWebSocketClient {
   private ws: WebSocket | null = null;
-  private feedResponseType: protobuf.Type | null = null;
-  private status: WebSocketStatus = 'unconfigured';
-  private statusMessage = 'Set UPSTOX_ANALYTICS_TOKEN to enable real-time Upstox WebSocket market feed.';
-  private reconnectTimer: NodeJS.Timeout | null = null;
-  private reconnectAttempts = 0;
-  private isExplicitlyStopped = false;
-  private subscribedKeys: string[] = [];
-
-  constructor(
-    private readonly token: string | undefined = process.env.UPSTOX_ANALYTICS_TOKEN,
-    private readonly onTick?: (update: UpstoxFeedUpdate) => void
-  ) {}
-
-  getStatus() {
-    return {
-      status: this.status,
-      message: this.statusMessage,
-      configured: !!this.token,
-    };
-  }
-
-  private async loadProtoSchema(): Promise<protobuf.Type> {
-    if (this.feedResponseType) return this.feedResponseType;
-    const protoPath = path.join(__dirname, 'MarketDataFeed.proto');
-    const root = await protobuf.load(protoPath);
-    this.feedResponseType = root.lookupType('com.upstox.marketdatafeederv3udapi.rpc.proto.FeedResponse');
-    return this.feedResponseType;
-  }
-
-  async start(instrumentKeys: string[] = []): Promise<void> {
-    this.isExplicitlyStopped = false;
-    this.subscribedKeys = instrumentKeys;
-
-    if (!this.token) {
-      this.status = 'unconfigured';
-      this.statusMessage = 'Set UPSTOX_ANALYTICS_TOKEN to enable real-time Upstox WebSocket market feed.';
-      return;
-    }
-
+  private timer?: ReturnType<typeof setTimeout>;
+  private watchdog?: ReturnType<typeof setInterval>;
+  private controller?: AbortController;
+  private stopped = true;
+  private attempt = 0;
+  private generation = 0;
+  private keys: string[] = [];
+  private lastFrame = 0;
+  private state = 'UNCONFIGURED';
+  private message = 'Set UPSTOX_ANALYTICS_TOKEN for the read-only one-year Analytics feed.';
+  constructor(private readonly token: string | undefined, private readonly onTick?: (tick: UpstoxFeedUpdate) => void) { this.stop(); }
+  getStatus() { return { status: this.state, message: this.message, configured: !!this.token }; }
+  async start(keys: string[]) {
+    if (!this.stopped) return;
+    if (!this.token) return;
+    this.keys = [...new Set(keys)];
+    if (!this.keys.length) { this.state = 'unavailable'; this.message = 'No supported instruments were resolved.'; return; }
+    this.stopped = false;
     await this.connect();
   }
-
-  private async connect(): Promise<void> {
-    if (this.isExplicitlyStopped) return;
-
+  private async connect() {
+    if (this.stopped) return;
+    const generation = ++this.generation;
+    this.state = 'connecting'; this.message = 'Authorizing read-only Upstox feed.';
+    this.controller = new AbortController();
+    const timeout = setTimeout(() => this.controller?.abort(), 10_000);
     try {
-      this.status = this.reconnectAttempts > 0 ? 'reconnecting' : 'connecting';
-      this.statusMessage = 'Authorizing Upstox WebSocket feed...';
-
-      // 1. Authorize WebSocket session via Upstox API
-      const authRes = await fetch('https://api.upstox.com/v3/feed/market-data-feed/authorize', {
-        headers: {
-          Authorization: `Bearer ${this.token}`,
-          Accept: 'application/json',
-        },
-        signal: AbortSignal.timeout(10_000),
+      const response = await fetch('https://api.upstox.com/v3/feed/market-data-feed/authorize', { headers: { Authorization: `Bearer ${this.token}`, Accept: 'application/json' }, signal: this.controller.signal, redirect: 'error' });
+      if (!response.ok) { await response.body?.cancel(); throw new Error('Authorization failed'); }
+      const parsed = z.object({ status: z.literal('success'), data: z.object({ authorized_redirect_uri: z.string().url() }) }).parse(await response.json());
+      const url = new URL(parsed.data.authorized_redirect_uri);
+      if (url.protocol !== 'wss:' || !url.hostname.endsWith('.upstox.com')) throw new Error('Invalid feed host');
+      if (this.stopped || generation !== this.generation) return;
+      const socket = new WebSocket(url, { handshakeTimeout: 10_000, maxPayload: 2_000_000 });
+      this.ws = socket;
+      socket.on('open', () => {
+        if (this.stopped || generation !== this.generation) { socket.terminate(); return; }
+        this.state = 'connected'; this.message = 'WebSocket connected; awaiting validated market observations.';
+        this.attempt = 0; this.lastFrame = Date.now();
+        socket.send(Buffer.from(JSON.stringify({ guid: `market-${Date.now()}`, method: 'sub', data: { mode: 'ltpc', instrumentKeys: this.keys } })), { binary: true });
+        this.watchdog = setInterval(() => { if (Date.now() - this.lastFrame > 60_000) socket.terminate(); else socket.ping(); }, 20_000);
+        this.watchdog.unref();
       });
-
-      if (!authRes.ok) {
-        throw new Error(`Upstox WebSocket auth failed with HTTP ${authRes.status}: ${authRes.statusText}`);
-      }
-
-      const authData = (await authRes.json()) as { status: string; data?: { authorizedRedirectUri?: string } };
-      const wsUrl = authData.data?.authorizedRedirectUri;
-      if (!wsUrl) {
-        throw new Error('Upstox WebSocket authorization response did not contain authorizedRedirectUri');
-      }
-
-      const FeedResponse = await this.loadProtoSchema();
-
-      // 2. Open WebSocket
-      this.ws = new WebSocket(wsUrl);
-
-      this.ws.on('open', () => {
-        this.status = 'connected';
-        this.statusMessage = `Connected to Upstox Market Data Feed; active since ${new Date().toISOString()}`;
-        this.reconnectAttempts = 0;
-
-        // Subscribe to instruments if keys were supplied
-        if (this.subscribedKeys.length > 0) {
-          this.subscribe(this.subscribedKeys);
-        }
-      });
-
-      this.ws.on('message', (data: WebSocket.RawData) => {
+      socket.on('pong', () => { this.lastFrame = Date.now(); });
+      socket.on('message', (raw) => {
+        if (this.stopped || generation !== this.generation) return;
+        this.lastFrame = Date.now();
         try {
-          const buffer = Buffer.isBuffer(data) ? data : Buffer.from(data as ArrayBuffer);
-          const decoded = FeedResponse.decode(new Uint8Array(buffer)) as any;
-
-          if (decoded && decoded.feeds) {
-            for (const [instrumentKey, feed] of Object.entries(decoded.feeds as Record<string, any>)) {
-              const ltpc = feed.ltpc || feed.fullFeed?.marketFF?.ltpc || feed.fullFeed?.indexFF?.ltpc;
-              if (!ltpc || typeof ltpc.ltp !== 'number') continue;
-
-              const lastPrice = ltpc.ltp;
-              const closePrice = typeof ltpc.cp === 'number' && ltpc.cp > 0 ? ltpc.cp : undefined;
-              const change = closePrice ? lastPrice - closePrice : undefined;
-              const changePercent = closePrice && closePrice > 0 && change !== undefined ? (change / closePrice) * 100 : undefined;
-              const timestamp = ltpc.ltt ? new Date(Number(ltpc.ltt)).toISOString() : new Date().toISOString();
-
-              this.onTick?.({
-                instrumentKey,
-                lastPrice,
-                closePrice,
-                change,
-                changePercent,
-                timestamp,
-              });
-            }
+          const bytes = Array.isArray(raw) ? Buffer.concat(raw) : Buffer.isBuffer(raw) ? raw : Buffer.from(raw);
+          for (const tick of decodeTicks(bytes)) if (this.keys.includes(tick.instrumentKey)) {
+            this.message = `Validated market observation received ${new Date().toISOString()}; source trade time ${tick.timestamp}.`;
+            this.onTick?.(tick);
           }
-        } catch (err) {
-          console.warn('Failed to decode Upstox WebSocket protobuf frame:', err);
-        }
+        } catch { this.message = 'Malformed feed frame ignored; REST quotes remain available.'; }
       });
-
-      this.ws.on('error', (err) => {
-        this.status = 'error';
-        this.statusMessage = `Upstox WebSocket error: ${err.message}`;
-      });
-
-      this.ws.on('close', () => {
-        if (!this.isExplicitlyStopped) {
-          this.status = 'disconnected';
-          this.scheduleReconnect();
-        }
-      });
-    } catch (err: any) {
-      this.status = 'error';
-      this.statusMessage = err?.message || 'Upstox WebSocket connection failed';
-      this.scheduleReconnect();
-    }
+      socket.on('error', () => { this.state = 'unavailable'; this.message = 'Upstox feed connection failed; REST quotes remain available.'; });
+      socket.on('close', () => { clearInterval(this.watchdog); if (!this.stopped && generation === this.generation) this.reconnect(); });
+    } catch {
+      if (!this.stopped && generation === this.generation) { this.state = 'unavailable'; this.message = 'Upstox feed authorization/connection unavailable. Check token permissions and network.'; this.reconnect(); }
+    } finally { clearTimeout(timeout); }
   }
-
-  subscribe(instrumentKeys: string[]): void {
-    this.subscribedKeys = instrumentKeys;
-    if (this.ws && this.ws.readyState === WebSocket.OPEN && instrumentKeys.length > 0) {
-      const payload = {
-        guid: `req-${Date.now()}`,
-        method: 'sub',
-        data: {
-          mode: 'ltpc',
-          instrumentKeys,
-        },
-      };
-      this.ws.send(JSON.stringify(payload));
-    }
+  private reconnect() {
+    if (this.stopped || this.timer) return;
+    this.state = 'reconnecting';
+    this.timer = setTimeout(() => { this.timer = undefined; void this.connect(); }, Math.min(60_000, 2000 * 2 ** Math.min(this.attempt++, 5)));
+    this.timer.unref();
   }
-
-  private scheduleReconnect(): void {
-    if (this.isExplicitlyStopped || this.reconnectTimer) return;
-    this.reconnectAttempts++;
-    const delay = Math.min(30_000, 2_000 * Math.pow(1.5, this.reconnectAttempts));
-    this.reconnectTimer = setTimeout(() => {
-      this.reconnectTimer = null;
-      void this.connect();
-    }, delay);
-  }
-
-  stop(): void {
-    this.isExplicitlyStopped = true;
-    if (this.reconnectTimer) {
-      clearTimeout(this.reconnectTimer);
-      this.reconnectTimer = null;
-    }
-    if (this.ws) {
-      this.ws.terminate();
-      this.ws = null;
-    }
-    this.status = 'disconnected';
-    this.statusMessage = 'Upstox WebSocket feed stopped.';
+  stop() {
+    this.stopped = true; this.generation++;
+    clearTimeout(this.timer); this.timer = undefined; clearInterval(this.watchdog); this.controller?.abort();
+    this.ws?.terminate(); this.ws = null;
+    this.state = this.token ? 'idle' : 'UNCONFIGURED'; this.message = this.token ? 'Feed idle; connects when a dashboard subscribes.' : 'Set UPSTOX_ANALYTICS_TOKEN for the one-year read-only Analytics feed.';
   }
 }

@@ -36,8 +36,8 @@ export async function fetchBytes(
     return output;
   } catch (error) {
     if (error instanceof Error && error.message.startsWith('Provider ')) throw error;
-    if (error instanceof Error && ['TimeoutError', 'AbortError'].includes(error.name)) throw new Error('Provider request timed out');
-    throw new Error('Provider network request failed');
+    if (error instanceof Error && ['TimeoutError', 'AbortError'].includes(error.name)) throw new Error('Provider request timed out', { cause: error });
+    throw new Error('Provider network request failed', { cause: error });
   }
 }
 

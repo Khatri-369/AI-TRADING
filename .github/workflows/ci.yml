@@ -15,3 +15,9 @@ jobs:
       - run: npm run lint
       - run: npm test
       - run: npm run build
+      - name: Install Playwright Browsers
+        run: npx playwright install --with-deps chromium
+      - name: Run Browser Tests
+        run: npm run test:browser
+      - name: Build Docker Container
+        run: docker build -t global-markets:ci .

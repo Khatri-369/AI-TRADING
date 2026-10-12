@@ -31,7 +31,7 @@ export class AIServiceError extends Error {
   }
 }
 
-export const DEFAULT_GEMINI_MODEL = 'gemini-3.8-flash';
+export const DEFAULT_GEMINI_MODEL = 'gemini-3.5-flash-lite';
 const FINBERT_URL = 'https://router.huggingface.co/hf-inference/models/ProsusAI/finbert';
 const MAX_RESPONSE_BYTES = 128 * 1024;
 const DISCLAIMER = 'AI-generated signals are informational and are not financial advice. Market data may be delayed. Independently verify information before investing.';

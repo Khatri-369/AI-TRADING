@@ -1,94 +1,422 @@
 import express, { type ErrorRequestHandler, type RequestHandler } from 'express';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
-import { timingSafeEqual } from 'node:crypto';
+import { timingSafeEqual, randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import type { ServerConfig } from './config';
 import { marketService } from './market/index';
 import { liveStreamManager } from './market/liveStream';
 import { analyze, scenario, aiProviderStatuses, AIServiceError } from './ai/index';
+import { aiSpendingGuard } from './ai/spendingGuard';
+import { metrics } from './metrics';
+import { logger } from './logger';
 import { ASSET_BY_SYMBOL, HISTORY_RANGES } from '../shared/assets';
 
-const headlineInput = z.object({
-  headline: z.string().trim().min(5).max(2000),
-  engine: z.enum(['gemini', 'finbert']).default('gemini'),
-  symbol: z.string().max(30).refine((value) => ASSET_BY_SYMBOL.has(value), 'Unknown asset').optional(),
-}).strict();
+const headlineInput = z
+  .object({
+    headline: z.string().trim().min(5).max(2000),
+    engine: z.enum(['gemini', 'finbert']).default('gemini'),
+    symbol: z
+      .string()
+      .max(30)
+      .refine((value) => ASSET_BY_SYMBOL.has(value), 'Unknown asset')
+      .optional(),
+  })
+  .strict();
+
 const scenarioInput = z.object({ scenario: z.string().trim().min(10).max(2000) }).strict();
 const historyRange = z.enum(HISTORY_RANGES);
-const asyncRoute = (handler: RequestHandler): RequestHandler => (req, res, next) => {
-  Promise.resolve(handler(req, res, next)).catch(next);
+
+const asyncRoute =
+  (handler: RequestHandler): RequestHandler =>
+  (req, res, next) => {
+    Promise.resolve(handler(req, res, next)).catch(next);
+  };
+
+/**
+ * Extract or generate a client session identifier for quota tracking.
+ * Uses an httpOnly secure session cookie or client IP.
+ */
+function getClientId(req: express.Request, res: express.Response): string {
+  const cookieHeader = req.headers.cookie ?? '';
+  const match = cookieHeader.match(/market_session=([a-zA-Z0-9_-]+)/);
+  let sessionId = match ? match[1] : undefined;
+  if (!sessionId) {
+    sessionId = randomUUID();
+    res.cookie('market_session', sessionId, {
+      path: '/',
+      httpOnly: true,
+      sameSite: 'lax',
+      secure: req.secure || req.headers['x-forwarded-proto'] === 'https',
+      maxAge: 30 * 24 * 3600 * 1000,
+    });
+  }
+  const clientIp = req.ip || req.socket.remoteAddress || '127.0.0.1';
+  return `${clientIp}:${sessionId}`;
+}
+
+/**
+ * Verify administrative authorization for diagnostics or unlimited quota bypass.
+ */
+function isAdminRequest(req: express.Request, adminToken?: string): boolean {
+  if (!adminToken) return false;
+  const authHeader = req.get('authorization')?.replace(/^Bearer\s+/i, '') || req.get('x-admin-token');
+  if (!authHeader) return false;
+  const supplied = Buffer.from(authHeader);
+  const expected = Buffer.from(adminToken);
+  return supplied.length === expected.length && timingSafeEqual(supplied, expected);
+}
+
+/**
+ * Anti-CSRF verification on POST endpoints.
+ * Requires custom request header (standard defense for single-page web apps).
+ */
+const csrfProtection: RequestHandler = (req, res, next) => {
+  if (req.method === 'POST') {
+    const hasHeader = req.headers['x-requested-with'] || req.headers['x-csrf-token'];
+    if (!hasHeader) {
+      res.status(403).json({
+        error: 'Security header missing (X-Requested-With required). CSRF verification failed.',
+        code: 'CSRF_VERIFICATION_FAILED',
+      });
+      return;
+    }
+  }
+  next();
 };
 
 export function createApp(config: ServerConfig, production = config.NODE_ENV === 'production') {
   const app = express();
   app.disable('x-powered-by');
   app.set('trust proxy', config.TRUST_PROXY_HOPS);
-  app.use(helmet({
-    contentSecurityPolicy: production ? {
-      directives: {
-        defaultSrc: ["'self'"], scriptSrc: ["'self'"],
-        styleSrc: ["'self'", "'unsafe-inline'"], imgSrc: ["'self'", 'data:'],
-        connectSrc: ["'self'"], fontSrc: ["'self'"], objectSrc: ["'none'"],
-        upgradeInsecureRequests: null,
-      },
-    } : false,
-    strictTransportSecurity: production ? undefined : false,
-  }));
-  app.use('/api', (_req, res, next) => { res.set('Cache-Control', 'no-store'); next(); });
-  app.use('/api', rateLimit({ windowMs: 60_000, limit: 120, standardHeaders: 'draft-8', legacyHeaders: false,
-    message: { error: 'Too many requests. Try again shortly.', code: 'RATE_LIMITED' } }));
+
+  // Set SSE streaming capacity from config
+  liveStreamManager.setMaxClients(config.SSE_MAX_CLIENTS);
+
+  // Production security headers
+  app.use(
+    helmet({
+      contentSecurityPolicy: production
+        ? {
+            directives: {
+              defaultSrc: ["'self'"],
+              scriptSrc: ["'self'"],
+              styleSrc: ["'self'", "'unsafe-inline'"],
+              imgSrc: ["'self'", 'data:'],
+              connectSrc: ["'self'"],
+              fontSrc: ["'self'"],
+              objectSrc: ["'none'"],
+              baseUri: ["'self'"],
+              formAction: ["'self'"],
+              frameAncestors: ["'none'"],
+              upgradeInsecureRequests: null,
+            },
+          }
+        : false,
+      strictTransportSecurity: production
+        ? {
+            maxAge: 31536000,
+            includeSubDomains: true,
+            preload: true,
+          }
+        : false,
+      xContentTypeOptions: true,
+      frameguard: { action: 'deny' },
+      referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
+    })
+  );
+
+  // Global API no-store & metrics recorder
+  app.use('/api', (req, res, next) => {
+    res.set('Cache-Control', 'no-store, no-cache, must-revalidate');
+    const start = Date.now();
+    res.on('finish', () => {
+      metrics.recordRequest(res.statusCode >= 500);
+      if (res.statusCode >= 500) {
+        logger.warn(`${req.method} ${req.originalUrl} failed with status ${res.statusCode} (${Date.now() - start}ms)`);
+      }
+    });
+    next();
+  });
+
+  // Global API rate limiter (120 req/min)
+  app.use(
+    '/api',
+    rateLimit({
+      windowMs: 60_000,
+      limit: 120,
+      standardHeaders: 'draft-8',
+      legacyHeaders: false,
+      message: { error: 'Too many requests. Please try again shortly.', code: 'RATE_LIMITED' },
+    })
+  );
+
   app.use(express.json({ limit: '16kb', strict: true }));
+
+  /**
+   * Sanitized Public Health Endpoint.
+   * Publicly accessible, fast, discloses zero internal keys or unmasked hostnames.
+   */
   app.get('/api/health', (_req, res) => {
-    res.json({ status: 'ok', generatedAt: new Date().toISOString(),
-      providers: [...marketService.providerStatuses(), ...aiProviderStatuses()],
-      aiAccess: config.AI_ACCESS_TOKEN ? 'protected' : production ? 'disabled' : 'local',
+    const rawProviders = [...marketService.providerStatuses(), ...aiProviderStatuses()];
+    const providers = rawProviders.map((p) => ({
+      id: p.id,
+      name: p.name,
+      status: p.configured ? 'connected' : 'unconfigured',
+    }));
+
+    const isDegraded = rawProviders.some(
+      (p) => p.configured && (p.status === 'unavailable' || p.status === 'rate-limited')
+    );
+
+    res.json({
+      status: isDegraded ? 'degraded' : 'ok',
+      version: '1.0.0',
+      uptimeSeconds: metrics.getUptimeSeconds(),
+      generatedAt: new Date().toISOString(),
+      providers,
+      aiAccess: !production
+        ? 'local'
+        : config.ANONYMOUS_AI_QUOTA_ENABLED
+        ? 'anonymous_quota'
+        : config.ADMIN_DIAGNOSTICS_TOKEN
+        ? 'protected'
+        : 'disabled',
     });
   });
-  app.get('/api/markets/overview', asyncRoute(async (_req, res) => { res.json(await marketService.overview()); }));
-  for (const category of ['us', 'india', 'crypto', 'commodities', 'forex']) {
-    app.get(`/api/markets/${category}`, asyncRoute(async (_req, res) => {
-      const overview = await marketService.overview();
-      res.json({ ...overview, quotes: overview.quotes.filter((quote) => quote.category === category) });
-    }));
-  }
-  app.get('/api/markets/history/:symbol', asyncRoute(async (req, res) => {
-    const symbol = String(req.params.symbol);
-    if (!ASSET_BY_SYMBOL.has(symbol)) { res.status(404).json({ error: 'Unknown asset.', code: 'UNKNOWN_ASSET' }); return; }
-    const range = historyRange.safeParse(req.query.range ?? '1M');
-    if (!range.success) { res.status(400).json({ error: 'Unsupported history range.', code: 'INVALID_INPUT' }); return; }
-    res.json(await marketService.history(symbol, range.data));
-  }));
-  liveStreamManager.start();
-  app.get('/api/stream/live-ticks', (_req, res) => { liveStreamManager.addClient(res); });
-  app.get('/api/news', asyncRoute(async (_req, res) => { res.json(await marketService.news()); }));
-  app.use('/api/ai', (req, res, next) => {
-    // This application access token protects paid quota; it is never a provider key.
-    if (!config.AI_ACCESS_TOKEN) {
-      if (!production) { next(); return; }
-      res.status(503).json({ error: 'AI access is disabled until the server administrator configures AI_ACCESS_TOKEN.', code: 'AI_ACCESS_DISABLED', engineStatus: 'unavailable' }); return;
+
+  /**
+   * Protected Administrative Diagnostics Endpoint.
+   * Requires ADMIN_DIAGNOSTICS_TOKEN.
+   */
+  app.get('/api/admin/diagnostics', (req, res) => {
+    if (!config.ADMIN_DIAGNOSTICS_TOKEN) {
+      res.status(403).json({
+        error: 'Administrative diagnostics are disabled on this instance.',
+        code: 'ADMIN_DIAGNOSTICS_DISABLED',
+      });
+      return;
     }
-    const supplied = Buffer.from(req.get('authorization')?.replace(/^Bearer /, '') ?? '');
-    const expected = Buffer.from(config.AI_ACCESS_TOKEN);
-    if (supplied.length !== expected.length || !timingSafeEqual(supplied, expected)) {
-      res.status(401).json({ error: 'An application access token is required for AI requests.', code: 'AI_ACCESS_REQUIRED', engineStatus: 'unavailable' }); return;
+    if (!isAdminRequest(req, config.ADMIN_DIAGNOSTICS_TOKEN)) {
+      res.status(401).json({
+        error: 'Administrative authorization token required.',
+        code: 'UNAUTHORIZED',
+      });
+      return;
+    }
+
+    res.json({
+      status: 'ok',
+      timestamp: new Date().toISOString(),
+      system: metrics.getDetailedDiagnostics(),
+      aiSpending: aiSpendingGuard.getSpendingMetrics(),
+      rawProviders: [...marketService.providerStatuses(), ...aiProviderStatuses()],
+    });
+  });
+
+  /**
+   * Public Markets Data
+   */
+  app.get(
+    '/api/markets/overview',
+    asyncRoute(async (_req, res) => {
+      res.json(await marketService.overview());
+    })
+  );
+
+  for (const category of ['us', 'india', 'crypto', 'commodities', 'forex'] as const) {
+    app.get(
+      `/api/markets/${category}`,
+      asyncRoute(async (_req, res) => {
+        const overview = await marketService.overview(category);
+        res.json({ ...overview, quotes: overview.quotes.filter((quote) => quote.category === category) });
+      })
+    );
+  }
+
+  app.get(
+    '/api/markets/history/:symbol',
+    asyncRoute(async (req, res) => {
+      const symbol = String(req.params.symbol);
+      if (!ASSET_BY_SYMBOL.has(symbol)) {
+        res.status(404).json({ error: 'Unknown asset.', code: 'UNKNOWN_ASSET' });
+        return;
+      }
+      const range = historyRange.safeParse(req.query.range ?? '1M');
+      if (!range.success) {
+        res.status(400).json({ error: 'Unsupported history range.', code: 'INVALID_INPUT' });
+        return;
+      }
+      res.json(await marketService.history(symbol, range.data));
+    })
+  );
+
+  /**
+   * Server-Sent Events (SSE) Live Feed.
+   * Configured for reverse proxy streaming with heartbeats & connection limits.
+   */
+  app.get('/api/stream/live-ticks', (req, res) => {
+    liveStreamManager.addClient(req, res);
+  });
+
+  app.get(
+    '/api/news',
+    asyncRoute(async (_req, res) => {
+      res.json(await marketService.news());
+    })
+  );
+
+  /**
+   * AI Quota Status Check.
+   * Tells the frontend how many AI queries remain in the current session.
+   */
+  app.get('/api/ai/quota', (req, res) => {
+    const isAdmin = isAdminRequest(req, config.ADMIN_DIAGNOSTICS_TOKEN);
+    const clientId = getClientId(req, res);
+    const status = aiSpendingGuard.checkQuota(clientId, isAdmin);
+    res.json(status);
+  });
+
+  /**
+   * AI Access Gate Middleware.
+   * Checks whether AI is globally disabled or requires admin authorization.
+   */
+  app.use('/api/ai', (req, res, next) => {
+    const isAdmin = isAdminRequest(req, config.ADMIN_DIAGNOSTICS_TOKEN);
+
+    // If anonymous quota is disabled, require admin token
+    if (!config.ANONYMOUS_AI_QUOTA_ENABLED && !isAdmin) {
+      if (!production) {
+        next();
+        return;
+      }
+      if (!config.ADMIN_DIAGNOSTICS_TOKEN) {
+        res.status(503).json({
+          error: 'AI access is disabled until the server administrator configures access.',
+          code: 'AI_ACCESS_DISABLED',
+          engineStatus: 'unavailable',
+        });
+        return;
+      }
+      res.status(401).json({
+        error: 'An application access token is required for AI requests.',
+        code: 'AI_ACCESS_REQUIRED',
+        engineStatus: 'unavailable',
+      });
+      return;
     }
     next();
   });
-  app.use('/api/ai', rateLimit({ windowMs: 60_000, limit: 10, standardHeaders: 'draft-8', legacyHeaders: false,
-    message: { error: 'AI request limit reached. Try again in a minute.', code: 'RATE_LIMITED', engineStatus: 'unavailable' } }));
-  app.post('/api/ai/analyze', asyncRoute(async (req, res) => {
-    const input = headlineInput.safeParse(req.body);
-    if (!input.success) { res.status(400).json({ error: 'Provide a headline (5–2000 characters), a supported engine and optional known symbol.', code: 'INVALID_INPUT' }); return; }
-    const context = input.data.engine === 'gemini' && process.env.GEMINI_API_KEY ? await buildContext(input.data.symbol) : undefined;
-    res.json(await analyze(input.data, context));
-  }));
-  app.post('/api/ai/scenario', asyncRoute(async (req, res) => {
-    const input = scenarioInput.safeParse(req.body);
-    if (!input.success) { res.status(400).json({ error: 'Provide a scenario of 10–2000 characters.', code: 'INVALID_INPUT' }); return; }
-    res.json(await scenario(input.data, process.env.GEMINI_API_KEY ? await buildContext() : undefined));
-  }));
-  app.use('/api', (_req, res) => { res.status(404).json({ error: 'API endpoint not found.', code: 'NOT_FOUND' }); });
+
+  // Dedicated AI request limiter (10 req/min per IP)
+  app.use(
+    '/api/ai',
+    rateLimit({
+      windowMs: 60_000,
+      limit: 10,
+      standardHeaders: 'draft-8',
+      legacyHeaders: false,
+      message: {
+        error: 'AI request limit reached. Try again in a minute.',
+        code: 'RATE_LIMITED',
+        engineStatus: 'unavailable',
+      },
+    })
+  );
+
+  /**
+   * AI Headline & Momentum Analysis.
+   */
+  app.post(
+    '/api/ai/analyze',
+    csrfProtection,
+    asyncRoute(async (req, res) => {
+      const isAdmin = isAdminRequest(req, config.ADMIN_DIAGNOSTICS_TOKEN);
+      const clientId = getClientId(req, res);
+
+      let releaseSlot: (() => void) | undefined;
+      try {
+        releaseSlot = aiSpendingGuard.acquire(clientId, isAdmin);
+      } catch (cause) {
+        const quotaErr = cause as { code: string; status: number; message: string; resetInSeconds?: number };
+        if (quotaErr.resetInSeconds) {
+          res.set('Retry-After', String(quotaErr.resetInSeconds));
+        }
+        res.status(quotaErr.status || 429).json({
+          error: quotaErr.message,
+          code: quotaErr.code,
+          engineStatus: 'unavailable',
+        });
+        return;
+      }
+
+      try {
+        const input = headlineInput.safeParse(req.body);
+        if (!input.success) {
+          res.status(400).json({
+            error: 'Provide a headline (5–2000 characters), a supported engine and optional known symbol.',
+            code: 'INVALID_INPUT',
+          });
+          return;
+        }
+
+        const context =
+          input.data.engine === 'gemini' && process.env.GEMINI_API_KEY
+            ? await buildContext(input.data.symbol)
+            : undefined;
+
+        res.json(await analyze(input.data, context));
+      } finally {
+        releaseSlot?.();
+      }
+    })
+  );
+
+  /**
+   * AI Macro Scenario Modeling.
+   */
+  app.post(
+    '/api/ai/scenario',
+    csrfProtection,
+    asyncRoute(async (req, res) => {
+      const isAdmin = isAdminRequest(req, config.ADMIN_DIAGNOSTICS_TOKEN);
+      const clientId = getClientId(req, res);
+
+      let releaseSlot: (() => void) | undefined;
+      try {
+        releaseSlot = aiSpendingGuard.acquire(clientId, isAdmin);
+      } catch (cause) {
+        const quotaErr = cause as { code: string; status: number; message: string; resetInSeconds?: number };
+        if (quotaErr.resetInSeconds) {
+          res.set('Retry-After', String(quotaErr.resetInSeconds));
+        }
+        res.status(quotaErr.status || 429).json({
+          error: quotaErr.message,
+          code: quotaErr.code,
+          engineStatus: 'unavailable',
+        });
+        return;
+      }
+
+      try {
+        const input = scenarioInput.safeParse(req.body);
+        if (!input.success) {
+          res.status(400).json({ error: 'Provide a scenario of 10–2000 characters.', code: 'INVALID_INPUT' });
+          return;
+        }
+
+        res.json(await scenario(input.data, process.env.GEMINI_API_KEY ? await buildContext() : undefined));
+      } finally {
+        releaseSlot?.();
+      }
+    })
+  );
+
+  // Fallthrough for unmatched /api routes
+  app.use('/api', (_req, res) => {
+    res.status(404).json({ error: 'API endpoint not found.', code: 'NOT_FOUND' });
+  });
+
   app.use(apiErrorHandler);
   return app;
 }
@@ -97,19 +425,32 @@ async function buildContext(symbol?: string) {
   const results = await Promise.allSettled([marketService.overview(), marketService.news()]);
   const overview = results[0].status === 'fulfilled' ? results[0].value : null;
   const news = results[1].status === 'fulfilled' ? results[1].value : null;
-  return { generatedAt: overview?.generatedAt,
+  return {
+    generatedAt: overview?.generatedAt,
     quotes: overview?.quotes.filter((quote) => !symbol || quote.symbol === symbol),
-    news: news?.articles.slice(0, 8), newsStatus: news?.status ?? 'unavailable' };
+    news: news?.articles.slice(0, 8),
+    newsStatus: news?.status ?? 'unavailable',
+  };
 }
 
 export const apiErrorHandler: ErrorRequestHandler = (error: unknown, _req, res, _next) => {
   if (res.headersSent) return;
   if (error instanceof AIServiceError) {
-    res.status(error.status).json({ error: error.message, code: error.code, engine: error.engine, engineStatus: 'unavailable' }); return;
+    res.status(error.status).json({
+      error: error.message,
+      code: error.code,
+      engine: error.engine,
+      engineStatus: 'unavailable',
+    });
+    return;
   }
   if (error && typeof error === 'object' && 'status' in error && (error.status === 400 || error.status === 413)) {
-    res.status(error.status).json({ error: error.status === 413 ? 'Request body is too large.' : 'Invalid JSON request.', code: 'INVALID_INPUT' }); return;
+    res.status(error.status).json({
+      error: error.status === 413 ? 'Request body is too large.' : 'Invalid JSON request.',
+      code: 'INVALID_INPUT',
+    });
+    return;
   }
-  console.error('Request failed unexpectedly.');
+  logger.error('Unhandled request exception', error);
   res.status(500).json({ error: 'The request could not be completed. Please try again.', code: 'INTERNAL_ERROR' });
 };
