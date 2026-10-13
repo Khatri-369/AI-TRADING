@@ -20,6 +20,7 @@ interface Props {
   quote: Quote;
   onClose: () => void;
   onAsk: () => void;
+  onWorkspace: () => void;
   engine: Engine;
   onEngine: (engine: Engine) => void;
   entry?: AnalysisEntry;
@@ -33,6 +34,7 @@ export default function AssetDetail({
   quote,
   onClose,
   onAsk,
+  onWorkspace,
   engine,
   onEngine,
   entry,
@@ -116,6 +118,7 @@ export default function AssetDetail({
           <div>
             <div className="flex flex-wrap items-center gap-2">
               <button className="button-secondary mb-2" onClick={onAsk}><Bot size={16} />Ask about {quote.symbol}</button>
+              <button className="button-secondary mb-2" onClick={onWorkspace}><ChartIcon size={16} />Open chart workspace</button>
               <h2 id="asset-detail-title" className="text-xl sm:text-2xl font-bold tracking-tight text-[var(--text-primary)]">
                 {quote.symbol}
               </h2>

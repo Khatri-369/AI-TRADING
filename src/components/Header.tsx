@@ -42,6 +42,7 @@ export const navItems = [
   { id: 'overview' as Tab, label: 'Overview', path: '/', icon: LayoutDashboard },
   { id: 'markets' as Tab, label: 'Markets', path: '/markets', icon: BarChart3 },
   { id: 'watchlist' as Tab, label: 'Watchlist', path: '/watchlist', icon: Star },
+  { id: 'desk' as Tab, label: 'Research desk', path: '/desk', icon: BarChart3 },
   { id: 'news' as Tab, label: 'News & Sentiment', path: '/news', icon: Newspaper },
   { id: 'scenarios' as Tab, label: 'Scenarios', path: '/scenarios', icon: FlaskConical },
   { id: 'diagnostics' as Tab, label: 'Diagnostics', path: '/diagnostics', icon: ShieldCheck },

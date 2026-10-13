@@ -1,4 +1,4 @@
-import { DatabaseSync } from 'node:sqlite';
+import { createRequire } from 'node:module';
 import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { randomBytes, createHash, scrypt as scryptCallback, timingSafeEqual } from 'node:crypto';
@@ -6,6 +6,15 @@ import { promisify } from 'node:util';
 import { recordSchemas, type RecordKind, type ResearchRecord, type PriceAlert } from '../../shared/research';
 import { ASSET_BY_SYMBOL } from '../../shared/assets';
 import type { Quote } from '../../shared/types';
+
+const req = createRequire(import.meta.url);
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let DatabaseSyncConstructor: any = null;
+try {
+  DatabaseSyncConstructor = req('node:sqlite').DatabaseSync;
+} catch {
+  // node:sqlite is an experimental feature not enabled in all runtime environments (e.g. serverless)
+}
 
 const scrypt = promisify(scryptCallback);
 export const digest = (value: string) => createHash('sha256').update(value).digest('hex');
@@ -21,10 +30,14 @@ export function inQuietHours(alert: PriceAlert, time: number) {
   return alert.quietStart !== alert.quietEnd && (alert.quietStart < alert.quietEnd ? hour >= alert.quietStart && hour < alert.quietEnd : hour >= alert.quietStart || hour < alert.quietEnd);
 }
 export class WorkspaceStore {
-  readonly db: DatabaseSync;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  readonly db: any;
   constructor(path: string) {
+    if (!DatabaseSyncConstructor) {
+      throw new WorkspaceError(503, 'SQLite database is not supported in this runtime environment.');
+    }
     if (path !== ':memory:') mkdirSync(dirname(path), { recursive: true });
-    this.db = new DatabaseSync(path);
+    this.db = new DatabaseSyncConstructor(path);
     this.db.exec(`PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON; PRAGMA busy_timeout=5000;
       CREATE TABLE IF NOT EXISTS migrations(version INTEGER PRIMARY KEY);
       CREATE TABLE IF NOT EXISTS users(id INTEGER PRIMARY KEY, username TEXT UNIQUE NOT NULL, password TEXT NOT NULL);

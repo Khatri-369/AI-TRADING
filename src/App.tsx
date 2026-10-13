@@ -20,6 +20,7 @@ import { ASSET_BY_SYMBOL } from '../shared/assets';
 const AssetDetail = lazy(() => import('./components/AssetDetail'));
 const ResearchChat = lazy(() => import('./components/ResearchChat'));
 const WatchlistPage = lazy(() => import('./components/WatchlistPage'));
+const ResearchDesk = lazy(() => import('./components/ResearchDesk'));
 
 class ErrorBoundary extends Component<{ children: ReactNode }, { failed: boolean }> {
   state = { failed: false };
@@ -107,6 +108,7 @@ function MainApp() {
   const handleNavigate = (page: Tab) => {
     switch (page) {
       case 'watchlist':
+      case 'desk':
         navigate(`/${page}`);
         break;
       case 'overview':
@@ -272,6 +274,7 @@ function MainApp() {
           )}
 
           {/* PAGE ROUTING */}
+          {route.page === 'desk' && <Suspense fallback={<Loading label="Loading research desk…" />}><ResearchDesk theme={theme} initialSymbol={new URLSearchParams(window.location.search).get('symbol') ?? 'RELIANCE'} /></Suspense>}
           {route.page === 'watchlist' && <Suspense fallback={<Loading label="Loading watchlist…" />}><WatchlistPage quotes={market.quotes} loading={market.loading} onSelect={handleSelectAsset} /></Suspense>}
           {route.page === 'overview' && (
             <div role="tabpanel" id="panel-overview" aria-labelledby="tab-overview">
@@ -434,6 +437,7 @@ function MainApp() {
             key={currentQuote.symbol}
             quote={currentQuote}
             onClose={handleCloseAsset}
+            onWorkspace={() => navigate(`/desk?symbol=${encodeURIComponent(currentQuote.symbol)}`)}
             onAsk={() => { setChatSymbol(currentQuote.symbol); setChatOpen(true); navigate('/markets'); }}
             engine={engine}
             onEngine={setEngine}

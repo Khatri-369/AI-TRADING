@@ -292,3 +292,6 @@
     scroll-behavior: auto !important;
   }
 }
+@layer components {
+  .research-card { border: 1px solid var(--border-default); background: var(--bg-surface); border-radius: .75rem; padding: 1rem; min-width: 0; }
+}
