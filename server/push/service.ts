@@ -77,6 +77,28 @@ export class NewsPushService {
       await this.persist();
     });
   }
+  async test(input: unknown) {
+    const subscription = subscriptionSchema.parse(input);
+    return this.exclusive(async () => {
+      const payload = JSON.stringify({
+        title: '🔔 Market Alert (Test)',
+        body: 'Real-time alerts active! You will receive notifications when breaking market news arrives.',
+        tag: 'market-alert-test',
+        url: '/news'
+      });
+      if (this.options.send) await this.options.send(subscription, payload);
+      else await webpush.sendNotification(subscription, payload, {
+        TTL: 300,
+        urgency: 'high',
+        timeout: 8000,
+        vapidDetails: {
+          subject: this.options.subject!,
+          publicKey: this.options.publicKey!,
+          privateKey: this.options.privateKey!
+        }
+      });
+    });
+  }
   async deliver(news: NewsResponse) {
     if (news.status === 'unavailable' || news.status === 'stale') return;
     return this.exclusive(async () => {

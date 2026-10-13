@@ -159,7 +159,7 @@ export function createApp(config: ServerConfig, production = config.NODE_ENV ===
 
   app.get('/api/notifications/config', asyncRoute(async (_req, res) => { res.json(await newsPush.status()); }));
   const notificationLimit = rateLimit({ windowMs: 60000, limit: 10, message: { error: 'Too many notification changes. Try again shortly.' } });
-  for (const action of ['subscribe', 'unsubscribe'] as const) {
+  for (const action of ['subscribe', 'unsubscribe', 'test'] as const) {
     app.post(`/api/notifications/${action}`, notificationLimit, csrfProtection, asyncRoute(async (req, res) => {
       const parsed = subscriptionSchema.safeParse(req.body);
       if (!parsed.success) { res.status(400).json({ error: 'Unsupported or invalid browser push subscription.' }); return; }
@@ -167,6 +167,11 @@ export function createApp(config: ServerConfig, production = config.NODE_ENV ===
       catch { res.status(503).json({ error: 'Notifications could not be updated. Check server configuration or try later.' }); }
     }));
   }
+  app.get('/api/cron/news', asyncRoute(async (_req, res) => {
+    const news = await marketService.news();
+    await newsPush.deliver(news);
+    res.json({ ok: true, count: news.articles.length, timestamp: new Date().toISOString() });
+  }));
 
   /**
    * Sanitized Public Health Endpoint.
@@ -277,7 +282,9 @@ export function createApp(config: ServerConfig, production = config.NODE_ENV ===
   app.get(
     '/api/news',
     asyncRoute(async (_req, res) => {
-      res.json(await marketService.news());
+      const news = await marketService.news();
+      void newsPush.deliver(news).catch(() => undefined);
+      res.json(news);
     })
   );
 

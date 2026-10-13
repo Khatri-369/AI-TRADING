@@ -15,15 +15,19 @@ self.addEventListener('fetch', event => {
 self.addEventListener('push', event => {
   let message = {};
   try { message = event.data?.json() ?? {}; } catch { /* Use a safe generic notification. */ }
-  event.waitUntil(self.registration.showNotification('Market news', {
+  const title = typeof message.title === 'string' ? message.title : 'Market news';
+  event.waitUntil(self.registration.showNotification(title, {
     body: typeof message.body === 'string' ? message.body.slice(0, 180) : 'New market news is available.',
-    icon: '/icons/markets-192.png', badge: '/icons/markets-192.png', tag: 'market-news',
-    data: { url: '/news' },
+    icon: '/icons/markets-192.png', badge: '/icons/markets-192.png',
+    tag: typeof message.tag === 'string' ? message.tag : 'market-news',
+    vibrate: [200, 100, 200],
+    data: { url: typeof message.url === 'string' ? message.url : '/news' },
   }));
 });
 self.addEventListener('notificationclick', event => {
   event.notification.close();
-  const destination = new URL('/news', self.location.origin).href;
+  const targetUrl = event.notification.data?.url || '/news';
+  const destination = new URL(targetUrl, self.location.origin).href;
   event.waitUntil(self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(async clients => {
     for (const client of clients) {
       if (new URL(client.url).origin === self.location.origin) { await client.navigate(destination); return client.focus(); }

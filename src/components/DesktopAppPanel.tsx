@@ -79,16 +79,48 @@ export default function DesktopAppPanel({ open, onClose }: { open: boolean; onCl
     } catch (error) { setMessage(error instanceof Error ? error.message : 'Could not disable alerts.'); }
     finally { setBusy(false); }
   }
+  async function sendTest() {
+    if (busy) return;
+    setBusy(true); setMessage('');
+    try {
+      const registration = await navigator.serviceWorker.getRegistration();
+      const subscription = await registration?.pushManager.getSubscription();
+      if (!subscription) throw new Error('Enable news alerts first before sending a test alert.');
+      const response = await fetch('/api/notifications/test', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+        body: JSON.stringify(subscription.toJSON()),
+        signal: AbortSignal.timeout(10000),
+      });
+      if (!response.ok) throw new Error('Could not send test notification. Please verify your connection.');
+      setMessage('🔔 Test alert sent! Check your notification tray.');
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'Could not send test alert.');
+    } finally {
+      setBusy(false);
+    }
+  }
   return <dialog ref={dialog} onCancel={onClose} onClose={onClose} className="m-auto max-h-[calc(100dvh-32px)] overflow-y-auto w-[min(560px,calc(100vw-24px))] rounded-2xl border border-[var(--border-default)] bg-[var(--bg-surface)] text-[var(--text-primary)] p-5 backdrop:bg-black/50" aria-labelledby="desktop-title">
     <div className="flex items-center justify-between gap-3"><h2 id="desktop-title" className="text-lg font-semibold">Desktop app & news alerts</h2><button className="icon-button" aria-label="Close desktop settings" onClick={onClose}><X size={18} /></button></div>
     <section className="mt-5 space-y-3"><h3 className="flex items-center gap-2 font-medium"><Download size={18} />Keep your markets one click away</h3><p className="text-sm text-[var(--text-secondary)]">Install this website as an app for its own window and quick access to your watchlist, news and research.</p>
       <button className="button-primary" disabled={installed || !install} onClick={async () => { if (!install) return; try { await install.prompt(); const choice = await install.userChoice; setMessage(choice.outcome === 'accepted' ? 'Installation requested. Your browser will finish setup.' : 'Installation dismissed. You can install from the browser menu later.'); } catch { setMessage('Use your browser menu to install this app.'); } finally { setInstall(null); } }}>{installed ? 'App is installed' : 'Install desktop app'}</button>
       {!installed && !install && <p className="text-xs leading-5 text-[var(--text-muted)]">In Chrome or Edge, open the browser menu and look for “Install app” or “Apps → Install this site as an app”. Your browser may offer a desktop shortcut. On iPhone/iPad, use Safari → Share → Add to Home Screen. Installation options depend on the browser.</p>}
     </section>
-    <section className="mt-5 border-t border-[var(--border-subtle)] pt-5 space-y-3"><h3 className="flex items-center gap-2 font-medium"><Bell size={18} />Latest market headlines</h3><p className="text-sm text-[var(--text-secondary)]">Opt in to background news alerts, even when this app’s window is closed. The server checks every five minutes and sends at most one newest-headline alert per check.</p>
+    <section className="mt-5 border-t border-[var(--border-subtle)] pt-5 space-y-3"><h3 className="flex items-center gap-2 font-medium"><Bell size={18} />Latest market headlines & mobile alerts</h3><p className="text-sm text-[var(--text-secondary)]">Opt in to background news alerts on mobile and desktop, even when this app’s window is closed. The server sends real-time alerts when new headlines arrive.</p>
       {!supported ? <p className="text-sm">Push notifications require a supported browser and HTTPS. On iPhone/iPad, install the app first.</p> : <>
         {config && !config.configured && <p className="text-sm">Background alerts are not configured on this server yet. News remains available in the News section.</p>}
-        <div className="flex flex-wrap gap-2"><button className="button-primary" disabled={busy || !config?.configured} onClick={() => void enable()}>{busy ? 'Updating…' : subscribed ? 'Renew news alerts' : 'Enable news alerts'}</button>{subscribed && <button className="button-secondary" disabled={busy} onClick={() => void disable()}>Disable alerts</button>}</div>
+        <div className="flex flex-wrap items-center gap-2">
+          <button className="button-primary" disabled={busy || !config?.configured} onClick={() => void enable()}>{busy ? 'Updating…' : subscribed ? 'Renew news alerts' : 'Enable news alerts'}</button>
+          {subscribed && <>
+            <button className="button-secondary" disabled={busy} onClick={() => void sendTest()}>Send test alert</button>
+            <button className="button-secondary" disabled={busy} onClick={() => void disable()}>Disable alerts</button>
+          </>}
+        </div>
+        <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface-elevated)] p-3 text-xs text-[var(--text-secondary)] space-y-1">
+          <p className="font-semibold text-[var(--text-primary)]">📱 Mobile Notification Access</p>
+          <p>• <strong>Android:</strong> Tap “Enable news alerts” and approve notifications in Chrome/Edge.</p>
+          <p>• <strong>iPhone / iOS (16.4+):</strong> In Safari, tap <strong>Share ⎋</strong> → <strong>Add to Home Screen ⊕</strong>, then open the installed app and enable alerts.</p>
+        </div>
       </>}
       <p className="text-xs leading-5 text-[var(--text-muted)]">Delivery depends on browser/OS settings and connectivity; alerts are not instant trading signals. Subscriptions expire after 90 days unless renewed. We store this browser’s push endpoint and encryption keys on the server to deliver alerts. Disable alerts to remove them. No historical headline flood when you subscribe.</p>
     </section>
