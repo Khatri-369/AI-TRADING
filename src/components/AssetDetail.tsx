@@ -8,13 +8,14 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
-import { Bot, Sparkles, X, Table, LineChart as ChartIcon } from 'lucide-react';
+import { Bot, Sparkles, X, Table, LineChart as ChartIcon, CandlestickChart } from 'lucide-react';
 import type { AnalysisEntry, Engine, HistoryRange, Quote, ThemeType } from '../types/market';
 import { errorMessage, getHistory } from '../services/api';
 import { changeClass, formatPercent, formatPrice, formatTime } from '../utils/format';
 import { Empty, ErrorNotice, Loading } from './Feedback';
 import AnalysisResult from './AnalysisResult';
 import StatusBadge from './StatusBadge';
+import CandleWorkspace from './CandleWorkspace';
 
 interface Props {
   quote: Quote;
@@ -43,7 +44,7 @@ export default function AssetDetail({
 }: Props) {
   const dialog = useRef<HTMLDialogElement>(null);
   const [range, setRange] = useState<HistoryRange>('1M');
-  const [viewMode, setViewMode] = useState<'chart' | 'table'>('chart');
+  const [viewMode, setViewMode] = useState<'chart' | 'candles' | 'table'>('chart');
   const [history, setHistory] = useState<Awaited<ReturnType<typeof getHistory>> | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -229,6 +230,20 @@ export default function AssetDetail({
                 </button>
                 <button
                   type="button"
+                  onClick={() => setViewMode('candles')}
+                  aria-pressed={viewMode === 'candles'}
+                  className={`flex items-center gap-1 rounded px-2 py-1 text-xs font-medium transition ${
+                    viewMode === 'candles'
+                      ? 'bg-[var(--accent-primary)] text-white'
+                      : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+                  }`}
+                  title="Display interactive candlestick chart with drawing tools"
+                >
+                  <CandlestickChart className="h-3.5 w-3.5" />
+                  <span>Candles</span>
+                </button>
+                <button
+                  type="button"
                   onClick={() => setViewMode('table')}
                   aria-pressed={viewMode === 'table'}
                   className={`flex items-center gap-1 rounded px-2 py-1 text-xs font-medium transition ${
@@ -244,27 +259,37 @@ export default function AssetDetail({
               </div>
             </div>
 
-            {/* Range Controls */}
-            <div className="flex flex-wrap gap-1" aria-label="History time range selector">
-              {ranges.map((v) => (
-                <button
-                  key={v}
-                  type="button"
-                  aria-pressed={range === v}
-                  onClick={() => setRange(v)}
-                  className={`rounded px-2.5 py-1 text-xs font-semibold transition ${
-                    range === v
-                      ? 'bg-[var(--accent-primary)] text-white'
-                      : 'border border-[var(--border-subtle)] text-[var(--text-secondary)] hover:bg-[var(--bg-surface-hover)] hover:text-[var(--text-primary)]'
-                  }`}
-                >
-                  {v}
-                </button>
-              ))}
-            </div>
+            {/* Range Controls for standard chart & table */}
+            {viewMode !== 'candles' && (
+              <div className="flex flex-wrap gap-1" aria-label="History time range selector">
+                {ranges.map((v) => (
+                  <button
+                    key={v}
+                    type="button"
+                    aria-pressed={range === v}
+                    onClick={() => setRange(v)}
+                    className={`rounded px-2.5 py-1 text-xs font-semibold transition ${
+                      range === v
+                        ? 'bg-[var(--accent-primary)] text-white'
+                        : 'border border-[var(--border-subtle)] text-[var(--text-secondary)] hover:bg-[var(--bg-surface-hover)] hover:text-[var(--text-primary)]'
+                    }`}
+                  >
+                    {v}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
 
-          {loading ? (
+          {viewMode === 'candles' ? (
+            <div className="mt-4">
+              <CandleWorkspace
+                symbol={quote.symbol}
+                theme={theme}
+                onPlan={onWorkspace}
+              />
+            </div>
+          ) : loading ? (
             <Loading
               showTimer
               label={`Loading ${range} historical candle observations…`}
@@ -385,7 +410,7 @@ export default function AssetDetail({
             </div>
           )}
 
-          {history && (
+          {viewMode !== 'candles' && history && (
             <p className="mt-3 text-[11px] text-[var(--text-muted)]">
               {history.provider} · {history.status.toUpperCase()} · Fetched: {formatTime(history.fetchedAt)} ·{' '}
               {history.points.length} observations{history.error ? ` · ${history.error}` : ''}

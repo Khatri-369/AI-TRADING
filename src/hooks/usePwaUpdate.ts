@@ -5,6 +5,7 @@ export function usePwaUpdate() {
   const [isUpdating, setIsUpdating] = useState(false);
   const [dismissed, setDismissed] = useState(false);
   const registrationRef = useRef<ServiceWorkerRegistration | null>(null);
+  const updatingRef = useRef(false);
 
   useEffect(() => {
     if (typeof window === 'undefined' || !('serviceWorker' in navigator) || !window.isSecureContext) {
@@ -13,9 +14,9 @@ export function usePwaUpdate() {
 
     let refreshing = false;
 
-    // When the new worker takes control, reload the app to run the new version
+    // Reload the app to run the new version ONLY when the user explicitly triggered an update
     const handleControllerChange = () => {
-      if (refreshing) return;
+      if (refreshing || !updatingRef.current) return;
       refreshing = true;
       window.location.reload();
     };
@@ -80,6 +81,7 @@ export function usePwaUpdate() {
   }, []);
 
   const applyUpdate = useCallback(() => {
+    updatingRef.current = true;
     setIsUpdating(true);
     const reg = registrationRef.current;
     if (reg?.waiting) {

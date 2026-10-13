@@ -19,6 +19,25 @@ test('desktop navigation, search, asset detail, chart table alternative, themes 
   await expect(page.getByText('matching instruments out of 42 tracked assets')).toBeVisible();
 
   // 4. Open Asset Detail for RELIANCE
+  await page.route('**/api/markets/candles/RELIANCE*', (route) =>
+    route.fulfill({
+      json: {
+        symbol: 'RELIANCE',
+        interval: '1d',
+        range: '1M',
+        currency: 'INR',
+        timezone: 'Asia/Kolkata',
+        provider: 'upstox',
+        status: 'cached',
+        candles: [
+          { time: '2026-09-15T09:15:00Z', open: 2900.0, high: 2920.0, low: 2895.0, close: 2910.5, volume: 1200000 },
+          { time: '2026-09-22T09:15:00Z', open: 2915.0, high: 2950.0, low: 2910.0, close: 2945.0, volume: 1500000 },
+          { time: '2026-09-29T09:15:00Z', open: 2940.0, high: 2990.0, low: 2935.0, close: 2980.25, volume: 1800000 },
+          { time: '2026-10-06T09:15:00Z', open: 2985.0, high: 3020.0, low: 2975.0, close: 3012.0, volume: 2100000 },
+        ],
+      },
+    })
+  );
   await page.route('**/api/markets/history/RELIANCE?range=1M', (route) =>
     route.fulfill({
       json: {
@@ -76,6 +95,16 @@ test('desktop navigation, search, asset detail, chart table alternative, themes 
   await expect(dialog.getByRole('columnheader', { name: 'Price' })).toBeVisible();
 
   // Switch back to Chart
+  await dialog.getByRole('button', { name: 'Chart', exact: true }).click();
+  await expect(dialog.locator('.recharts-surface')).toBeVisible();
+
+  // 6b. Test Interactive Candlestick Workspace with Drawing Tools
+  await dialog.getByRole('button', { name: 'Candles', exact: true }).click();
+  await expect(dialog.getByRole('group', { name: 'Drawing tools' })).toBeVisible();
+  await expect(dialog.getByRole('button', { name: 'level', exact: true })).toBeVisible();
+  await expect(dialog.getByRole('button', { name: 'trend', exact: true })).toBeVisible();
+
+  // Return to line chart
   await dialog.getByRole('button', { name: 'Chart', exact: true }).click();
   await expect(dialog.locator('.recharts-surface')).toBeVisible();
 

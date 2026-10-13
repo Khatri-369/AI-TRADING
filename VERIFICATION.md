@@ -1,6 +1,14 @@
-# Research features — 13 October 2026
+# Research features & Workspace upgrades — 13 October 2026
 
-Desktop/PWA preparation: manifest, 192/512px icons, network-only market data, offline fallback, install controls, opt-in Web Push endpoints and a persistent single-instance news worker were added. Fifty backend tests and seven browser tests passed; both standard and Vercel-output builds passed. The Vercel output check used an example origin only, and its generated routing config was removed afterward. Vercel CLI reports logged out. No public deployment or actual device push delivery has been verified; see DEPLOYMENT.md for required infrastructure and acceptance checks.
+Interactive Candlestick Workspace, Account-Synced Watchlists & Test Suite Expansion:
+- **Interactive OHLCV Candlestick Workspace**: Added a dedicated "Candles" mode in `AssetDetail.tsx` alongside standard "Chart" (Recharts area trend) and "Table" (accessible screen-reader table). Traders can analyze multi-timeframe candles (`5m`, `30m`, `1d`), draw support/resistance levels, trend lines, price zones and text annotations with undo/redo/locking, view SMA 20 / EMA 20 moving averages, examine volume histograms, and export PNG charts.
+- **Cloud-Synced Watchlists with Resilient Local Fallback**: Connected `WatchlistPage.tsx` to `useResearchStore`. Authenticated traders sync their watchlists across desktop and mobile devices via SQLite optimistic locking (`store.save('user-watchlist', 'watchlist', ...)`). Guest traders retain fast, offline-first browser storage (`localStorage`).
+- **PWA Update Reload Hardening**: Hardened `usePwaUpdate.ts` so `controllerchange` triggers a page reload strictly when the user clicks "Update Now", preventing spontaneous reload interrupts during initial Service Worker client claims.
+- **Test Suite Results**:
+  - Unit tests: **53 passed, 0 failed** (`npm test`).
+  - Browser tests: **7 passed, 0 failed** (`npm run test:browser`), verified on Chromium and Edge across desktop and phone viewports (320px, 390px, 768px, 1440px) in both Light and Dark appearance modes.
+
+Desktop/PWA preparation: manifest, 192/512px icons, network-only market data, offline fallback, install controls, opt-in Web Push endpoints and a persistent single-instance news worker were added. Fifty-three backend tests and seven browser tests passed; both standard and Vercel-output builds passed. The Vercel output check used an example origin only, and its generated routing config was removed afterward. Vercel CLI reports logged out. No public deployment or actual device push delivery has been verified; see DEPLOYMENT.md for required infrastructure and acceptance checks.
 
 Follow-up UX change: the assistant is now a persistent bottom-right robot launcher with a compact conversation panel, Enter-to-send composer, source references and asset-detail context handoff. Its navigation item was removed; old `/research` links open the assistant over the overview. Closing the panel or navigating inside the app preserves conversation memory; reload/New conversation clears it. The overview now guides shortlist → evidence → scenario research, and movers exclude stale/unavailable quotes and enforce positive/negative change signs.
 

@@ -6,11 +6,13 @@ import { recordSchemas, type RecordKind, type ResearchRecord, type PriceAlert } 
 import { ASSET_BY_SYMBOL } from '../../shared/assets';
 import type { Quote } from '../../shared/types';
 
+import { createRequire } from 'node:module';
+const nodeRequire = createRequire(import.meta.url);
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let DatabaseSyncConstructor: any = null;
 try {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const nodeSqlite = typeof require !== 'undefined' ? require('node:sqlite') : null;
+  const nodeSqlite = nodeRequire('node:sqlite');
   DatabaseSyncConstructor = nodeSqlite?.DatabaseSync ?? null;
 } catch {
   // node:sqlite is an experimental feature not enabled in all runtime environments (e.g. serverless)
