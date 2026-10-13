@@ -15,6 +15,8 @@ import {
   Loader2,
   RefreshCw,
   Info,
+  Download,
+  Star,
 } from 'lucide-react';
 import type { Tab, ThemeType } from '../types/market';
 import { THEMES } from '../utils/themes';
@@ -33,11 +35,13 @@ interface Props {
   connected?: boolean;
   onRefresh?: () => void;
   onOpenDisclosures?: () => void;
+  onDesktop: () => void;
 }
 
 export const navItems = [
   { id: 'overview' as Tab, label: 'Overview', path: '/', icon: LayoutDashboard },
   { id: 'markets' as Tab, label: 'Markets', path: '/markets', icon: BarChart3 },
+  { id: 'watchlist' as Tab, label: 'Watchlist', path: '/watchlist', icon: Star },
   { id: 'news' as Tab, label: 'News & Sentiment', path: '/news', icon: Newspaper },
   { id: 'scenarios' as Tab, label: 'Scenarios', path: '/scenarios', icon: FlaskConical },
   { id: 'diagnostics' as Tab, label: 'Diagnostics', path: '/diagnostics', icon: ShieldCheck },
@@ -57,6 +61,7 @@ export default function Header({
   connected = false,
   onRefresh,
   onOpenDisclosures,
+  onDesktop,
 }: Props) {
   const [now, setNow] = useState(() => new Date());
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -136,6 +141,7 @@ export default function Header({
 
         {/* Action Controls */}
         <div className="flex items-center gap-1.5 sm:gap-2">
+          <button className="icon-button h-8 w-8" onClick={onDesktop} aria-label="Desktop app and news alerts" title="Install app & news alerts"><Download size={17} /></button>
           {/* Live Sync Status & Countdown Timer Pill */}
           <div className="flex items-center">
             {loading ? (
@@ -246,7 +252,7 @@ export default function Header({
         className="hidden border-t border-[var(--border-subtle)] bg-[var(--bg-subtle)] px-4 sm:px-6 lg:px-8 md:block"
         aria-label="Primary navigation"
       >
-        <div className="mx-auto flex max-w-[1440px] items-center gap-1 py-1.5" role="tablist" aria-label="Main sections">
+        <div className="mx-auto flex flex-wrap max-w-[1440px] items-center gap-1 py-1.5" role="tablist" aria-label="Main sections">
           {navItems.map(({ id, label, icon: Icon }) => {
             const active = tab === id;
             return (
@@ -256,7 +262,7 @@ export default function Header({
                 role="tab"
                 aria-selected={active}
                 aria-controls={`panel-${id}`}
-                tabIndex={active ? 0 : -1}
+                tabIndex={0}
                 onClick={() => onNavigate(id)}
                 className={`flex items-center gap-2 rounded-md px-3.5 py-2 text-xs font-semibold transition ${
                   active

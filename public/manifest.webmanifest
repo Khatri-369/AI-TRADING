@@ -1,0 +1,20 @@
+{
+  "id": "/",
+  "name": "Global Markets Research",
+  "short_name": "Markets",
+  "description": "Your markets, watchlist, news and research in one workspace.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#090d16",
+  "theme_color": "#090d16",
+  "icons": [
+    { "src": "/icons/markets-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/markets-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ],
+  "shortcuts": [
+    { "name": "Watchlist", "url": "/watchlist" },
+    { "name": "Market news", "url": "/news" },
+    { "name": "All markets", "url": "/markets" }
+  ]
+}

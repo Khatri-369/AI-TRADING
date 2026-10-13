@@ -29,11 +29,11 @@ export default function OverviewPage({
     .filter((q): q is Quote => Boolean(q));
 
   // Calculate real gainers and losers from loaded quotes
-  const quotesWithChanges = quotes.filter((q) => q.changePercent !== null);
-  const sortedGainers = [...quotesWithChanges]
+  const quotesWithChanges = quotes.filter((q) => q.changePercent !== null && q.price !== null && !['unavailable', 'stale'].includes(q.status));
+  const sortedGainers = quotesWithChanges.filter(q => (q.changePercent ?? 0) > 0)
     .sort((a, b) => (b.changePercent ?? 0) - (a.changePercent ?? 0))
     .slice(0, 4);
-  const sortedLosers = [...quotesWithChanges]
+  const sortedLosers = quotesWithChanges.filter(q => (q.changePercent ?? 0) < 0)
     .sort((a, b) => (a.changePercent ?? 0) - (b.changePercent ?? 0))
     .slice(0, 4);
 
@@ -90,6 +90,17 @@ export default function OverviewPage({
       </div>
 
       {/* Key Benchmark Spotlights */}
+      <section aria-label="Research before a trade" className="rounded-xl border border-[var(--border-default)] bg-[var(--bg-surface)] p-5">
+        <h3 className="font-semibold">Make the evidence part of your trading process</h3>
+        <p className="mt-2 text-sm text-[var(--text-secondary)]">Use this workspace to build a shortlist, review the context and identify what is still unknown. A price move or AI sentiment score alone is not a complete trade thesis.</p>
+        <div className="mt-4 grid gap-3 md:grid-cols-3">
+          {[
+            { title: '1. Build your shortlist', text: 'Save instruments and compare their source, currency, price change and observation time.', page: 'watchlist' as Tab, action: 'Open watchlist' },
+            { title: '2. Check the evidence', text: 'Read the original headlines. Check whether data is delayed and whether news actually relates to your asset.', page: 'news' as Tab, action: 'Review news' },
+            { title: '3. Challenge your thesis', text: 'Explore an alternative scenario and ask the assistant what evidence is missing before drawing a conclusion.', page: 'scenarios' as Tab, action: 'Explore scenarios' },
+          ].map(step => <article key={step.title} className="rounded-lg bg-[var(--bg-subtle)] p-4"><h4 className="text-sm font-semibold">{step.title}</h4><p className="mt-2 text-xs leading-5 text-[var(--text-secondary)]">{step.text}</p><button className="button-secondary mt-3" onClick={() => onNavigate(step.page)}>{step.action}<ArrowRight size={14} /></button></article>)}
+        </div>
+      </section>
       <section aria-labelledby="benchmarks-heading">
         <div className="mb-3 flex items-center justify-between">
           <h3 id="benchmarks-heading" className="text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)]">

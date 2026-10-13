@@ -1,0 +1,8 @@
+.env
+.env.*
+.push-data
+node_modules
+.git
+test-results
+playwright-report
+*.log

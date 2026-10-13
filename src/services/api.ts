@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { chatResultSchema, type ChatInput } from '../../shared/chat';
 import type { AIAnalysis, Engine, HistoryRange, ScenarioResult } from '../types/market';
 
 const finite = z.number().finite();
@@ -180,6 +181,7 @@ async function request<T>(path: string, schema: z.ZodType<T>, signal: AbortSigna
 }
 
 export const getOverview = (signal: AbortSignal) => request('/api/markets/overview', overviewSchema, signal);
+export const askResearch = (body: ChatInput, signal: AbortSignal) => request('/api/ai/chat', chatResultSchema, signal, body);
 export const getNews = (signal: AbortSignal) => request('/api/news', newsSchema, signal);
 export const getHealth = (signal: AbortSignal) => request('/api/health', healthSchema, signal);
 export const getQuota = (signal: AbortSignal): Promise<AIQuota> => request('/api/ai/quota', quotaSchema, signal);
