@@ -1,4 +1,5 @@
 import { defineConfig } from '@playwright/test';
+import { randomBytes } from 'node:crypto';
 
 const isCI = Boolean(process.env.CI);
 const port = process.env.PORT || '3000';
@@ -25,6 +26,7 @@ export default defineConfig({
     ? undefined
     : {
         command: 'node dist/server.js --production',
+        env: { SESSION_SECRET: randomBytes(32).toString('hex'), WORKSPACE_DB_PATH: process.env.WORKSPACE_DB_PATH || '.workspace-data/playwright.sqlite' },
         url: `${baseURL}/api/health`,
         reuseExistingServer: true,
         timeout: 30_000,

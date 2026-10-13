@@ -56,7 +56,7 @@ export default function DesktopAppPanel({ open, onClose }: { open: boolean; onCl
       let subscription = await registration.pushManager.getSubscription();
       if (!subscription) { subscription = await registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: applicationKey(config.publicKey) }); created = subscription; }
       await updateSubscription('subscribe', subscription);
-      setSubscribed(true); setMessage('News alerts enabled for this browser. Only newly published headlines will be sent.');
+      setSubscribed(true); setMessage('Device subscribed. Signed-in devices follow account news preferences and price alerts. Only new matching headlines will be sent.');
     } catch (error) {
       if (created) await created.unsubscribe().catch(() => undefined);
       setMessage(error instanceof Error ? error.message : 'Could not enable notifications.');
@@ -93,7 +93,7 @@ export default function DesktopAppPanel({ open, onClose }: { open: boolean; onCl
         signal: AbortSignal.timeout(10000),
       });
       if (!response.ok) throw new Error('Could not send test notification. Please verify your connection.');
-      setMessage('🔔 Test alert sent! Check your notification tray.');
+      setMessage('🔔 Test accepted by the push service. Check your notification tray to confirm delivery.');
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'Could not send test alert.');
     } finally {

@@ -15,6 +15,7 @@ const route = (fn: (req: Request, res: Response) => Promise<unknown> | unknown) 
 export function workspaceRouter(production: boolean) {
   const router = Router();
   router.use((req, res, next) => {
+    res.set('Cache-Control', 'no-store');
     if (req.method !== 'GET' && req.get('X-Requested-With') !== 'XMLHttpRequest') { res.status(403).json({ error: 'Security header required.' }); return; }
     next();
   });
@@ -28,11 +29,19 @@ export function workspaceRouter(production: boolean) {
   }));
   router.use((req, res, next) => { if (!workspaceUser(req)) { res.status(401).json({ error: 'Sign in to access your synced workspace.' }); return; } next(); });
   const userId = (req: Request) => workspaceUser(req)!.id;
+  router.post('/change-password', authLimit, route(async (req, res) => {
+    const input = z.object({ current: z.string().min(1).max(128), next: z.string().min(12).max(128) }).strict().parse(req.body);
+    const user = workspaceUser(req)!;
+    const store = workspaceStore();
+    await store.changePassword(user, input.current, input.next);
+    res.cookie('research_session', store.session(user.id), { httpOnly: true, secure: production, sameSite: 'lax', path: '/', maxAge: 7 * 86400000 });
+    res.json({ ok: true });
+  }));
   router.post('/logout', route(async (req, res) => { await newsPush.removeOwner(String(userId(req))).catch(() => undefined); workspaceStore().logout(workspaceToken(req)); res.clearCookie('research_session', { path: '/' }); res.json({ ok: true }); }));
   router.get('/records', route((req, res) => res.json({ records: workspaceStore().records(userId(req)), paper: workspaceStore().paper(userId(req)), events: workspaceStore().events(userId(req)) })));
   router.post('/records/:id', route((req, res) => {
     const id = z.string().regex(/^[\w.-]{1,100}$/).parse(req.params.id);
-    const input = z.object({ kind: z.enum(['chart', 'plan', 'journal', 'alert', 'watchlist']), version: z.number().int().nonnegative(), data: z.unknown() }).strict().parse(req.body);
+    const input = z.object({ kind: z.enum(['chart', 'plan', 'journal', 'alert', 'watchlist', 'preferences']), version: z.number().int().nonnegative(), data: z.unknown() }).strict().parse(req.body);
     res.json(workspaceStore().save(userId(req), id, input.kind, input.version, input.data));
   }));
   router.post('/records/:id/delete', route((req, res) => { workspaceStore().remove(userId(req), String(req.params.id), z.number().int().positive().parse(req.body.version)); res.json({ ok: true }); }));

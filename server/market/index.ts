@@ -169,7 +169,20 @@ export class MarketService {
   async candles(symbol: string, interval: '5m' | '30m' | '1d', range: HistoryRange) {
     const asset = ASSET_BY_SYMBOL.get(symbol);
     if (!asset) throw new Error('Unknown instrument');
-    const base = { symbol, interval, range, currency: asset.currency, timezone: asset.category === 'india' ? 'Asia/Kolkata' : 'America/New_York', provider: this.providerFor(asset) };
+    const exchange = asset.category === 'india'
+      ? (asset.symbol.endsWith('.BSE') || asset.symbol === 'SENSEX' ? 'BSE' : 'NSE')
+      : asset.category === 'us'
+      ? 'US'
+      : asset.category.toUpperCase();
+    const base = {
+      symbol,
+      interval,
+      range,
+      currency: asset.currency,
+      timezone: asset.category === 'india' ? 'Asia/Kolkata' : 'America/New_York',
+      exchange,
+      provider: this.providerFor(asset),
+    };
     try {
       const result = await this.candleCache.get(`${symbol}:${interval}:${range}`, 60000, HOUR, () => this.providers.candles(asset, interval, range));
       return { ...base, candles: result.value, fetchedAt: result.fetchedAt, status: result.stale ? 'stale' : 'delayed', cached: result.cached, note: 'Provider candles; the latest bar may be unfinished. Missing sessions are not interpolated.' };

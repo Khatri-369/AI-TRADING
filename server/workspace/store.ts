@@ -6,11 +6,13 @@ import { recordSchemas, type RecordKind, type ResearchRecord, type PriceAlert } 
 import { ASSET_BY_SYMBOL } from '../../shared/assets';
 import type { Quote } from '../../shared/types';
 
+import { createRequire } from 'node:module';
+const nodeRequire = createRequire(import.meta.url);
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let DatabaseSyncConstructor: any = null;
 try {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const nodeSqlite = typeof require !== 'undefined' ? require('node:sqlite') : null;
+  const nodeSqlite = nodeRequire('node:sqlite');
   DatabaseSyncConstructor = nodeSqlite?.DatabaseSync ?? null;
 } catch {
   // node:sqlite is an experimental feature not enabled in all runtime environments (e.g. serverless)
@@ -25,7 +27,7 @@ export function usableQuote(quote: Quote, now = Date.now()) {
   const age = now - Date.parse(quote.asOf ?? '');
   return quote.price !== null && quote.price > 0 && quote.status === 'live' && quote.session.state === 'OPEN' && age >= -5000 && age <= 120000;
 }
-export function inQuietHours(alert: PriceAlert, time: number) {
+export function inQuietHours(alert: Pick<PriceAlert, 'timezone' | 'quietStart' | 'quietEnd'>, time: number) {
   const hour = Number(new Intl.DateTimeFormat('en-GB', { timeZone: alert.timezone, hour: '2-digit', hourCycle: 'h23' }).format(new Date(time)));
   return alert.quietStart !== alert.quietEnd && (alert.quietStart < alert.quietEnd ? hour >= alert.quietStart && hour < alert.quietEnd : hour >= alert.quietStart || hour < alert.quietEnd);
 }
@@ -46,7 +48,9 @@ export class WorkspaceStore {
       CREATE TABLE IF NOT EXISTS paper(id TEXT NOT NULL, user INTEGER REFERENCES users(id) ON DELETE CASCADE, data TEXT NOT NULL, PRIMARY KEY(user,id));
       CREATE TABLE IF NOT EXISTS alert_state(user INTEGER, id TEXT, price REAL, time TEXT, PRIMARY KEY(user,id), FOREIGN KEY(user,id) REFERENCES records(user,id) ON DELETE CASCADE);
       CREATE TABLE IF NOT EXISTS alert_events(id INTEGER PRIMARY KEY, user INTEGER REFERENCES users(id) ON DELETE CASCADE, rule TEXT, data TEXT, created TEXT);
-      INSERT OR IGNORE INTO migrations VALUES(1);`);
+      CREATE TABLE IF NOT EXISTS alert_cooldown(user INTEGER, id TEXT, sent INTEGER NOT NULL, PRIMARY KEY(user,id), FOREIGN KEY(user,id) REFERENCES records(user,id) ON DELETE CASCADE);
+      INSERT OR IGNORE INTO migrations VALUES(1);
+      INSERT OR IGNORE INTO migrations VALUES(2);`);
   }
   async password(value: string, salt = randomBytes(16).toString('hex')) { const key = await scrypt(value, salt, 64) as Buffer; return `${salt}:${key.toString('hex')}`; }
   async register(username: string, password: string): Promise<User> {
@@ -88,7 +92,12 @@ export class WorkspaceStore {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   paper(user: number): Paper[] { return this.db.prepare('SELECT data FROM paper WHERE user=?').all(user).map((row: any) => JSON.parse(String(row.data))); }
   openPaper(user: number, id: string, quote: Quote, quantity: number, feeBps: number, slippageBps: number) {
-    const prior = this.paper(user).find(p => p.id === id); if (prior) return prior;
+    if (!Number.isInteger(quantity) || quantity <= 0 || quantity > 1000000 || ![feeBps, slippageBps].every(n => Number.isFinite(n) && n >= 0 && n <= 100)) throw new WorkspaceError(400, 'Invalid practice quantity or cost assumptions.');
+    const prior = this.paper(user).find(p => p.id === id);
+    if (prior) {
+      if (prior.symbol !== quote.symbol || prior.quantity !== quantity || prior.feeBps !== feeBps || prior.slippageBps !== slippageBps) throw new WorkspaceError(409, 'This practice request already exists with different inputs. Refresh the ledger before trying again.');
+      return prior;
+    }
     if (!usableQuote(quote) || !['india', 'us'].includes(quote.category) || ['NIFTY50', 'BANKNIFTY', 'SENSEX'].includes(quote.symbol)) throw new WorkspaceError(409, 'Practice fills need a fresh, open-session equity/ETF quote. No fill was created.');
     const positions = this.paper(user).filter(p => p.currency === quote.currency);
     const balance = 100000 + positions.filter(p => p.exit !== null).reduce((sum, p) => sum + (p.exit! - p.entry) * p.quantity - p.fees, 0) - positions.filter(p => p.exit === null).reduce((sum, p) => sum + p.entry * p.quantity + p.fees, 0);
@@ -115,19 +124,41 @@ export class WorkspaceStore {
       const old = this.db.prepare('SELECT price,time FROM alert_state WHERE user=? AND id=?').get(row.user, row.id);
       if (old && String(old.time) >= quote.asOf!) continue;
       this.db.prepare('INSERT INTO alert_state VALUES(?,?,?,?) ON CONFLICT(user,id) DO UPDATE SET price=excluded.price,time=excluded.time').run(row.user, row.id, quote.price, quote.asOf);
-      if (!old) continue;
+      if (!old || Date.parse(quote.asOf!) - Date.parse(String(old.time)) > 300000) continue;
       const crossed = alert.direction === 'above' ? Number(old.price) <= alert.level && quote.price! > alert.level : Number(old.price) >= alert.level && quote.price! < alert.level;
       if (!crossed) continue;
       const quiet = inQuietHours(alert, now);
-      const event = { symbol: quote.symbol, price: quote.price, level: alert.level, provider: quote.provider, asOf: quote.asOf, status: quiet ? 'quiet-hours' : 'detected', delivery: 'not-attempted' };
+      const previous = this.db.prepare('SELECT sent FROM alert_cooldown WHERE user=? AND id=?').get(row.user, row.id);
+      const cooling = previous && now - Number(previous.sent) < alert.cooldownMinutes * 60000;
+      const event = { symbol: quote.symbol, price: quote.price, level: alert.level, provider: quote.provider, asOf: quote.asOf, status: quiet ? 'quiet-hours' : cooling ? 'cooldown' : 'detected', delivery: 'not-attempted' };
       const inserted = this.db.prepare('INSERT INTO alert_events(user,rule,data,created) VALUES(?,?,?,?)').run(row.user, row.id, JSON.stringify(event), new Date(now).toISOString());
-      if (!quiet) events.push({ user: Number(row.user), id: Number(inserted.lastInsertRowid), title: 'Price alert', body: `${quote.symbol} crossed ${alert.direction} ${alert.level} ${quote.currency}. Observed ${quote.asOf}.` });
+      if (!quiet && !cooling) {
+        this.db.prepare('INSERT INTO alert_cooldown VALUES(?,?,?) ON CONFLICT(user,id) DO UPDATE SET sent=excluded.sent').run(row.user, row.id, now);
+        events.push({ user: Number(row.user), id: Number(inserted.lastInsertRowid), title: 'Price alert', body: `${quote.symbol} crossed ${alert.direction} ${alert.level} ${quote.currency}. Observed ${quote.asOf}.` });
+      }
     }
     this.db.exec('DELETE FROM alert_events WHERE id NOT IN (SELECT id FROM alert_events ORDER BY id DESC LIMIT 10000)');
     return events;
   }
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   events(user: number) { return this.db.prepare('SELECT id,data,created FROM alert_events WHERE user=? ORDER BY id DESC LIMIT 100').all(user).map((row: any) => ({ id: row.id, ...JSON.parse(String(row.data)), created: row.created })); }
+  newsPreferences(user: number) {
+    const records = this.records(user);
+    const preferences = records.find(r => r.kind === 'preferences');
+    const parsed = recordSchemas.preferences.safeParse(preferences?.data);
+    const symbols = records.filter(r => r.kind === 'watchlist').flatMap(r => recordSchemas.watchlist.parse(r.data).symbols);
+    return { ...(parsed.success ? parsed.data : { scope: 'watchlist' as const, paused: false, timezone: 'Asia/Kolkata', quietStart: 22, quietEnd: 8, frequencyMinutes: 30 }), symbols };
+  }
+  async changePassword(user: User, current: string, next: string) {
+    await this.login(user.username, current);
+    const password = await this.password(next);
+    this.db.exec('BEGIN IMMEDIATE');
+    try {
+      this.db.prepare('UPDATE users SET password=? WHERE id=?').run(password, user.id);
+      this.db.prepare('DELETE FROM sessions WHERE user=?').run(user.id);
+      this.db.exec('COMMIT');
+    } catch (error) { this.db.exec('ROLLBACK'); throw error; }
+  }
   deleteUser(user: number) { this.db.prepare('DELETE FROM users WHERE id=?').run(user); }
   close() { this.db.close(); }
 }

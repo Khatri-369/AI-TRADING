@@ -1,3 +1,4 @@
+import type { ChatFocus } from '../shared/chat';
 import { Component, lazy, Suspense, useEffect, useState, type ReactNode } from 'react';
 import { RefreshCw, X } from 'lucide-react';
 import Header from './components/Header';
@@ -85,6 +86,7 @@ function MainApp() {
   const [desktopOpen, setDesktopOpen] = useState(false);
   const [chatOpen, setChatOpen] = useState(() => window.location.pathname === '/research');
   const [chatSymbol, setChatSymbol] = useState('');
+  const [chatFocus, setChatFocus] = useState<ChatFocus>();
   const [disclosuresOpen, setDisclosuresOpen] = useState(false);
   const [engine, setEngine] = useState<Engine>('gemini');
 
@@ -276,7 +278,7 @@ function MainApp() {
           )}
 
           {/* PAGE ROUTING */}
-          {route.page === 'desk' && <Suspense fallback={<Loading label="Loading research desk…" />}><ResearchDesk theme={theme} initialSymbol={new URLSearchParams(window.location.search).get('symbol') ?? 'RELIANCE'} /></Suspense>}
+          {route.page === 'desk' && <Suspense fallback={<Loading label="Loading research desk…" />}><ResearchDesk quotes={market.quotes} onNotifications={() => setDesktopOpen(true)} onAsk={focus => { setChatFocus(focus); setChatSymbol(focus.symbol); setChatOpen(true); }} theme={theme} initialSymbol={new URLSearchParams(window.location.search).get('symbol') ?? 'RELIANCE'} /></Suspense>}
           {route.page === 'watchlist' && <Suspense fallback={<Loading label="Loading watchlist…" />}><WatchlistPage quotes={market.quotes} loading={market.loading} onSelect={handleSelectAsset} /></Suspense>}
           {route.page === 'overview' && (
             <div role="tabpanel" id="panel-overview" aria-labelledby="tab-overview">
@@ -429,7 +431,7 @@ function MainApp() {
 
       {/* Legal & Product Disclosures Modal */}
       <DesktopAppPanel open={desktopOpen} onClose={() => setDesktopOpen(false)} />
-      <Suspense fallback={null}><ResearchChat open={chatOpen} onOpenChange={setChatOpen} symbol={chatSymbol} onClearFocus={() => setChatSymbol('')} /></Suspense>
+      <Suspense fallback={null}><ResearchChat open={chatOpen} onOpenChange={setChatOpen} symbol={chatSymbol} focus={chatFocus} onClearFocus={() => { setChatSymbol(''); setChatFocus(undefined); }} /></Suspense>
       <ProductDisclosuresModal open={disclosuresOpen} onClose={() => setDisclosuresOpen(false)} />
 
       {/* Asset Detail Dialog / Direct Link Modal */}
@@ -440,7 +442,7 @@ function MainApp() {
             quote={currentQuote}
             onClose={handleCloseAsset}
             onWorkspace={() => navigate(`/desk?symbol=${encodeURIComponent(currentQuote.symbol)}`)}
-            onAsk={() => { setChatSymbol(currentQuote.symbol); setChatOpen(true); navigate('/markets'); }}
+            onAsk={() => { setChatFocus(undefined); setChatSymbol(currentQuote.symbol); setChatOpen(true); navigate('/markets'); }}
             engine={engine}
             onEngine={setEngine}
             theme={theme}

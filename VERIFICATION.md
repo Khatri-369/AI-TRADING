@@ -1,6 +1,72 @@
-# Research features — 13 October 2026
+# Advanced workspace completion — 13 October 2026
 
-Desktop/PWA preparation: manifest, 192/512px icons, network-only market data, offline fallback, install controls, opt-in Web Push endpoints and a persistent single-instance news worker were added. Fifty backend tests and seven browser tests passed; both standard and Vercel-output builds passed. The Vercel output check used an example origin only, and its generated routing config was removed afterward. Vercel CLI reports logged out. No public deployment or actual device push delivery has been verified; see DEPLOYMENT.md for required infrastructure and acceptance checks.
+This section records the current pass and supersedes conflicting historical claims below.
+
+Implemented and checked:
+- Chart/plan-aware floating assistant with English/Hindi selection. Attached annotations remain untrusted user hypotheses; actual OHLCV, SMA/EMA and source timestamps are prepared on the backend. Source IDs are validated. Missing history never produces fabricated candles or indicators. Snapshot attachments must be refreshed after editing.
+- Durable price crossings with baseline initialization, freshness/out-of-order checks, quiet hours with IANA timezones, expiry, pause/resume and persisted cooldown reservations. Provider gaps longer than five minutes reinitialize the baseline. Delivery history distinguishes detection, suppression and push-service acceptance.
+- Watchlist news preferences, quiet time, frequency and pause. Tagged instrument matching does not imply exhaustive news coverage. Device subscription requires explicit browser consent.
+- Manual journal with plan references, symbol/tag filtering, costs, long/short P&L, per-currency net results, average wins/losses, win rate, realized drawdown, plan adherence and CSV export. Practice ledger displays currency-specific virtual cash and clearly labeled observed unrealized valuation. Fills remain long-only simulations requiring fresh open-session backend quotes; no broker order endpoint exists.
+- Accounts, explicit guest import, cross-device records, conflict protection, password changes with session revocation, exports and password-confirmed account deletion. Fixed account watchlists leaking into guest storage and stale cloud completions changing the wrong local workspace. Chart autosave preserves edits made while a save is pending and stops automatic retries after errors.
+- Removed hardcoded VAPID credentials, ephemeral Vercel push storage, shared production session-secret fallbacks and serverless error stack disclosure. Missing configuration is visible in `/api/health`. Production session secrets must now be supplied explicitly.
+
+Validation:
+- 64 backend/contract tests and 10 browser scenarios, including authenticated isolation, optimistic concurrency, alerts, journal arithmetic and practice-fill rejection. Lint/TypeScript, standard build and Vercel serverless build pass. Browser coverage includes both themes and 320/390/768/1440px widths. Mobile assistant and desktop journal screenshots were visually inspected.
+- Real authenticated Upstox daily history requests succeeded for RELIANCE, RELIANCE.BSE, NIFTY50, BANKNIFTY and SENSEX. Each returned 19 actual bars for 1M; latest returned bar began `2026-10-11T18:30:00Z`. They were labeled delayed. This after-hours check does not verify an actively moving intraday stream.
+- Gemini's authenticated model listing succeeded, but live chat inference returned provider-unavailable/timeouts for the configured model, including a diagnostic attempt allowed 50 seconds. The live assistant is therefore NOT verified operational. Unit/browser chat tests use labeled fixtures. No alternate provider or model was silently substituted, and the normal 25-second timeout remains in place.
+- Web Push is unconfigured locally; no real device delivery was claimed. Background tasks/account sync require a private persistent backend. Vercel-only mode supports guest storage and read-only serverless APIs; it cannot provide those background/durable features.
+
+Public deployment, provider entitlements/redistribution permission, password recovery, multi-instance storage/quotas and real notification delivery remain separate operator/infrastructure work. See VERCEL_DEPLOYMENT.md for explicit configuration and recovery steps. Nothing in this verification claims a public production deployment.
+
+---
+
+# Research features & Workspace upgrades — 13 October 2026
+
+## Interactive Trade-Planning Feature Connected to Chart Workspace
+- **Research & Calculation Purpose**: Built a dedicated, non-execution trade-planning tool on the Research Desk (`/desk`) connected bidirectionally to the interactive candlestick chart workspace. Does not execute live broker orders or present AI recommendations as user choices.
+- **Saved Plan Data Schema**:
+  - `symbol`, `exchange` (NSE, BSE, US), `currency` (INR, USD), and `createdAt` ISO timestamp.
+  - Direction scenario: `long` or `short`.
+  - Intended `entry`, invalidation `stop`, and profit `target`.
+  - Level ordering validation: Long enforces `stop < entry < target`; Short enforces `target < entry < stop`; zero distance (`entry === stop`) and negative/zero prices are strictly rejected.
+  - Position sizing: user quantity (whole units) or maximum hypothetical loss budget.
+  - Instrument lot constraints: Indian cash equities enforce 1-share minimum whole unit lot sizing; broad indices (`NIFTY50`, `BANKNIFTY`, `SENSEX`) explicitly disclose that cash shares cannot be bought/sold directly and require index derivatives or ETF equivalents.
+  - Written `thesis`, supporting `evidence`, and `invalidation` conditions.
+  - Linked `newsLinks` (headline and URL) and chart drawing snapshot reference (`chartSnapshot`).
+  - Plan lifecycle states: `draft`, `watching`, `archived`, and `reviewed` with filterable tabs and status transitions.
+- **Transparent Mathematical Calculations**:
+  - Entry-to-stop distance (`|entry - stop|`).
+  - Potential loss (`distance * quantity + friction`) and potential reward (`targetDistance * quantity - friction`).
+  - Reward-to-risk ratio (`reward / loss`).
+  - Budget-derived whole unit quantity via `calculateQuantityFromBudget(...)` factoring two-sided friction per unit.
+  - Explicit editable friction assumptions: `feeBps` (default 10 bps per side) and `slippageBps` (default 5 bps per side) showing 30 bps round-trip friction.
+  - Currency integrity: currencies are isolated to instrument native currencies; `convertCurrency(...)` requires explicit timestamped exchange conversion rates.
+  - Disclaimers: Market gaps and slippage can cause actual execution losses to exceed calculated stop levels.
+- **Interactive Chart Synchronization**:
+  - `CandleWorkspace.tsx` displays color-coded dashed guidelines: Entry (Blue), Stop / Invalidation (Rose), Target (Emerald).
+  - Draggable handle knobs on chart allow adjusting levels with mouse or touch, updating the plan form numbers in real time.
+  - Numerical edits in the form immediately translate to chart coordinates on the canvas overlay.
+  - Touch mode separation: Navigation mode preserves one-finger pan and two-finger pinch-zoom; Plan Levels mode allows precise handle dragging.
+- **Test Suite Results**:
+  - Unit tests: **54 passed, 0 failed** (`npm test`), verifying long/short ordering, budget sizing, lot constraints, fees, slippage, and currency integrity.
+  - Linting: **0 errors, 0 warnings** (`npm run lint`).
+  - Browser tests: **7 passed, 0 failed** (`npm run test:browser`), verifying trade planning creation, budget derivation, validation indicators, saved plans listing, and zero horizontal overflow across 320px, 390px, 768px, and 1440px viewports in Light and Dark themes.
+
+Mobile-First Chart Workspace, Exchange Metadata & Account-Synced Watchlists:
+- **Mobile-First Interactive OHLCV Candlestick Workspace**: Upgraded `CandleWorkspace.tsx` to provide a dedicated, touch-ergonomic financial charting workspace powered by Lightweight Charts (Apache 2.0). Features include:
+  - Live Crosshair HUD displaying Open, High, Low, Close, Volume, and Change % on hover/touch, defaulting to the latest completed candle.
+  - Strict Touch Mode Separation: Navigation Mode enables one-finger pan and two-finger pinch-to-zoom via pointer-events pass-through. Drawing Mode captures touch events exclusively for drawing tools without unintended chart displacement.
+  - Comprehensive Drawing Toolset: Horizontal price levels, 2-point trendlines, rectangle price zones, and text annotations stored in time/price coordinates (preserving meaning on pan/zoom/reload) with edit handles, lock/unlock, delete, and 30-level undo/redo.
+  - Real Candle Moving Averages: SMA 20 (blue) and EMA 20 (amber) calculated from genuine candle closes with clear warm-up disclosures explaining that the initial 20 bars require completion before line values appear.
+  - Export & Accessibility: High-resolution PNG export with metadata watermark; accessible semantic data table alternative for screen readers; fullscreen support with browser fallback.
+  - Backend Exchange Metadata: Extended `/api/markets/candles/:symbol` to include exchange classification (`NSE`, `BSE`, `US`), exchange timezone, provider, interval, and freshness metadata without synthetic interpolation of missing sessions.
+- **Cloud-Synced Watchlists with Resilient Local Fallback**: Connected `WatchlistPage.tsx` to `useResearchStore`. Authenticated traders sync their watchlists across desktop and mobile devices via SQLite optimistic locking (`store.save('user-watchlist', 'watchlist', ...)`). Guest traders retain fast, offline-first browser storage (`localStorage`).
+- **PWA Update Reload Hardening**: Hardened `usePwaUpdate.ts` so `controllerchange` triggers a page reload strictly when the user clicks "Update Now", preventing spontaneous reload interrupts during initial Service Worker client claims.
+- **Test Suite Results**:
+  - Unit tests: **53 passed, 0 failed** (`npm test`).
+  - Browser tests: **7 passed, 0 failed** (`npm run test:browser`), verified on Chromium and Edge across desktop and phone viewports (320px, 390px, 768px, 1440px) in both Light and Dark appearance modes.
+
+Desktop/PWA preparation: manifest, 192/512px icons, network-only market data, offline fallback, install controls, opt-in Web Push endpoints and a persistent single-instance news worker were added. Fifty-three backend tests and seven browser tests passed; both standard and Vercel-output builds passed. The Vercel output check used an example origin only, and its generated routing config was removed afterward. Vercel CLI reports logged out. No public deployment or actual device push delivery has been verified; see DEPLOYMENT.md for required infrastructure and acceptance checks.
 
 Follow-up UX change: the assistant is now a persistent bottom-right robot launcher with a compact conversation panel, Enter-to-send composer, source references and asset-detail context handoff. Its navigation item was removed; old `/research` links open the assistant over the overview. Closing the panel or navigating inside the app preserves conversation memory; reload/New conversation clears it. The overview now guides shortlist → evidence → scenario research, and movers exclude stale/unavailable quotes and enforce positive/negative change signs.
 

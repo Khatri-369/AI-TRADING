@@ -1,14 +1,15 @@
 import { useEffect, useRef, useState } from 'react';
 import { Bot, Send, Square, Trash2, X } from 'lucide-react';
 import { askResearch, errorMessage, safeArticleUrl } from '../services/api';
-import type { ChatInput, ChatResult } from '../../shared/chat';
+import type { ChatInput, ChatResult, ChatFocus } from '../../shared/chat';
 
 type Turn = { question: string; result: ChatResult };
 const starters = ['Summarize the available Indian market data and its limitations.', 'Explain how interest rates can affect equities and gold.', 'Compare the available data for NIFTY 50 and BANK NIFTY.'];
 
-export default function ResearchChat({ open, onOpenChange, symbol = '', onClearFocus }: { open: boolean; onOpenChange: (open: boolean) => void; symbol?: string; onClearFocus: () => void }) {
+export default function ResearchChat({ open, onOpenChange, symbol = '', focus, onClearFocus }: { open: boolean; onOpenChange: (open: boolean) => void; symbol?: string; focus?: ChatFocus; onClearFocus: () => void }) {
   const [turns, setTurns] = useState<Turn[]>([]);
   const [draft, setDraft] = useState('');
+  const [language, setLanguage] = useState<'en' | 'hi'>('en');
   const [pending, setPending] = useState('');
   const [error, setError] = useState('');
   const controller = useRef<AbortController | null>(null);
@@ -42,7 +43,7 @@ export default function ResearchChat({ open, onOpenChange, symbol = '', onClearF
       size += turn.question.length + turn.result.answer.length;
     }
     try {
-      const result = await askResearch({ message: question.trim(), history, symbols: symbol ? [symbol] : [] }, request.signal);
+      const result = await askResearch({ message: question.trim(), history, symbols: symbol ? [symbol] : [], language, focus }, request.signal);
       if (!request.signal.aborted) { setTurns(previous => [...previous.slice(-19), { question, result }]); setDraft(''); }
     } catch (cause) {
       if (!request.signal.aborted) setError(errorMessage(cause));
@@ -52,14 +53,16 @@ export default function ResearchChat({ open, onOpenChange, symbol = '', onClearF
   }
 
   return <>
-    <button ref={launcher} type="button" aria-label="Open market assistant" aria-expanded={open} aria-controls="market-chat" onClick={() => onOpenChange(!open)} className="fixed bottom-5 right-5 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-[var(--accent-primary)] text-white shadow-lg hover:opacity-90"><Bot size={27} /></button>
-    <section hidden={!open} id="market-chat" role="dialog" aria-modal="false" aria-labelledby="research-heading" onKeyDown={event => { if (event.key === 'Escape') { event.stopPropagation(); close(); } }} className="fixed bottom-24 right-3 sm:right-5 z-50 flex h-[min(660px,calc(100dvh-112px))] w-[min(440px,calc(100vw-24px))] flex-col overflow-hidden rounded-2xl border border-[var(--border-default)] bg-[var(--bg-surface)] shadow-2xl" style={!open ? { display: 'none' } : undefined}>
+    <button ref={launcher} type="button" aria-label="Open market assistant" aria-expanded={open} aria-controls="market-chat" onClick={() => onOpenChange(!open)} className="fixed bottom-24 md:bottom-5 right-5 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-[var(--accent-primary)] text-white shadow-lg hover:opacity-90"><Bot size={27} /></button>
+    <section hidden={!open} id="market-chat" role="dialog" aria-modal="false" aria-labelledby="research-heading" onKeyDown={event => { if (event.key === 'Escape') { event.stopPropagation(); close(); } }} className="fixed bottom-40 md:bottom-24 right-3 sm:right-5 z-50 flex h-[min(660px,calc(100dvh-180px))] md:h-[min(660px,calc(100dvh-112px))] w-[min(440px,calc(100vw-24px))] flex-col overflow-hidden rounded-2xl border border-[var(--border-default)] bg-[var(--bg-surface)] shadow-2xl" style={!open ? { display: 'none' } : undefined}>
       <header className="flex shrink-0 items-center gap-3 border-b border-[var(--border-subtle)] p-4">
         <Bot size={24} className="text-[var(--accent-text)]" /><div className="flex-1 min-w-0"><h2 id="research-heading" className="font-semibold">Market assistant</h2><p className="text-xs text-[var(--text-muted)]">{symbol ? `Researching ${symbol}` : 'Ask, understand, compare'} · Gemini</p></div>
+        <select aria-label="Assistant language" className="field text-xs max-w-20" disabled={Boolean(pending)} value={language} onChange={e => setLanguage(e.target.value as typeof language)}><option value="en">English</option><option value="hi">हिन्दी</option></select>
         <button aria-label="New conversation" title="New conversation" className="icon-button" disabled={Boolean(pending) || !turns.length} onClick={() => { setTurns([]); setError(''); setDraft(''); input.current?.focus(); }}><Trash2 size={16} /></button>
         <button aria-label="Close market assistant" className="icon-button" onClick={close}><X size={19} /></button>
       </header>
       {symbol && <div className="flex shrink-0 items-center justify-between gap-2 border-b border-[var(--border-subtle)] px-4 py-2 text-xs"><span>Evidence focused on {symbol}</span><button disabled={Boolean(pending)} className="text-[var(--accent-text)] underline" onClick={onClearFocus}>Use all markets</button></div>}
+      {focus && <p className="px-4 py-2 text-xs border-b border-[var(--border-subtle)]">Attached snapshot: {focus.interval} · {focus.range} · {focus.drawings.length} annotations{focus.plan ? " · hypothetical plan" : ""}. Chart prices are fetched on the server. Reattach after editing.</p>}
       <div className="min-h-0 flex-1 overflow-y-auto space-y-6 p-4" aria-label="Research conversation" role="log" aria-live="polite" aria-relevant="additions text">
       {!turns.length && !pending && <div className="py-4 space-y-4"><h3 className="text-lg font-medium">What would you like to understand?</h3><p className="text-sm text-[var(--text-secondary)]">Check the evidence behind a move, compare assets or learn what to research before a trade.</p><div className="grid gap-2">{(symbol ? [`Explain the available data for ${symbol}.`, `What evidence is missing before evaluating ${symbol}?`] : starters).map(question => <button key={question} className="rounded-lg border border-[var(--border-default)] p-3 text-left text-sm hover:bg-[var(--bg-surface-hover)]" onClick={() => void send(question)}>{question}</button>)}</div></div>}
         {turns.map((turn, index) => <article key={index} className="space-y-3">

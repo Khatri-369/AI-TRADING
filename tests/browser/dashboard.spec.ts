@@ -19,6 +19,28 @@ test('desktop navigation, search, asset detail, chart table alternative, themes 
   await expect(page.getByText('matching instruments out of 42 tracked assets')).toBeVisible();
 
   // 4. Open Asset Detail for RELIANCE
+  await page.route('**/api/markets/candles/RELIANCE*', (route) =>
+    route.fulfill({
+      json: {
+        symbol: 'RELIANCE',
+        interval: '1d',
+        range: '1M',
+        currency: 'INR',
+        timezone: 'Asia/Kolkata',
+        provider: 'upstox',
+        status: 'cached',
+        cached: true,
+        fetchedAt: '2026-10-13T10:00:00Z',
+        note: 'Provider candles; the latest bar may be unfinished.',
+        candles: [
+          { time: '2026-09-15T09:15:00Z', open: 2900.0, high: 2920.0, low: 2895.0, close: 2910.5, volume: 1200000 },
+          { time: '2026-09-22T09:15:00Z', open: 2915.0, high: 2950.0, low: 2910.0, close: 2945.0, volume: 1500000 },
+          { time: '2026-09-29T09:15:00Z', open: 2940.0, high: 2990.0, low: 2935.0, close: 2980.25, volume: 1800000 },
+          { time: '2026-10-06T09:15:00Z', open: 2985.0, high: 3020.0, low: 2975.0, close: 3012.0, volume: 2100000 },
+        ],
+      },
+    })
+  );
   await page.route('**/api/markets/history/RELIANCE?range=1M', (route) =>
     route.fulfill({
       json: {
@@ -79,6 +101,32 @@ test('desktop navigation, search, asset detail, chart table alternative, themes 
   await dialog.getByRole('button', { name: 'Chart', exact: true }).click();
   await expect(dialog.locator('.recharts-surface')).toBeVisible();
 
+  // 6b. Test Interactive Candlestick Workspace with Drawing Tools & Mobile Ergonomics
+  await dialog.getByRole('button', { name: 'Candles', exact: true }).click();
+  await expect(dialog.getByLabel('RELIANCE interactive candlestick chart')).toBeVisible();
+  await expect(dialog.getByRole('group', { name: 'Drawing tools' })).toBeVisible();
+  await expect(dialog.getByRole('button', { name: 'level', exact: true })).toBeVisible();
+  await expect(dialog.getByRole('button', { name: 'trend', exact: true })).toBeVisible();
+  await expect(dialog.getByText('Navigation Mode')).toBeVisible();
+  await expect(dialog.getByText(/Warm-up: Requires 20 completed candles/)).toBeVisible();
+  await expect(dialog.getByText('Saved locally on this device')).toBeVisible();
+
+  // Test mode separation: selecting trend switches to drawing mode
+  await dialog.getByRole('button', { name: 'trend', exact: true }).click();
+  await expect(dialog.getByText('Drawing: TREND')).toBeVisible();
+  await dialog.getByRole('button', { name: 'Done drawing' }).click();
+  await expect(dialog.getByText('Navigation Mode')).toBeVisible();
+
+  // Test accessible candle table toggle
+  await dialog.getByRole('button', { name: 'Candle table', exact: true }).click();
+  await expect(dialog.getByRole('columnheader', { name: 'Open' })).toBeVisible();
+  await expect(dialog.getByRole('columnheader', { name: 'Close' })).toBeVisible();
+  await dialog.getByRole('button', { name: 'Show candles', exact: true }).click();
+
+  // Return to line chart
+  await dialog.getByRole('button', { name: 'Chart', exact: true }).click();
+  await expect(dialog.locator('.recharts-surface')).toBeVisible();
+
   // 7. Close dialog via Escape key
   await page.keyboard.press('Escape');
   await expect(dialog).toHaveCount(0);
@@ -99,6 +147,40 @@ test('desktop navigation, search, asset detail, chart table alternative, themes 
   await expect(page).toHaveURL(/\/diagnostics/);
   await expect(page.getByRole('heading', { name: 'Provider connections & diagnostics' })).toBeVisible();
   await expect(page.getByText('Upstox · Indian equities and indices', { exact: true })).toBeVisible();
+
+  // 8b. Navigation to Research Desk and Trade-Planning Workspace
+  await page.getByRole('tab', { name: 'Research desk' }).click();
+  await expect(page).toHaveURL(/\/desk/);
+  await expect(page.getByRole('heading', { name: 'Research desk' })).toBeVisible();
+
+  // Switch to Plan Tab
+  await page.getByRole('button', { name: 'Plan', exact: true }).click();
+  await expect(page.getByRole('heading', { name: /New Trade Plan/ })).toBeVisible();
+  await expect(page.getByText('Interactive Chart Workspace')).toBeVisible();
+
+  // Enter Trade Plan Numerical Levels
+  await page.getByLabel('Intended entry').fill('2900');
+  await page.getByLabel(/Stop level/).fill('2850');
+  await page.getByLabel(/Target/).fill('3050');
+  await expect(page.getByText('✓ Valid Long (Stop < Entry < Target)')).toBeVisible();
+
+  // Sizing via hypothetical loss budget
+  await page.getByLabel(/Loss budget/).fill('5000');
+  await page.getByRole('button', { name: 'Derive whole units from budget' }).click();
+
+  // Fill thesis, evidence, invalidation
+  await page.getByPlaceholder(/Why this trade/).fill('Weekly cup and handle breakout with strong volume');
+  await page.getByPlaceholder(/e.g., 200 EMA support/).fill('20 EMA support confluence');
+  await page.getByPlaceholder(/Specific price action or events/).fill('Close below 2850 stop level');
+
+  // Verify calculation summary
+  await expect(page.getByText('Transparent Calculation Summary')).toBeVisible();
+  await expect(page.getByText(/Reward \/ Risk Ratio:/)).toBeVisible();
+
+  // Save the trade plan
+  await page.getByRole('button', { name: 'Save trade plan' }).click();
+  await expect(page.getByText('Saved Trade Plans (1)')).toBeVisible();
+  await expect(page.getByText('Weekly cup and handle breakout with strong volume')).toBeVisible();
 
   // 9. Light and Dark Theme Persistence
   await page.goto('/');
