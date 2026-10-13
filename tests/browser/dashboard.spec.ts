@@ -28,7 +28,16 @@ test('desktop navigation, search, asset detail, chart table alternative, themes 
 
   // 5. Historical Recharts Surface and Range Selection
   await expect(dialog.locator('.recharts-surface')).toBeVisible();
+  // Explicit empty-session fixture: before the market opens, intraday candles
+  // may legitimately be absent. Exercise that state without clock dependence.
+  await page.route('**/api/markets/history/RELIANCE?range=1D', route => route.fulfill({ json: {
+    symbol: 'RELIANCE', range: '1D', currency: 'INR', points: [],
+    provider: 'upstox', status: 'unavailable', fetchedAt: null, cached: false,
+    error: 'No intraday candles are available for this session.',
+  } }));
   await dialog.getByRole('button', { name: '1D', exact: true }).click();
+  await expect(dialog.getByText('Historical data unavailable', { exact: true })).toBeVisible();
+  await dialog.getByRole('button', { name: '1M', exact: true }).click();
   await expect(dialog.locator('.recharts-surface')).toBeVisible();
 
   // 6. Test Text / Table Alternative for Chart Data

@@ -38,6 +38,25 @@ const post = (url: string, body: unknown, headers: Record<string, string> = {}) 
     body: JSON.stringify(body),
   });
 
+test('research endpoint validates input, rejects injected context and reports missing AI without market calls', async () => {
+  await withServer(async url => {
+    for (const body of [{ message: 'x' }, { message: 'Explain NIFTY', symbols: ['UNKNOWN'] }, { message: 'Explain NIFTY', evidence: { price: 999 } }]) {
+      assert.equal((await post(`${url}/api/ai/chat`, body)).status, 400);
+    }
+    const response = await post(`${url}/api/ai/chat`, { message: 'Explain NIFTY' });
+    assert.equal(response.status, 503);
+    assert.equal((await response.json()).code, 'AI_NOT_CONFIGURED');
+  });
+});
+
+test('research endpoint inherits production authorization and CSRF protection', async () => {
+  await withServer(async url => {
+    assert.equal((await post(`${url}/api/ai/chat`, { message: 'Explain NIFTY' })).status, 401);
+    const response = await fetch(`${url}/api/ai/chat`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer research-test-token' }, body: JSON.stringify({ message: 'Explain NIFTY' }) });
+    assert.equal(response.status, 403);
+  }, { production: true, token: 'research-test-token', anonymousQuota: false });
+});
+
 test('health returns configuration and security headers without provider credentials', async () => {
   await withServer(async (url) => {
     const response = await fetch(`${url}/api/health`);

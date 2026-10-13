@@ -8,7 +8,7 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
-import { Sparkles, X, Table, LineChart as ChartIcon } from 'lucide-react';
+import { Bot, Sparkles, X, Table, LineChart as ChartIcon } from 'lucide-react';
 import type { AnalysisEntry, Engine, HistoryRange, Quote, ThemeType } from '../types/market';
 import { errorMessage, getHistory } from '../services/api';
 import { changeClass, formatPercent, formatPrice, formatTime } from '../utils/format';
@@ -19,6 +19,7 @@ import StatusBadge from './StatusBadge';
 interface Props {
   quote: Quote;
   onClose: () => void;
+  onAsk: () => void;
   engine: Engine;
   onEngine: (engine: Engine) => void;
   entry?: AnalysisEntry;
@@ -31,6 +32,7 @@ const ranges: HistoryRange[] = ['1D', '5D', '1M', '3M', '6M', '1Y'];
 export default function AssetDetail({
   quote,
   onClose,
+  onAsk,
   engine,
   onEngine,
   entry,
@@ -113,6 +115,7 @@ export default function AssetDetail({
         <div className="flex items-start justify-between gap-4 border-b border-[var(--border-subtle)] pb-4">
           <div>
             <div className="flex flex-wrap items-center gap-2">
+              <button className="button-secondary mb-2" onClick={onAsk}><Bot size={16} />Ask about {quote.symbol}</button>
               <h2 id="asset-detail-title" className="text-xl sm:text-2xl font-bold tracking-tight text-[var(--text-primary)]">
                 {quote.symbol}
               </h2>

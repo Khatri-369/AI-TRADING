@@ -1,3 +1,14 @@
+# Research features — 13 October 2026
+
+Follow-up UX change: the assistant is now a persistent bottom-right robot launcher with a compact conversation panel, Enter-to-send composer, source references and asset-detail context handoff. Its navigation item was removed; old `/research` links open the assistant over the overview. Closing the panel or navigating inside the app preserves conversation memory; reload/New conversation clears it. The overview now guides shortlist → evidence → scenario research, and movers exclude stale/unavailable quotes and enforce positive/negative change signs.
+
+- Implemented `/research` with bounded Gemini conversations, instrument focus, source references resolved on the backend, follow-up questions, cancellation and recoverable provider errors. Unknown citation IDs and client-supplied evidence are rejected. Source validation does not guarantee the correctness of model reasoning.
+- Implemented `/watchlist` with browser-local persistence, search/category filters, change sorting and a maximum of three comparison instruments. Currency, timestamps, provider status and differing change periods remain visible. No cross-device sync or background alerts are claimed.
+- A real `POST /api/ai/chat` request through the production server succeeded with Gemini and the backend's Upstox NIFTY 50 evidence. It returned the 12 October closing observation and explicitly stated delayed/closed-session status. This was an after-hours check, not verification of moving intraday prices.
+- ESLint/TypeScript, production build and all 46 backend tests passed. The two new browser tests passed in Light and Dark, including follow-up context, HTTP 429 recovery, safe source links, watchlist persistence, comparison limits and mobile overflow checks. Screenshots were visually inspected.
+- The broader browser run passed five of six checks. The remaining existing check assumed nonempty intraday history before the session opened. It now explicitly tests an empty-session fixture and returns to the real one-month history for chart/table checks; both dashboard tests passed on rerun. All six browser scenarios therefore passed across these runs.
+- Conversations are intentionally transient and clear on page navigation/reload. Existing AI access and quota middleware applies. Deployment, provider redistribution permissions and previously documented provider/account blockers are not resolved by these additions.
+
 # System Verification Report — 12 October 2026
 
 Verification performed directly against active codebase, live dev server, and configured backend providers. In accordance with security constraints, no credentials, authorized WebSocket tokens, or secrets are logged or exposed.

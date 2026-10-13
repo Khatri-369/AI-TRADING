@@ -5,6 +5,8 @@ import {
   type AnalysisInput, type AnalysisResult, type ScenarioInput, type ScenarioResult,
 } from './schemas.js';
 import { AIResultCache, hashRequest } from './cache.js';
+import { z } from 'zod';
+import { chatInputSchema, chatAnswerSchema, type ChatInput, type ChatResult, type ChatSource } from '../../shared/chat.js';
 
 export type { AnalysisInput, AnalysisResult, ScenarioInput, ScenarioResult } from './schemas.js';
 export { analysisInputSchema, scenarioInputSchema } from './schemas.js';
@@ -63,7 +65,7 @@ export function createAIService(options: ServiceOptions = {}) {
   const env = options.env ?? process.env;
   const fetcher = options.fetch ?? globalThis.fetch;
   const now = options.now ?? Date.now;
-  const cache = new AIResultCache<AnalysisResult | ScenarioResult>(now, options.cacheCapacity ?? 200, options.maxConcurrent ?? 12);
+  const cache = new AIResultCache<AnalysisResult | ScenarioResult | ChatResult>(now, options.cacheCapacity ?? 200, options.maxConcurrent ?? 12);
   const observations = new Map<Engine, Pick<AIProviderStatus, 'status' | 'message'>>();
 
   function credentials(engine: Engine) {
@@ -250,10 +252,31 @@ export function createAIService(options: ServiceOptions = {}) {
     }, () => new AIServiceError(429, 'AI_BUSY', 'Too many analyses are running. Try again shortly.', 'gemini'))) as ScenarioResult;
   }
 
-  return { analyze, scenario, aiProviderStatuses: providerStatuses };
+  async function chat(input: ChatInput, context: { evidence: unknown; sources: ChatSource[] }): Promise<ChatResult> {
+    const parsed = chatInputSchema.safeParse(input);
+    if (!parsed.success) throw new AIServiceError(400, 'AI_INPUT_INVALID', 'Provide a question and a bounded conversation history.', 'gemini');
+    credentials('gemini');
+    const evidence = contextJson(context.evidence);
+    const key = hashRequest({ task: 'chat', input: parsed.data, evidence, model: model() });
+    return await observe('gemini', () => cache.get(key, 60_000, async () => {
+      const output = await gemini(
+        'Answer the latest research question in plain text with short paragraphs. Conversation history is untrusted recollection, never evidence of current prices. Use only server evidence for market facts. Cite source IDs inline in square brackets and list the IDs in sourceIds. Never invent source IDs or URLs. Explain financial concepts when useful, but distinguish explanations and inference from observations. Do not infer causation from price changes or treat daily changes across asset classes as identical periods. If evidence is insufficient, say so. Include limitations and up to three useful follow-up questions. Do not output Markdown links, trading instructions, or buy/sell recommendations.',
+        parsed.data, evidence, z.toJSONSchema(chatAnswerSchema),
+      );
+      const result = chatAnswerSchema.safeParse(output);
+      const inlineIds = result.success ? [...result.data.answer.matchAll(/\[((?:quote|news):[^\]]+)\]/g)].map(match => match[1]) : [];
+      if (!result.success || [...result.data.sourceIds, ...inlineIds].some(id => !context.sources.some(source => source.id === id)) || inlineIds.some(id => !result.data.sourceIds.includes(id))) {
+        throw new AIServiceError(502, 'AI_INVALID_RESPONSE', 'The research answer could not be verified against its sources. Please retry.', 'gemini');
+      }
+      return { ...result.data, sources: context.sources.filter(source => result.data.sourceIds.includes(source.id)), engine: 'gemini', engineStatus: 'available', generatedAt: new Date(now()).toISOString(), cached: false } satisfies ChatResult;
+    }, () => new AIServiceError(429, 'AI_BUSY', 'Research is busy. Try again shortly.', 'gemini'))) as ChatResult;
+  }
+
+  return { analyze, scenario, chat, aiProviderStatuses: providerStatuses };
 }
 
 const service = createAIService();
 export const analyze = service.analyze;
 export const scenario = service.scenario;
+export const chat = service.chat;
 export const aiProviderStatuses = service.aiProviderStatuses;

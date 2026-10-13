@@ -6,7 +6,9 @@ import { z } from 'zod';
 import type { ServerConfig } from './config';
 import { marketService } from './market/index';
 import { liveStreamManager } from './market/liveStream';
-import { analyze, scenario, aiProviderStatuses, AIServiceError } from './ai/index';
+import { analyze, scenario, chat, aiProviderStatuses, AIServiceError } from './ai/index';
+import { chatInputSchema } from '../shared/chat';
+import { prepareChatContext } from './ai/chatContext';
 import { aiSpendingGuard } from './ai/spendingGuard';
 import { metrics } from './metrics';
 import { logger } from './logger';
@@ -411,6 +413,31 @@ export function createApp(config: ServerConfig, production = config.NODE_ENV ===
       }
     })
   );
+
+  app.post('/api/ai/chat', csrfProtection, asyncRoute(async (req, res) => {
+    const input = chatInputSchema.safeParse(req.body);
+    if (!input.success || input.data.symbols.some(symbol => !ASSET_BY_SYMBOL.has(symbol))) {
+      res.status(400).json({ error: 'Enter a question of 3–1600 characters and select supported instruments. Start a new conversation if the history is too long.', code: 'INVALID_INPUT' });
+      return;
+    }
+    if (!process.env.GEMINI_API_KEY?.trim()) {
+      throw new AIServiceError(503, 'AI_NOT_CONFIGURED', 'The research assistant is unavailable until Gemini is configured on the server.', 'gemini');
+    }
+    let release: (() => void) | undefined;
+    try {
+      release = aiSpendingGuard.acquire(getClientId(req, res), isAdminRequest(req, config.ADMIN_DIAGNOSTICS_TOKEN));
+    } catch (cause) {
+      const error = cause as { status?: number; message: string; code?: string; resetInSeconds?: number };
+      if (error.resetInSeconds) res.set('Retry-After', String(error.resetInSeconds));
+      res.status(error.status ?? 429).json({ error: error.message, code: error.code, engineStatus: 'unavailable' });
+      return;
+    }
+    try {
+      const [overview, news] = await Promise.allSettled([marketService.overview(), marketService.news()]);
+      const context = prepareChatContext(overview.status === 'fulfilled' ? overview.value : null, news.status === 'fulfilled' ? news.value : null, input.data.symbols);
+      res.json(await chat(input.data, context));
+    } finally { release?.(); }
+  }));
 
   // Fallthrough for unmatched /api routes
   app.use('/api', (_req, res) => {

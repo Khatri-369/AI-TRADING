@@ -9,6 +9,7 @@ export interface RouteState {
 
 export function parseRoute(pathname: string): RouteState {
   const clean = pathname.replace(/\/+$/, '') || '/';
+  if (clean === '/watchlist') return { page: 'watchlist', symbol: null, path: clean };
   if (clean.startsWith('/asset/')) {
     const raw = clean.slice('/asset/'.length);
     const symbol = decodeURIComponent(raw).trim();
