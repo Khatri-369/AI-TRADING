@@ -50,7 +50,7 @@ export function readConfig(env: NodeJS.ProcessEnv = process.env) {
     data.ADMIN_DIAGNOSTICS_TOKEN = data.AI_ACCESS_TOKEN;
   }
 
-  // Validate placeholder secrets safely without echoing their contents
+  // Validate and clean placeholder secrets safely without echoing their contents
   for (const key of [
     'GEMINI_API_KEY',
     'FINNHUB_API_KEY',
@@ -60,10 +60,17 @@ export function readConfig(env: NodeJS.ProcessEnv = process.env) {
     'GOLD_API_KEY',
     'ADMIN_DIAGNOSTICS_TOKEN',
   ] as const) {
-    const value = data[key];
-    if (value && (/^(MY_|your_|replace_|placeholder|test_token)/i.test(value) || value !== value.trim())) {
+    let value = data[key];
+    if (typeof value === 'string') {
+      value = value.trim();
+      if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
+        value = value.slice(1, -1).trim();
+      }
+      data[key] = value || undefined;
+    }
+    if (value && /^(MY_|your_|replace_|placeholder|test_token)/i.test(value)) {
       throw new Error(
-        `Invalid environment configuration: ${key} must be a real credential without surrounding whitespace, or empty.`
+        `Invalid environment configuration: ${key} must be a real credential or empty.`
       );
     }
   }
