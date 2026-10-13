@@ -76,16 +76,8 @@ export function readConfig(env: NodeJS.ProcessEnv = process.env) {
   }
 
   // Production security checks
-  if (data.NODE_ENV === 'production') {
-    if (data.SESSION_SECRET === 'development-session-secret-key-min-16-chars') {
-      if (process.env.VERCEL) {
-        data.SESSION_SECRET = 'vercel-serverless-session-secret-salt-32chars';
-      } else {
-        throw new Error(
-          'Production configuration error: SESSION_SECRET must be set to a high-entropy string of at least 16 characters in production.'
-        );
-      }
-    }
+  if (data.NODE_ENV === 'production' && data.SESSION_SECRET === 'development-session-secret-key-min-16-chars') {
+    throw new Error('Production configuration error: SESSION_SECRET must be set to a high-entropy string of at least 16 characters in production.');
   }
 
   return data;

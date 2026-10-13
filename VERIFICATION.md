@@ -1,3 +1,25 @@
+# Advanced workspace completion — 13 October 2026
+
+This section records the current pass and supersedes conflicting historical claims below.
+
+Implemented and checked:
+- Chart/plan-aware floating assistant with English/Hindi selection. Attached annotations remain untrusted user hypotheses; actual OHLCV, SMA/EMA and source timestamps are prepared on the backend. Source IDs are validated. Missing history never produces fabricated candles or indicators. Snapshot attachments must be refreshed after editing.
+- Durable price crossings with baseline initialization, freshness/out-of-order checks, quiet hours with IANA timezones, expiry, pause/resume and persisted cooldown reservations. Provider gaps longer than five minutes reinitialize the baseline. Delivery history distinguishes detection, suppression and push-service acceptance.
+- Watchlist news preferences, quiet time, frequency and pause. Tagged instrument matching does not imply exhaustive news coverage. Device subscription requires explicit browser consent.
+- Manual journal with plan references, symbol/tag filtering, costs, long/short P&L, per-currency net results, average wins/losses, win rate, realized drawdown, plan adherence and CSV export. Practice ledger displays currency-specific virtual cash and clearly labeled observed unrealized valuation. Fills remain long-only simulations requiring fresh open-session backend quotes; no broker order endpoint exists.
+- Accounts, explicit guest import, cross-device records, conflict protection, password changes with session revocation, exports and password-confirmed account deletion. Fixed account watchlists leaking into guest storage and stale cloud completions changing the wrong local workspace. Chart autosave preserves edits made while a save is pending and stops automatic retries after errors.
+- Removed hardcoded VAPID credentials, ephemeral Vercel push storage, shared production session-secret fallbacks and serverless error stack disclosure. Missing configuration is visible in `/api/health`. Production session secrets must now be supplied explicitly.
+
+Validation:
+- 64 backend/contract tests and 10 browser scenarios, including authenticated isolation, optimistic concurrency, alerts, journal arithmetic and practice-fill rejection. Lint/TypeScript, standard build and Vercel serverless build pass. Browser coverage includes both themes and 320/390/768/1440px widths. Mobile assistant and desktop journal screenshots were visually inspected.
+- Real authenticated Upstox daily history requests succeeded for RELIANCE, RELIANCE.BSE, NIFTY50, BANKNIFTY and SENSEX. Each returned 19 actual bars for 1M; latest returned bar began `2026-10-11T18:30:00Z`. They were labeled delayed. This after-hours check does not verify an actively moving intraday stream.
+- Gemini's authenticated model listing succeeded, but live chat inference returned provider-unavailable/timeouts for the configured model, including a diagnostic attempt allowed 50 seconds. The live assistant is therefore NOT verified operational. Unit/browser chat tests use labeled fixtures. No alternate provider or model was silently substituted, and the normal 25-second timeout remains in place.
+- Web Push is unconfigured locally; no real device delivery was claimed. Background tasks/account sync require a private persistent backend. Vercel-only mode supports guest storage and read-only serverless APIs; it cannot provide those background/durable features.
+
+Public deployment, provider entitlements/redistribution permission, password recovery, multi-instance storage/quotas and real notification delivery remain separate operator/infrastructure work. See VERCEL_DEPLOYMENT.md for explicit configuration and recovery steps. Nothing in this verification claims a public production deployment.
+
+---
+
 # Research features & Workspace upgrades — 13 October 2026
 
 ## Interactive Trade-Planning Feature Connected to Chart Workspace

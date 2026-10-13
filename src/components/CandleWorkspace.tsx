@@ -1,3 +1,4 @@
+import type { ChatFocus } from '../../shared/chat';
 import { useEffect, useRef, useState, useCallback } from 'react';
 import {
   createChart,
@@ -25,6 +26,7 @@ export default function CandleWorkspace({
   symbol,
   theme,
   onPlan,
+  onAsk,
   onAlert,
   planLevels,
   onPlanLevelChange,
@@ -32,6 +34,7 @@ export default function CandleWorkspace({
   symbol: string;
   theme: ThemeType;
   onPlan?: () => void;
+  onAsk?: (focus: ChatFocus) => void;
   onAlert?: (level: number) => void;
   planLevels?: PlanLevels;
   onPlanLevelChange?: (levelType: 'entry' | 'stop' | 'target', price: number) => void;
@@ -85,21 +88,23 @@ export default function CandleWorkspace({
   useEffect(() => {
     const identity = `${store.user?.id ?? 'guest'}:${layoutId}`;
     const record = store.records.find((r) => r.id === layoutId && r.kind === 'chart');
-    if (loaded.current === identity) return;
+    if (loaded.current === identity && (dirty || version === (record?.version ?? 0))) return;
     loaded.current = identity;
     const parsed = chartLayoutSchema.safeParse(record?.data);
     setDrawings(parsed.success ? parsed.data.drawings : []);
     setVersion(record?.version ?? 0);
     setName(parsed.success ? parsed.data.name : 'Default');
+    if (parsed.success) setInterval(parsed.data.interval);
     setDirty(false);
     setUndo([]);
     setRedo([]);
-  }, [store.records, store.user?.id, layoutId]);
+  }, [store.records, store.user?.id, layoutId, dirty, version]);
 
   const commit = (next: Drawing[]) => {
     setUndo((previous) => [...previous.slice(-29), drawingRef.current]);
     setRedo([]);
     setDrawings(next);
+    setError('');
     setDirty(true);
   };
 
@@ -129,25 +134,32 @@ export default function CandleWorkspace({
     return () => controller.abort();
   }, [symbol, interval, range]);
 
+  const saving = useRef(false);
+  const revision = JSON.stringify({ layoutId, symbol, name, interval, drawings });
+  const latestRevision = useRef(revision);
+  latestRevision.current = revision;
   const save = useCallback(async () => {
+    if (saving.current) return;
+    saving.current = true;
+    const savedRevision = revision;
     try {
       await store.save(layoutId, 'chart', { symbol, name, interval, drawings }, version);
-      setVersion((v) => v + 1);
-      setDirty(false);
+      if (latestRevision.current === savedRevision) setDirty(false);
+      if (JSON.parse(latestRevision.current).layoutId === layoutId) setVersion(v => v + 1);
       setError('');
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Could not save layout.');
-    }
-  }, [store, layoutId, symbol, name, interval, drawings, version]);
+    } finally { saving.current = false; }
+  }, [store, layoutId, symbol, name, interval, drawings, version, revision]);
 
   // Debounced autosave
   useEffect(() => {
-    if (!dirty) return;
+    if (!dirty || error) return;
     const timer = setTimeout(() => {
       void save();
     }, 1200);
     return () => clearTimeout(timer);
-  }, [drawings, name, dirty, save]);
+  }, [drawings, name, dirty, save, error]);
 
   // Lightweight Charts rendering
   useEffect(() => {
@@ -906,6 +918,7 @@ export default function CandleWorkspace({
           value={name}
           onChange={(e) => {
             setName(e.target.value);
+            setError('');
             setDirty(true);
           }}
         />
@@ -995,8 +1008,9 @@ export default function CandleWorkspace({
       )}
 
       {/* Action to create trade plan */}
-      {onPlan && (
-        <button type="button" className="button-primary" onClick={onPlan}>
+      {onAsk && <button className="button-secondary" onClick={() => onAsk({ symbol, interval, range, drawings: drawings.slice(0, 10) })}>Ask assistant about this chart</button>}
+        {onPlan && (
+        <button type="button" className="button-primary" onClick={() => { if (dirty) { setError('Save chart changes before opening a plan.'); return; } onPlan(); }}>
           Create a trade plan
         </button>
       )}

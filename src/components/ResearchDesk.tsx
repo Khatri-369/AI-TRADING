@@ -1,4 +1,9 @@
-import { useEffect, useState } from 'react';
+import NewsPreferences from './NewsPreferences';
+import JournalAnalytics from './JournalAnalytics';
+import PracticeSummary from './PracticeSummary';
+import type { Quote } from '../../shared/types';
+import type { ChatFocus } from '../../shared/chat';
+import { useEffect, useState, useRef } from 'react';
 import { ASSET_BY_SYMBOL } from '../../shared/assets';
 import {
   alertSchema,
@@ -64,9 +69,15 @@ type Event = {
 export default function ResearchDesk({
   theme,
   initialSymbol = 'RELIANCE',
+  onAsk,
+  onNotifications,
+  quotes,
 }: {
   theme: ThemeType;
+  onNotifications: () => void;
+  quotes: Quote[];
   initialSymbol?: string;
+  onAsk?: (focus: ChatFocus) => void;
 }) {
   const store = useResearchStore();
   const [symbol, setSymbol] = useState(
@@ -84,6 +95,9 @@ export default function ResearchDesk({
   const [showChartSync, setShowChartSync] = useState(true);
 
   const [level, setLevel] = useState('');
+  const [cooldown, setCooldown] = useState(15);
+  const [journalFilter, setJournalFilter] = useState('');
+  const [newPassword, setNewPassword] = useState('');
   const [direction, setDirection] = useState<'above' | 'below'>('above');
   const [quietStart, setQuietStart] = useState(22);
   const [quietEnd, setQuietEnd] = useState(8);
@@ -103,6 +117,7 @@ export default function ResearchDesk({
     notes: '',
     followedPlan: false,
     tags: '',
+    planId: '',
   });
 
   const [username, setUsername] = useState('');
@@ -116,13 +131,13 @@ export default function ResearchDesk({
 
   const asset = ASSET_BY_SYMBOL.get(symbol)!;
   const plans = store.records.filter((r) => r.kind === 'plan');
-  const journals = store.records.filter((r) => r.kind === 'journal');
+  const journals = store.records.filter(r => r.kind === 'journal' && [journalSchema.parse(r.data).symbol, journalSchema.parse(r.data).tags].some(value => value.toLowerCase().includes(journalFilter.toLowerCase())));
   const alerts = store.records.filter((r) => r.kind === 'alert');
 
   const candidate = planSchema.safeParse({
     ...plan,
     symbol,
-    exchange: asset.category === 'india' ? 'NSE' : 'US',
+    exchange: symbol.endsWith('.BSE') || symbol === 'SENSEX' ? 'BSE' : asset.category === 'india' ? 'NSE' : asset.category === 'us' ? 'US' : asset.category,
     currency: asset.currency,
     createdAt: editing
       ? ((editing.data as Record<string, unknown>).createdAt as string) ?? new Date().toISOString()
@@ -140,13 +155,17 @@ export default function ResearchDesk({
 
   const metrics = candidate.success ? planMetrics(candidate.data) : null;
 
+  const activeUser = useRef(store.user?.id);
+  activeUser.current = store.user?.id;
   async function loadExtra() {
+    const owner = store.user?.id;
     if (!store.user) {
       setPaper([]);
       setEvents([]);
       return;
     }
     const response = await workspaceRequest<{ paper: Paper[]; events: Event[] }>('/records');
+    if (activeUser.current !== owner) return;
     setPaper(response.paper);
     setEvents(response.events);
   }
@@ -155,8 +174,10 @@ export default function ResearchDesk({
     void loadExtra().catch(() => undefined);
   }, [store.user?.id, tab]);
 
+  const acting = useRef(false);
   async function act(fn: () => Promise<unknown>) {
-    if (busy) return;
+    if (acting.current) return;
+    acting.current = true;
     setBusy(true);
     setError('');
     try {
@@ -164,6 +185,7 @@ export default function ResearchDesk({
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Action failed.');
     } finally {
+      acting.current = false;
       setBusy(false);
     }
   }
@@ -211,8 +233,8 @@ export default function ResearchDesk({
       const entryNum = Number(plan.entry);
       const stopNum = Number(plan.stop);
       const budgetNum = Number(budget);
-      const feeBpsNum = Number(plan.feeBps) || 10;
-      const slippageBpsNum = Number(plan.slippageBps) || 5;
+      const feeBpsNum = Number(plan.feeBps);
+      const slippageBpsNum = Number(plan.slippageBps);
 
       const result = calculateQuantityFromBudget({
         symbol,
@@ -288,6 +310,8 @@ export default function ResearchDesk({
             onChange={(e) => {
               setSymbol(e.target.value);
               setEditing(null);
+              setPlan(initialPlan);
+              setJournal(previous => ({ ...previous, planId: '' }));
             }}
           >
             {[...ASSET_BY_SYMBOL.values()].map((a) => (
@@ -311,6 +335,7 @@ export default function ResearchDesk({
 
       {tab === 'Chart' && (
         <CandleWorkspace
+          onAsk={onAsk}
           key={symbol}
           symbol={symbol}
           theme={theme}
@@ -350,6 +375,7 @@ export default function ResearchDesk({
             {showChartSync && (
               <div className="mt-3">
                 <CandleWorkspace
+          onAsk={focus => onAsk?.({ ...focus, ...(tab === 'Plan' && candidate.success ? { plan: candidate.data } : {}) })}
                   key={`plan-chart-${symbol}`}
                   symbol={symbol}
                   theme={theme}
@@ -506,8 +532,8 @@ export default function ResearchDesk({
                       const est = estimatePlanCosts(
                         Number(plan.entry) || 0,
                         Number(plan.quantity) || 1,
-                        Number(plan.feeBps) || 10,
-                        Number(plan.slippageBps) || 5
+                        Number(plan.feeBps),
+                        Number(plan.slippageBps)
                       );
                       setPlan({ ...plan, costs: String(est) });
                     }}
@@ -843,6 +869,7 @@ export default function ResearchDesk({
                             costs: String(p.costs),
                             direction: p.direction,
                             notes: p.thesis,
+                            planId: r.id,
                           });
                           setTab('Journal');
                           setEditing(null);
@@ -890,10 +917,10 @@ export default function ResearchDesk({
           </div>
         </div>
       )}
-    {tab === 'Alerts' && <div className="grid gap-4 lg:grid-cols-2"><form className="research-card space-y-3" onSubmit={e => { e.preventDefault(); void act(async () => { const data = alertSchema.parse({ symbol, direction, level: Number(level), paused: false, expiresAt: new Date(`${expiry}T23:59:59Z`).toISOString(), timezone, quietStart, quietEnd }); if (Date.parse(data.expiresAt) <= Date.now()) throw new Error('Choose a future expiration.'); await store.save(editing?.id ?? crypto.randomUUID(), 'alert', data, editing?.version ?? 0); setEditing(null); }); }}><h2 className="font-semibold">Price crossing alert · {symbol}</h2>{numericField('Alert level', level, setLevel)}<select aria-label="Crossing direction" className="field" value={direction} onChange={e => setDirection(e.target.value as typeof direction)}><option value="above">Crosses above</option><option value="below">Crosses below</option></select><label className="block text-xs">Expiration (UTC date)<input className="field block" type="date" value={expiry} onChange={e => setExpiry(e.target.value)} required /></label><label className="block text-xs">Quiet-hours timezone<input className="field w-full" value={timezone} onChange={e => setTimezone(e.target.value)} /></label><div className="flex gap-2">{numericField('Quiet start hour', String(quietStart), v => setQuietStart(Number(v)))}{numericField('Quiet end hour', String(quietEnd), v => setQuietEnd(Number(v)))}</div><p className="text-xs text-[var(--text-muted)]">Equal hours disable quiet time. A fresh baseline is established first; delayed, stale and out-of-order observations never trigger. Quiet-time crossings appear in history without a push. Checks run once a minute on the persistent backend.</p>{!store.user && <p className="text-sm">Guest rules are saved drafts. Sign in and import them to activate server evaluation.</p>}<button className="button-primary" disabled={busy}>Save alert</button><button type="button" className="button-secondary" onClick={() => void act(loadExtra)}>Refresh alert history</button></form><div className="space-y-3">{alerts.map(r => { const a = alertSchema.parse(r.data); return <article key={r.id} className="research-card"><p>{a.symbol} crosses {a.direction} {a.level} · {a.paused ? 'Paused' : store.user ? 'Enabled' : 'Guest draft'}</p><div className="mt-2 flex gap-2"><button className="button-secondary" onClick={() => void act(() => store.save(r.id, 'alert', { ...a, paused: !a.paused }, r.version))}>{a.paused ? 'Resume' : 'Pause'}</button><button className="button-secondary" onClick={() => { setEditing(r); setSymbol(a.symbol); setDirection(a.direction); setLevel(String(a.level)); setExpiry(a.expiresAt.slice(0, 10)); setTimezone(a.timezone); setQuietStart(a.quietStart); setQuietEnd(a.quietEnd); }}>Edit</button><button className="button-secondary" onClick={() => void act(() => store.remove(r))}>Delete</button></div></article>; })}<h3 className="font-semibold">Detection & delivery history</h3>{events.map(event => <p key={event.id} className="research-card text-xs">{event.symbol} · {event.price} · {event.asOf} · {event.status} · {event.delivery}. Push accepted means accepted by the push service, not confirmed on the device.</p>)}</div></div>}
-    {tab === 'Journal' && <div className="space-y-4"><form className="research-card space-y-3" onSubmit={e => { e.preventDefault(); void act(async () => { const value = journalSchema.parse({ ...journal, symbol, entry: Number(journal.entry), exit: Number(journal.exit), quantity: Number(journal.quantity), costs: Number(journal.costs), openedAt: new Date(journal.openedAt).toISOString(), closedAt: new Date(journal.closedAt).toISOString() }); await store.save(editing?.id ?? crypto.randomUUID(), 'journal', value, editing?.version ?? 0); setEditing(null); }); }}><h2 className="font-semibold">Record a completed trade · manual entry</h2><select aria-label="Journal direction" className="field" value={journal.direction} onChange={e => setJournal({ ...journal, direction: e.target.value as 'long' | 'short' })}><option value="long">Long</option><option value="short">Short</option></select><div className="grid grid-cols-2 md:grid-cols-4 gap-3">{(['entry', 'exit', 'quantity', 'costs'] as const).map(key => <div key={key}>{numericField(`Journal ${key}`, journal[key], value => setJournal({ ...journal, [key]: value }))}</div>)}</div><div className="flex flex-wrap gap-3">{(['openedAt', 'closedAt'] as const).map(key => <label key={key} className="text-xs">{key === 'openedAt' ? 'Entry date (UTC)' : 'Exit date (UTC)'}<input className="field block" type="date" value={journal[key]} onChange={e => setJournal({ ...journal, [key]: e.target.value })} required /></label>)}</div><label className="block text-xs">Lessons and original thesis<textarea className="field block w-full" maxLength={2000} value={journal.notes} onChange={e => setJournal({ ...journal, notes: e.target.value })} /></label><label className="block text-xs">Tags<input className="field block" maxLength={160} value={journal.tags} onChange={e => setJournal({ ...journal, tags: e.target.value })} /></label><label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={journal.followedPlan} onChange={e => setJournal({ ...journal, followedPlan: e.target.checked })} />I followed my plan</label><button className="button-primary" disabled={busy}>Save journal entry</button></form><div className="research-card space-y-3"><h3 className="font-semibold">Review by currency · closed entries only</h3>{[...new Set(journals.map(r => ASSET_BY_SYMBOL.get(journalSchema.parse(r.data).symbol)!.currency))].map(currency => { const entries = journals.map(r => journalSchema.parse(r.data)).filter(j => ASSET_BY_SYMBOL.get(j.symbol)?.currency === currency).sort((a, b) => a.closedAt.localeCompare(b.closedAt)); const outcomes = entries.map(journalPnl); let equity = 0; let peak = 0; let drawdown = 0; for (const value of outcomes) { equity += value; peak = Math.max(peak, equity); drawdown = Math.max(drawdown, peak - equity); } return <p key={currency} className="text-sm">{currency}: net {equity.toFixed(2)} · realized drawdown {drawdown.toFixed(2)} · plan adherence {entries.filter(j => j.followedPlan).length}/{entries.length}. {entries.length < 10 ? 'Small sample; avoid performance conclusions.' : 'Based only on manually entered closed trades.'}</p>; })}<button className="button-secondary" onClick={() => { const rows = journals.map(r => journalSchema.parse(r.data)); const cell = (value: unknown) => `"${String(value).replace(/^[=+@-]/, "'$&").replaceAll('"', '""')}"`; download('trading-journal.csv', ['symbol,currency,entry,exit,quantity,costs,net,notes', ...rows.map(j => [j.symbol, ASSET_BY_SYMBOL.get(j.symbol)?.currency, j.entry, j.exit, j.quantity, j.costs, journalPnl(j), j.notes].map(cell).join(','))].join('\n'), 'text/csv'); }}>Export CSV</button></div>{journals.map(r => { const j = journalSchema.parse(r.data); return <article key={r.id} className="research-card"><h3>{j.symbol} · Net {journalPnl(j).toFixed(2)} {ASSET_BY_SYMBOL.get(j.symbol)?.currency}</h3><p className="text-sm whitespace-pre-wrap">{j.notes}</p><div className="flex gap-2 mt-2"><button className="button-secondary" onClick={() => { setEditing(r); setSymbol(j.symbol); setJournal({ ...j, entry: String(j.entry), exit: String(j.exit), quantity: String(j.quantity), costs: String(j.costs), openedAt: j.openedAt.slice(0, 10), closedAt: j.closedAt.slice(0, 10) }); }}>Correct entry</button><button className="button-secondary" onClick={() => void act(() => store.remove(r))}>Delete</button></div></article>; })}</div>}
-    {tab === 'Practice' && <div className="space-y-4"><form className="research-card space-y-3" onSubmit={e => { e.preventDefault(); void act(async () => { await workspaceRequest('/paper', { id: orderId, symbol, quantity: Number(quantity), feeBps: Number(feeBps), slippageBps: Number(slippageBps) }); setOrderId(crypto.randomUUID()); await loadExtra(); }); }}><h2 className="font-semibold">SIMULATED practice account</h2><p className="text-sm">100,000 virtual units per currency, independently funded. Whole-unit equity/ETF long positions only. Fills use the backend’s latest fresh open-session quote, plus your slippage and fees. No limit orders, shorting or real execution.</p><div className="grid grid-cols-3 gap-2">{numericField('Practice quantity', quantity, setQuantity)}{numericField('Fees (basis points per side)', feeBps, setFeeBps)}{numericField('Slippage (basis points per side)', slippageBps, setSlippageBps)}</div><button className="button-primary" disabled={busy || !store.user}>Simulate market buy</button>{!store.user && <p className="text-sm">Sign in to use the durable practice ledger.</p>}<p className="text-xs text-[var(--text-muted)]">Simulations exclude liquidity and queue position. Results do not establish expected real-world performance.</p></form>{paper.map(p => <article className="research-card" key={p.id}><h3>SIMULATED · {p.symbol} · {p.exit === null ? 'Open' : 'Closed'}</h3><p className="text-sm">{p.quantity} units · entry {p.entry.toFixed(4)} {p.currency} · fees {p.fees.toFixed(4)} · {p.openedAt}</p>{p.exit === null ? <button className="button-secondary mt-2" disabled={busy} onClick={() => void act(async () => { await workspaceRequest(`/paper/${p.id}/close`, {}); await loadExtra(); })}>Simulate closing position</button> : <p>Net realized {((p.exit - p.entry) * p.quantity - p.fees).toFixed(2)} {p.currency}</p>}</article>)}</div>}
-    {tab === 'Account' && <div className="research-card max-w-xl space-y-4"><h2 className="font-semibold">Phone & desktop workspace</h2>{!store.user ? <form className="space-y-3" onSubmit={e => { e.preventDefault(); void act(async () => { await store.auth('login', username, password); setPassword(''); }); }}><p className="text-sm">Use the same account on each device. Guest records remain local until you choose to import them.</p><label className="block text-xs">Username<input className="field block w-full" autoComplete="username" value={username} onChange={e => setUsername(e.target.value)} required pattern="[a-zA-Z0-9_-]{3,40}" /></label><label className="block text-xs">Password (12+ characters)<input className="field block w-full" type="password" autoComplete="current-password" value={password} onChange={e => setPassword(e.target.value)} minLength={12} maxLength={128} required /></label><div className="flex gap-2"><button className="button-primary" disabled={busy}>Sign in</button><button className="button-secondary" disabled={busy || password.length < 12} type="button" onClick={() => void act(async () => { await store.auth('register', username, password); setPassword(''); })}>Create account</button></div><p className="text-xs">Use a password manager. Automated password recovery is not available in this initial account implementation.</p></form> : <><p>Signed in as {store.user.username}</p><div className="flex flex-wrap gap-2"><button className="button-secondary" disabled={busy} onClick={() => void act(store.refresh)}>Refresh synced data</button><button className="button-secondary" disabled={busy} onClick={() => void act(store.importLocal)}>Import this browser’s guest records</button><button className="button-secondary" disabled={busy} onClick={() => void act(async () => download('research-export.json', JSON.stringify(await workspaceRequest('/export'), null, 2)))}>Export account data</button><button className="button-secondary" disabled={busy} onClick={() => void act(store.logout)}>Sign out</button></div><p className="text-xs">Signing out also removes this account’s background push subscriptions on all devices. Re-enable alerts on a device after signing in.</p><details><summary className="cursor-pointer">Delete account and all synced data</summary><p className="mt-2 text-sm">This permanently deletes plans, drawings, alerts, journal and practice records. Export first. Local guest copies remain on this browser.</p><input aria-label="Password to delete account" className="field mt-2" type="password" value={password} onChange={e => setPassword(e.target.value)} /><button className="button-secondary mt-2" disabled={busy || !password} onClick={() => void act(async () => { await workspaceRequest('/delete-account', { password }); setPassword(''); await store.refresh(); })}>Permanently delete my account</button></details></>}<p className="text-xs text-[var(--text-muted)]">Cloud sync needs a persistent backend database. Vercel-only deployments retain guest research but cannot store these account records on ephemeral function disks.</p></div>}
+    {tab === 'Alerts' && <div className="grid gap-4 lg:grid-cols-2"><div className="lg:col-span-2"><NewsPreferences key={store.user?.id ?? 'guest'} onNotifications={onNotifications} /></div><form className="research-card space-y-3" onSubmit={e => { e.preventDefault(); void act(async () => { const data = alertSchema.parse({ symbol, direction, level: Number(level), paused: false, expiresAt: new Date(`${expiry}T23:59:59Z`).toISOString(), timezone, quietStart, quietEnd, cooldownMinutes: cooldown }); if (Date.parse(data.expiresAt) <= Date.now()) throw new Error('Choose a future expiration.'); await store.save(editing?.id ?? crypto.randomUUID(), 'alert', data, editing?.version ?? 0); setEditing(null); }); }}><h2 className="font-semibold">Price crossing alert · {symbol}</h2>{numericField('Alert level', level, setLevel)}{numericField('Cooldown minutes', String(cooldown), v => setCooldown(Number(v)))}<select aria-label="Crossing direction" className="field" value={direction} onChange={e => setDirection(e.target.value as typeof direction)}><option value="above">Crosses above</option><option value="below">Crosses below</option></select><label className="block text-xs">Expiration (UTC date)<input className="field block" type="date" value={expiry} onChange={e => setExpiry(e.target.value)} required /></label><label className="block text-xs">Quiet-hours timezone<input className="field w-full" value={timezone} onChange={e => setTimezone(e.target.value)} /></label><div className="flex gap-2">{numericField('Quiet start hour', String(quietStart), v => setQuietStart(Number(v)))}{numericField('Quiet end hour', String(quietEnd), v => setQuietEnd(Number(v)))}</div><p className="text-xs text-[var(--text-muted)]">Equal hours disable quiet time. A fresh baseline is established first; delayed, stale and out-of-order observations never trigger. Quiet-time crossings appear in history without a push. Checks run once a minute on the persistent backend. Cooldowns suppress repeated crossings; gaps over five minutes establish a new baseline.</p>{!store.user && <p className="text-sm">Guest rules are saved drafts. Sign in and import them to activate server evaluation.</p>}<button className="button-primary" disabled={busy}>Save alert</button><button type="button" className="button-secondary" onClick={() => void act(loadExtra)}>Refresh alert history</button></form><div className="space-y-3">{alerts.map(r => { const a = alertSchema.parse(r.data); return <article key={r.id} className="research-card"><p>{a.symbol} crosses {a.direction} {a.level} · {Date.parse(a.expiresAt) <= Date.now() ? 'Expired' : a.paused ? 'Paused' : store.user ? 'Enabled' : 'Guest draft'}</p><div className="mt-2 flex gap-2"><button className="button-secondary" onClick={() => void act(() => store.save(r.id, 'alert', { ...a, paused: !a.paused }, r.version))}>{a.paused ? 'Resume' : 'Pause'}</button><button className="button-secondary" onClick={() => { setEditing(r); setSymbol(a.symbol); setDirection(a.direction); setLevel(String(a.level)); setExpiry(a.expiresAt.slice(0, 10)); setTimezone(a.timezone); setQuietStart(a.quietStart); setQuietEnd(a.quietEnd); setCooldown(a.cooldownMinutes ?? 15); }}>Edit</button><button className="button-secondary" onClick={() => void act(() => store.remove(r))}>Delete</button></div></article>; })}<h3 className="font-semibold">Detection & delivery history</h3>{events.map(event => <p key={event.id} className="research-card text-xs">{event.symbol} · {event.price} · {event.asOf} · {event.status} · {event.delivery}. Push accepted means accepted by the push service, not confirmed on the device.</p>)}</div></div>}
+    {tab === 'Journal' && <div className="space-y-4"><label className="block text-xs">Filter journal by symbol or tag<input className="field block w-full" value={journalFilter} onChange={e => setJournalFilter(e.target.value)} /></label><form className="research-card space-y-3" onSubmit={e => { e.preventDefault(); void act(async () => { const value = journalSchema.parse({ ...journal, symbol, entry: Number(journal.entry), exit: Number(journal.exit), quantity: Number(journal.quantity), costs: Number(journal.costs), openedAt: new Date(journal.openedAt).toISOString(), closedAt: new Date(journal.closedAt).toISOString() }); await store.save(editing?.id ?? crypto.randomUUID(), 'journal', value, editing?.version ?? 0); setEditing(null); }); }}><h2 className="font-semibold">Record a completed trade · manual entry</h2>{journal.planId && <p className="text-xs">Linked plan: {journal.planId}</p>}<select aria-label="Journal direction" className="field" value={journal.direction} onChange={e => setJournal({ ...journal, direction: e.target.value as 'long' | 'short' })}><option value="long">Long</option><option value="short">Short</option></select><div className="grid grid-cols-2 md:grid-cols-4 gap-3">{(['entry', 'exit', 'quantity', 'costs'] as const).map(key => <div key={key}>{numericField(`Journal ${key}`, journal[key], value => setJournal({ ...journal, [key]: value }))}</div>)}</div><div className="flex flex-wrap gap-3">{(['openedAt', 'closedAt'] as const).map(key => <label key={key} className="text-xs">{key === 'openedAt' ? 'Entry date (UTC)' : 'Exit date (UTC)'}<input className="field block" type="date" value={journal[key]} onChange={e => setJournal({ ...journal, [key]: e.target.value })} required /></label>)}</div><label className="block text-xs">Lessons and original thesis<textarea className="field block w-full" maxLength={2000} value={journal.notes} onChange={e => setJournal({ ...journal, notes: e.target.value })} /></label><label className="block text-xs">Tags<input className="field block" maxLength={160} value={journal.tags} onChange={e => setJournal({ ...journal, tags: e.target.value })} /></label><label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={journal.followedPlan} onChange={e => setJournal({ ...journal, followedPlan: e.target.checked })} />I followed my plan</label><button className="button-primary" disabled={busy}>Save journal entry</button></form><JournalAnalytics records={journals} /><div className="research-card space-y-3"><button className="button-secondary" onClick={() => { const rows = journals.map(r => journalSchema.parse(r.data)); const cell = (value: unknown) => `"${String(value).replace(/^[=+@-]/, "'$&").replaceAll('"', '""')}"`; download('trading-journal.csv', ['symbol,currency,direction,openedAt,closedAt,entry,exit,quantity,costs,net,followedPlan,tags,planId,notes', ...rows.map(j => [j.symbol, ASSET_BY_SYMBOL.get(j.symbol)?.currency, j.direction, j.openedAt, j.closedAt, j.entry, j.exit, j.quantity, j.costs, journalPnl(j), j.followedPlan, j.tags, j.planId ?? '', j.notes].map(cell).join(','))].join('\n'), 'text/csv'); }}>Export CSV</button></div>{journals.map(r => { const j = journalSchema.parse(r.data); return <article key={r.id} className="research-card"><h3>{j.symbol} · Net {journalPnl(j).toFixed(2)} {ASSET_BY_SYMBOL.get(j.symbol)?.currency}</h3><p className="text-sm whitespace-pre-wrap">{j.notes}</p><div className="flex gap-2 mt-2"><button className="button-secondary" onClick={() => { setEditing(r); setSymbol(j.symbol); setJournal({ ...j, planId: j.planId ?? '', entry: String(j.entry), exit: String(j.exit), quantity: String(j.quantity), costs: String(j.costs), openedAt: j.openedAt.slice(0, 10), closedAt: j.closedAt.slice(0, 10) }); }}>Correct entry</button><button className="button-secondary" onClick={() => void act(() => store.remove(r))}>Delete</button></div></article>; })}</div>}
+    {tab === 'Practice' && <div className="space-y-4"><PracticeSummary paper={paper} quotes={quotes} /><button className="button-secondary" disabled={busy || !store.user} onClick={() => void act(async () => { await loadExtra(); setOrderId(crypto.randomUUID()); })}>Refresh practice ledger</button><form className="research-card space-y-3" onSubmit={e => { e.preventDefault(); void act(async () => { await workspaceRequest('/paper', { id: orderId, symbol, quantity: Number(quantity), feeBps: Number(feeBps), slippageBps: Number(slippageBps) }); setOrderId(crypto.randomUUID()); await loadExtra(); }); }}><h2 className="font-semibold">SIMULATED practice account</h2><p className="text-sm">100,000 virtual units per currency, independently funded. Whole-unit equity/ETF long positions only. Fills use the backend’s latest fresh open-session quote, plus your slippage and fees. No limit orders, shorting or real execution.</p><div className="grid grid-cols-3 gap-2">{numericField('Practice quantity', quantity, setQuantity)}{numericField('Fees (basis points per side)', feeBps, setFeeBps)}{numericField('Slippage (basis points per side)', slippageBps, setSlippageBps)}</div><button className="button-primary" disabled={busy || !store.user}>Simulate market buy</button>{!store.user && <p className="text-sm">Sign in to use the durable practice ledger.</p>}<p className="text-xs text-[var(--text-muted)]">Simulations exclude liquidity and queue position. Results do not establish expected real-world performance.</p></form>{paper.map(p => <article className="research-card" key={p.id}><h3>SIMULATED · {p.symbol} · {p.exit === null ? 'Open' : 'Closed'}</h3><p className="text-sm">{p.quantity} units · entry {p.entry.toFixed(4)} {p.currency} · fees {p.fees.toFixed(4)} · {p.openedAt}</p>{p.exit === null ? <button className="button-secondary mt-2" disabled={busy} onClick={() => void act(async () => { await workspaceRequest(`/paper/${p.id}/close`, {}); await loadExtra(); })}>Simulate closing position</button> : <p>Net realized {((p.exit - p.entry) * p.quantity - p.fees).toFixed(2)} {p.currency}</p>}</article>)}</div>}
+    {tab === 'Account' && <div className="research-card max-w-xl space-y-4"><h2 className="font-semibold">Phone & desktop workspace</h2>{!store.user ? <form className="space-y-3" onSubmit={e => { e.preventDefault(); void act(async () => { await store.auth('login', username, password); setPassword(''); }); }}><p className="text-sm">Use the same account on each device. Guest records remain local until you choose to import them.</p><label className="block text-xs">Username<input className="field block w-full" autoComplete="username" value={username} onChange={e => setUsername(e.target.value)} required pattern="[a-zA-Z0-9_-]{3,40}" /></label><label className="block text-xs">Password (12+ characters)<input className="field block w-full" type="password" autoComplete="current-password" value={password} onChange={e => setPassword(e.target.value)} minLength={12} maxLength={128} required /></label><div className="flex gap-2"><button className="button-primary" disabled={busy}>Sign in</button><button className="button-secondary" disabled={busy || password.length < 12} type="button" onClick={() => void act(async () => { await store.auth('register', username, password); setPassword(''); })}>Create account</button></div><p className="text-xs">Use a password manager. Automated password recovery is not available in this initial account implementation.</p></form> : <><p>Signed in as {store.user.username}</p><div className="flex flex-wrap gap-2"><button className="button-secondary" disabled={busy} onClick={() => void act(store.refresh)}>Refresh synced data</button><button className="button-secondary" disabled={busy} onClick={() => void act(store.importLocal)}>Import this browser’s guest records</button><button className="button-secondary" disabled={busy} onClick={() => void act(async () => download('research-export.json', JSON.stringify(await workspaceRequest('/export'), null, 2)))}>Export account data</button><button className="button-secondary" disabled={busy} onClick={() => void act(store.logout)}>Sign out</button></div><form className="space-y-2" onSubmit={e => { e.preventDefault(); void act(async () => { await workspaceRequest('/change-password', { current: password, next: newPassword }); setPassword(''); setNewPassword(''); await store.refresh(); }); }}><h3 className="font-medium">Change password</h3><input aria-label="Current password" className="field block w-full" type="password" autoComplete="current-password" required value={password} onChange={e => setPassword(e.target.value)} /><input aria-label="New password" className="field block w-full" type="password" autoComplete="new-password" minLength={12} maxLength={128} required value={newPassword} onChange={e => setNewPassword(e.target.value)} /><button disabled={busy} className="button-secondary">Update password and revoke other sessions</button></form><p className="text-xs">Signing out also removes this account’s background push subscriptions on all devices. Re-enable alerts on a device after signing in.</p><details><summary className="cursor-pointer">Delete account and all synced data</summary><p className="mt-2 text-sm">This permanently deletes plans, drawings, alerts, journal and practice records. Export first. Local guest copies remain on this browser.</p><input aria-label="Password to delete account" className="field mt-2" type="password" value={password} onChange={e => setPassword(e.target.value)} /><button className="button-secondary mt-2" disabled={busy || !password} onClick={() => void act(async () => { await workspaceRequest('/delete-account', { password }); setPassword(''); await store.refresh(); })}>Permanently delete my account</button></details></>}<p className="text-xs text-[var(--text-muted)]">Cloud sync needs a persistent backend database. Vercel-only deployments retain guest research but cannot store these account records on ephemeral function disks.</p></div>}
     </section>
   );
 }

@@ -226,3 +226,8 @@ test('configuration rejects invalid port and placeholder secrets without echoing
     (error) => error instanceof Error && !error.message.includes('MY_SECRET')
   );
 });
+
+
+test('production requires an explicit session secret even on Vercel', () => {
+  assert.throws(() => readConfig({ NODE_ENV: 'production', VERCEL: '1' }), /SESSION_SECRET/);
+});

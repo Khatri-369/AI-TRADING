@@ -10,6 +10,7 @@ import { newsPush } from './server/push';
 import { marketService } from './server/market';
 import { startWorkspaceAlerts } from './server/workspace/worker';
 
+if (process.argv.includes('--production')) process.env.NODE_ENV = 'production';
 const config = readConfig();
 const production = process.argv.includes('--production') || config.NODE_ENV === 'production';
 const app = createApp(config, production);

@@ -59,3 +59,26 @@ test('expired push endpoints are pruned and corrupt storage is not silently repl
     assert.equal(await readFile(path, 'utf8'), 'corrupt');
   } finally { await rm(dir, { recursive: true, force: true }); }
 });
+
+
+test('account news selects watchlist stories, honors quiet time and survives duplicate delivery attempts', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'markets-push-preferences-'));
+  try {
+    let now = Date.parse('2026-10-13T08:00:00Z');
+    let muted = false;
+    const sent: string[] = [];
+    const service = new NewsPushService({ path: join(dir, 'subscriptions.json'), publicKey: 'A'.repeat(87), privateKey: 'B'.repeat(43), subject: 'mailto:test@example.com', now: () => now,
+      send: async (_subscription, body) => { sent.push(body); }, preferences: () => ({ scope: 'watchlist', symbols: ['TCS'], frequencyMinutes: 30, muted }) });
+    await service.subscribe(subscription, '123');
+    now += 60000;
+    const articles = ['AAPL', 'TCS'].map((symbol, i) => ({ id: symbol, headline: symbol + ' headline', publishedAt: new Date(now - i * 1000).toISOString(), source: 'test', relatedAssets: [symbol], summary: '', url: 'https://example.com' }));
+    const news: NewsResponse = { articles, provider: 'test', status: 'live', cached: false, fetchedAt: null };
+    muted = true; await service.deliver(news); assert.equal(sent.length, 0);
+    muted = false; await service.deliver(news); assert.equal(sent.length, 1);
+    assert.equal(JSON.parse(sent[0]).body, 'TCS headline');
+    now += 5 * 60000; articles[1].publishedAt = new Date(now).toISOString();
+    await service.deliver(news); assert.equal(sent.length, 1);
+    now += 30 * 60000; await service.deliver(news); assert.equal(sent.length, 2);
+    await service.removeOwner('123'); assert.equal(await service.notifyOwner('123', 'test'), 'no-subscription');
+  } finally { assert.ok(dir.startsWith(join(tmpdir(), 'markets-push-preferences-'))); await rm(dir, { recursive: true, force: true }); }
+});

@@ -186,10 +186,11 @@ export function convertCurrency(
 export const journalSchema = z.object({ symbol: z.string().max(30), direction: z.enum(['long', 'short']), entry: z.number().positive(), exit: z.number().positive(), quantity: z.number().positive().max(1000000), costs: z.number().nonnegative(), openedAt: z.string().datetime(), closedAt: z.string().datetime(), notes: z.string().max(2000), followedPlan: z.boolean(), tags: z.string().max(160), planId: z.string().max(80).optional() }).refine(j => j.closedAt >= j.openedAt, 'Exit date must follow entry');
 export type Journal = z.infer<typeof journalSchema>;
 export function journalPnl(j: Journal) { return (j.exit - j.entry) * (j.direction === 'long' ? 1 : -1) * j.quantity - j.costs; }
-export const alertSchema = z.object({ symbol: z.string().max(30), direction: z.enum(['above', 'below']), level: z.number().positive(), paused: z.boolean().default(false), expiresAt: z.string().datetime(), timezone: z.string().max(60).refine(value => { try { new Intl.DateTimeFormat('en', { timeZone: value }); return true; } catch { return false; } }), quietStart: z.number().int().min(0).max(23), quietEnd: z.number().int().min(0).max(23) });
-export type PriceAlert = z.infer<typeof alertSchema>;
+export const alertSchema = z.object({ symbol: z.string().max(30), direction: z.enum(['above', 'below']), level: z.number().positive(), paused: z.boolean().default(false), cooldownMinutes: z.number().int().min(1).max(1440).optional().default(15), expiresAt: z.string().datetime(), timezone: z.string().max(60).refine(value => { try { new Intl.DateTimeFormat('en', { timeZone: value }); return true; } catch { return false; } }), quietStart: z.number().int().min(0).max(23), quietEnd: z.number().int().min(0).max(23) });
+export type PriceAlert = z.input<typeof alertSchema>;
+export const newsPreferencesSchema = z.object({ scope: z.enum(['all', 'watchlist']).default('watchlist'), paused: z.boolean().default(false), timezone: alertSchema.shape.timezone, quietStart: alertSchema.shape.quietStart, quietEnd: alertSchema.shape.quietEnd, frequencyMinutes: z.number().int().min(5).max(1440).default(30) });
 export const chartLayoutSchema = z.object({ symbol: z.string().max(30), name: z.string().min(1).max(60), interval: z.enum(intervals), drawings: z.array(drawingSchema).max(50) });
-export const recordSchemas = { chart: chartLayoutSchema, plan: planSchema, journal: journalSchema, alert: alertSchema, watchlist: z.object({ symbols: z.array(z.string().max(30)).max(100) }) };
+export const recordSchemas = { preferences: newsPreferencesSchema, chart: chartLayoutSchema, plan: planSchema, journal: journalSchema, alert: alertSchema, watchlist: z.object({ symbols: z.array(z.string().max(30)).max(100) }) };
 export type RecordKind = keyof typeof recordSchemas;
 export type ResearchRecord = { id: string; kind: RecordKind; version: number; data: unknown; updatedAt: string };
 export function movingAverage(candles: Candle[], period: number, exponential = false) {
@@ -201,4 +202,18 @@ export function movingAverage(candles: Candle[], period: number, exponential = f
     result.push({ time: candles[i].time, value: previous });
   }
   return result;
+}
+
+/** Closed-trade statistics, evaluated separately for each native currency by callers. */
+export function journalStatistics(entries: Journal[]) {
+  const outcomes = [...entries].sort((a, b) => a.closedAt.localeCompare(b.closedAt)).map(journalPnl);
+  const gains = outcomes.filter(n => n > 0), losses = outcomes.filter(n => n < 0);
+  let net = 0, peak = 0, drawdown = 0;
+  const equity = outcomes.map(n => { net += n; peak = Math.max(peak, net); drawdown = Math.max(drawdown, peak - net); return net; });
+  return { count: entries.length, net, drawdown, equity,
+    winRate: entries.length ? gains.length / entries.length * 100 : null,
+    averageWin: gains.length ? gains.reduce((a, b) => a + b, 0) / gains.length : null,
+    averageLoss: losses.length ? losses.reduce((a, b) => a + b, 0) / losses.length : null,
+    adherence: entries.length ? entries.filter(e => e.followedPlan).length / entries.length * 100 : null,
+  };
 }

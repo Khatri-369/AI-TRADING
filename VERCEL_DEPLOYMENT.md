@@ -45,7 +45,7 @@ The worker sends at most one newest headline per subscriber per check, only for 
 2. Select `Khatri-369/AI-TRADING`. Use the branch containing these changes. Choose a new project name such as `global-markets-research`; do not select or overwrite an existing unrelated project.
 3. Use **Other** as the framework preset. The checked-in `vercel.json` selects `npm run build:vercel`. Leave Output Directory unset: the script produces Vercel Build Output API files under `.vercel/output`.
 4. Add `BACKEND_ORIGIN` containing the backend HTTPS origin, for example `https://your-backend.example` (no `/api` suffix, credentials, query, or path). Do not add provider keys to the frontend project.
-5. Deploy. Without a backend origin, the build intentionally fails instead of publishing a website with broken APIs.
+5. Deploy. Without BACKEND_ORIGIN, the build creates a Vercel function for read-only API requests. Configure backend secrets and a private SESSION_SECRET on that function. This mode cannot provide durable accounts, price-alert workers or background news push; guest research remains browser-local. Use the persistent backend for the complete workspace.
 
 CLI alternative, after signing in with `npx vercel login`: link a new project with `npx vercel link`, set `BACKEND_ORIGIN` using Vercel environment settings, then create a preview deployment with `npx vercel`. Verify the preview before promoting production. Never deploy prebuilt artifacts containing a test/example backend origin.
 
@@ -67,3 +67,20 @@ The same-origin API proxy preserves frontend API paths. SSE may disconnect at pr
 Keep the backend and VAPID keys stable across frontend releases. Revert/promote a known-good frontend deployment using Vercel. Back up the private subscription file before backend upgrades; do not restore an old file containing subscriptions that users have since revoked. Disable the worker by removing its push configuration and restarting if delivery must be suspended.
 
 References: [Vercel function duration limits](https://vercel.com/docs/functions/limitations), [Build Output API](https://vercel.com/docs/build-output-api), [Web app service workers and push](https://web.dev/learn/pwa/service-workers).
+
+
+## Account workspace, alert workers and recovery
+
+Set `WORKSPACE_DB_PATH=/data/research.sqlite` on the persistent backend. Node 22.14+ is required for built-in SQLite; Node 24 is used for local verification. Use a private persistent disk accessible only to the service account. Never put this database in `public`, `dist/client` or a Git commit. Run exactly one backend instance: SQLite storage, notification reservation and the AI quota guard are designed for that deployment.
+
+The account API uses scrypt password hashes, opaque hashed seven-day session tokens and HTTP-only SameSite cookies. Production requires HTTPS. Changing a password revokes existing sessions; signing out revokes the account's push subscriptions on all devices. Password recovery via email is not implemented; use a password manager. Account deletion requires the current password and removes the account's synced records; previously downloaded exports and guest copies remain under the user's control.
+
+Charts, plans, journals, alerts, news preferences and watchlists sync through explicit record versions. A stale edit receives HTTP 409 instead of overwriting another device. Reload the latest record before reapplying edits. Guest import is explicit and skips IDs already present in the account. Failed cloud writes never become silent guest writes.
+
+Price alerts check once per minute, require fresh open-session observations, and establish a baseline before triggering. Missing observations for over five minutes establish a new baseline. Quiet-hour and cooldown events are logged without delivery. Checks cannot guarantee detecting crossings between samples. Reservations prioritize avoiding duplicate notifications over guaranteed delivery after a crash. Push acceptance is not proof of device receipt. Account news defaults to the saved watchlist; coverage depends on provider tags. News preferences control quiet hours and frequency. Renew the device subscription after signing in so it is associated with the correct account.
+
+Earlier code included shared default VAPID credentials. Those defaults are removed. If they were ever deployed, generate a new private pair and have browsers disable/re-enable notifications. The app now reports push as unconfigured until all VAPID settings and a persistent PUSH_STORE_PATH are supplied. Vercel's temporary disk is never accepted for these subscriptions.
+
+For a consistent backup, stop the single backend and securely copy the SQLite database plus any `-wal`/`-shm` files and the private push store before restarting. Keep encrypted, access-controlled backups with a retention/deletion policy. Test restoration on an isolated backend before upgrades. Restoring a backup must not re-enable revoked push consent or resurrect deleted accounts; reconcile deletions and disable delivery during restoration.
+
+The `/api/health` feature flags distinguish account storage, price-alert worker configuration, push configuration and disabled order placement. These are configuration checks, not delivery or availability guarantees. Confirm a real opt-in notification on each target mobile/desktop platform before public release. Public deployment and provider display/redistribution permissions remain operator prerequisites.

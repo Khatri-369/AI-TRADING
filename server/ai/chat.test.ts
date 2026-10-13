@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createAIService } from './index';
-import { prepareChatContext } from './chatContext';
+import { prepareChatContext, prepareChartEvidence } from './chatContext';
 import { chatInputSchema } from '../../shared/chat';
 
 const input = { message: 'Explain this market evidence', history: [], symbols: [] };
@@ -51,4 +51,27 @@ test('context gracefully represents provider outages and excludes unrelated news
   const news = { articles: [{ id: '1', headline: 'Other asset', source: 'Test', url: 'javascript:alert(1)', publishedAt: '2026-10-13T10:00:00Z', summary: 'Test', relatedAssets: ['AAPL'] }], provider: 'Test', status: 'delayed' as const, fetchedAt: null, cached: false };
   assert.equal(prepareChatContext(null, news, ['NIFTY50']).sources.length, 0);
   assert.equal(prepareChatContext(null, news, []).sources[0].url, null);
+});
+
+
+test('chart evidence uses server candles, bounds history and labels user drawings as annotations', () => {
+  const focus = { symbol: 'RELIANCE', interval: '1d' as const, range: '1M' as const, drawings: [{ id: 'note', type: 'level' as const, a: { time: 1, price: 999999 }, text: 'not an observed price', locked: false }] };
+  const candles = Array.from({ length: 80 }, (_, i) => ({ time: new Date(Date.UTC(2026, 0, i + 1)).toISOString(), open: 100 + i, high: 102 + i, low: 99 + i, close: 101 + i, volume: 1000 }));
+  const context = prepareChartEvidence(focus, { candles, provider: 'test-only', status: 'delayed', asOf: candles.at(-1)!.time });
+  assert.equal(context.evidence.candles.length, 60);
+  assert.equal(context.evidence.totalBars, 80);
+  assert.equal(context.evidence.sma20?.value, 170.5);
+  assert.equal(JSON.stringify(context.evidence).includes('999999'), false);
+  assert.equal(prepareChartEvidence(focus, null).evidence.sma20, null);
+  assert.equal(chatInputSchema.safeParse({ ...input, focus: { ...focus, candles } }).success, false);
+});
+
+test('Hindi chart requests preserve language and reject invented chart citations', async () => {
+  let bodyText = '';
+  const service = createAIService({ env: { GEMINI_API_KEY: 'unit-test-key' }, fetch: async (_url, init) => {
+    bodyText = String(init?.body);
+    return response({ ...answer, answer: 'Unsupported [chart:FAKE].', sourceIds: ['chart:FAKE'] });
+  } });
+  await assert.rejects(service.chat({ ...input, language: 'hi' }, context), { code: 'AI_INVALID_RESPONSE' });
+  assert.ok(bodyText.includes('Devanagari'));
 });

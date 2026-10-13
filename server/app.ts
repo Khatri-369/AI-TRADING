@@ -8,10 +8,11 @@ import { marketService } from './market/index';
 import { liveStreamManager } from './market/liveStream';
 import { analyze, scenario, chat, aiProviderStatuses, AIServiceError } from './ai/index';
 import { chatInputSchema } from '../shared/chat';
-import { prepareChatContext } from './ai/chatContext';
+import { prepareChatContext, prepareChartEvidence } from './ai/chatContext';
 import { newsPush } from './push';
 import { subscriptionSchema } from './push/service';
 import { intervals } from '../shared/research';
+import { workspaceStore } from './workspace/store';
 import { workspaceRouter, workspaceUser } from './workspace/routes';
 import { aiSpendingGuard } from './ai/spendingGuard';
 import { metrics } from './metrics';
@@ -158,6 +159,8 @@ export function createApp(config: ServerConfig, production = config.NODE_ENV ===
     })
   );
 
+  // Chart annotations and multilingual conversations need a bounded larger body.
+  app.use(['/api/workspace', '/api/ai/chat'], express.json({ limit: '64kb', strict: true }));
   app.use(express.json({ limit: '16kb', strict: true }));
   app.use('/api/workspace', workspaceRouter(production));
 
@@ -181,19 +184,23 @@ export function createApp(config: ServerConfig, production = config.NODE_ENV ===
    * Sanitized Public Health Endpoint.
    * Publicly accessible, fast, discloses zero internal keys or unmasked hostnames.
    */
-  app.get('/api/health', (_req, res) => {
+  app.get('/api/health', asyncRoute(async (_req, res) => {
     const rawProviders = [...marketService.providerStatuses(), ...aiProviderStatuses()];
     const providers = rawProviders.map((p) => ({
       id: p.id,
       name: p.name,
-      status: p.configured ? 'connected' : 'unconfigured',
+      status: p.configured ? p.status : p.id.startsWith('upstox') ? 'UNCONFIGURED' : 'unconfigured',
     }));
 
     const isDegraded = rawProviders.some(
       (p) => p.configured && (p.status === 'unavailable' || p.status === 'rate-limited')
     );
 
+    let accountStorage = false;
+    try { workspaceStore(); accountStorage = true; } catch { /* Optional persistent storage. */ }
+    const push = await newsPush.status();
     res.json({
+      features: { accountSync: accountStorage ? 'configured' : 'unconfigured', backgroundPriceAlerts: accountStorage && !process.env.VERCEL ? 'configured' : 'unconfigured', webPush: push.configured ? 'configured' : 'unconfigured', orderPlacement: 'disabled' },
       status: isDegraded ? 'degraded' : 'ok',
       version: '1.0.0',
       uptimeSeconds: metrics.getUptimeSeconds(),
@@ -207,7 +214,7 @@ export function createApp(config: ServerConfig, production = config.NODE_ENV ===
         ? 'protected'
         : 'disabled',
     });
-  });
+  }));
 
   /**
    * Protected Administrative Diagnostics Endpoint.
@@ -448,7 +455,7 @@ export function createApp(config: ServerConfig, production = config.NODE_ENV ===
 
   app.post('/api/ai/chat', csrfProtection, asyncRoute(async (req, res) => {
     const input = chatInputSchema.safeParse(req.body);
-    if (!input.success || input.data.symbols.some(symbol => !ASSET_BY_SYMBOL.has(symbol))) {
+    if (!input.success || input.data.symbols.some(symbol => !ASSET_BY_SYMBOL.has(symbol)) || input.data.focus && (!ASSET_BY_SYMBOL.has(input.data.focus.symbol) || input.data.focus.plan && input.data.focus.plan.symbol !== input.data.focus.symbol)) {
       res.status(400).json({ error: 'Enter a question of 3–1600 characters and select supported instruments. Start a new conversation if the history is too long.', code: 'INVALID_INPUT' });
       return;
     }
@@ -465,9 +472,12 @@ export function createApp(config: ServerConfig, production = config.NODE_ENV ===
       return;
     }
     try {
-      const [overview, news] = await Promise.allSettled([marketService.overview(), marketService.news()]);
-      const context = prepareChatContext(overview.status === 'fulfilled' ? overview.value : null, news.status === 'fulfilled' ? news.value : null, input.data.symbols);
-      res.json(await chat(input.data, context));
+      const focus = input.data.focus;
+      const [overview, news, candles] = await Promise.allSettled([marketService.overview(), marketService.news(), focus ? marketService.candles(focus.symbol, focus.interval, focus.range) : Promise.resolve(null)]);
+      const context = prepareChatContext(overview.status === 'fulfilled' ? overview.value : null, news.status === 'fulfilled' ? news.value : null, focus ? [focus.symbol] : input.data.symbols);
+      const series = candles.status === 'fulfilled' ? candles.value : null;
+      const chart = focus ? prepareChartEvidence(focus, series ? { ...series, asOf: series.candles.at(-1)?.time ?? null } : null) : null;
+      res.json(await chat(input.data, { sources: [...context.sources, ...(chart ? [chart.source] : [])], evidence: { ...context.evidence, chart: chart?.evidence ?? null } }));
     } finally { release?.(); }
   }));
 

@@ -10,9 +10,6 @@ function getApp(): Express {
   if (initError) throw initError;
   if (!appInstance) {
     try {
-      if (!process.env.SESSION_SECRET || process.env.SESSION_SECRET.length < 16) {
-        process.env.SESSION_SECRET = 'vercel-serverless-session-secret-salt-32chars';
-      }
       const config = readConfig({
         ...process.env,
         NODE_ENV: 'production',
@@ -52,16 +49,14 @@ export default function handler(req: IncomingMessage, res: ServerResponse) {
 
     const app = getApp();
     return app(req, res);
-  } catch (err: unknown) {
-    const errorObj = err instanceof Error ? err : new Error(String(err));
+  } catch {
     if (!res.headersSent) {
       res.statusCode = 500;
       res.setHeader('Content-Type', 'application/json');
       res.end(
         JSON.stringify({
           error: 'Serverless initialization failed',
-          message: errorObj.message,
-          stack: errorObj.stack,
+          message: 'Check the backend environment configuration, including SESSION_SECRET.',
         })
       );
     }

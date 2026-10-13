@@ -22,7 +22,7 @@ export const subscriptionSchema = z.object({
 type Subscription = z.infer<typeof subscriptionSchema>;
 const recordSchema = z.object({ subscription: subscriptionSchema, since: z.number().finite(), lastId: z.string(), lastSent: z.number().finite(), expiresAt: z.number().finite(), owner: z.string().optional() });
 type Record = z.infer<typeof recordSchema>;
-interface Options { path?: string; publicKey?: string; privateKey?: string; subject?: string; now?: () => number; send?: (subscription: Subscription, payload: string) => Promise<unknown> }
+interface Options { preferences?: (owner: string) => { scope: 'all' | 'watchlist'; symbols: string[]; frequencyMinutes: number; muted: boolean };  path?: string; publicKey?: string; privateKey?: string; subject?: string; now?: () => number; send?: (subscription: Subscription, payload: string) => Promise<unknown> }
 
 /** Bounded single-instance store. Use a private persistent disk, never a serverless filesystem. */
 export class NewsPushService {
@@ -82,7 +82,7 @@ export class NewsPushService {
     return this.exclusive(async () => {
       const payload = JSON.stringify({
         title: '🔔 Market Alert (Test)',
-        body: 'Real-time alerts active! You will receive notifications when breaking market news arrives.',
+        body: 'Test notification. Background checks are periodic; delivery depends on browser and OS settings.',
         tag: 'market-alert-test',
         url: '/news'
       });
@@ -103,12 +103,17 @@ export class NewsPushService {
     if (news.status === 'unavailable' || news.status === 'stale') return;
     return this.exclusive(async () => {
       const articles = news.articles.filter(a => Date.parse(a.publishedAt) <= this.now() && Date.parse(a.publishedAt) > this.now() - 6 * 3600000).sort((a, b) => Date.parse(b.publishedAt) - Date.parse(a.publishedAt));
-      const article = articles[0];
-      if (!article) return;
-      const id = createHash('sha256').update(`${article.id}:${article.publishedAt}`).digest('hex');
+      if (!articles.length) return;
       this.records = this.records.filter(record => record.expiresAt > this.now());
       for (const record of [...this.records]) {
-        if (record.since >= Date.parse(article.publishedAt) || record.lastId === id || this.now() - record.lastSent < 300000) continue;
+        let preferences: ReturnType<NonNullable<Options['preferences']>> | undefined;
+        try { preferences = record.owner ? this.options.preferences?.(record.owner) : undefined; }
+        catch { continue; } // Account storage failure must not broaden a watchlist subscription.
+        if (preferences?.muted) continue;
+        const article = articles.find(a => !preferences || preferences.scope === 'all' || a.relatedAssets.some(symbol => preferences.symbols.includes(symbol)));
+        if (!article) continue;
+        const id = createHash('sha256').update(`${article.id}:${article.publishedAt}`).digest('hex');
+        if (record.since >= Date.parse(article.publishedAt) || record.lastId === id || this.now() - record.lastSent < (preferences?.frequencyMinutes ?? 5) * 60000) continue;
         // Reserve before sending: a restart must not flood users with the same headline.
         record.lastId = id; record.lastSent = this.now();
         await this.persist();

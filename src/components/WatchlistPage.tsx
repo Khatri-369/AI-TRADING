@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Star, ArrowUpRight, X } from 'lucide-react';
 import type { Quote } from '../types/market';
 import { ASSET_BY_SYMBOL } from '../../shared/assets';
@@ -9,13 +9,8 @@ const storageKey = 'markets.watchlist.v1';
 
 export default function WatchlistPage({ quotes, loading, onSelect }: { quotes: Quote[]; loading: boolean; onSelect: (quote: Quote) => void }) {
   const store = useResearchStore();
-  const [saved, setSaved] = useState<string[]>(() => {
-    try {
-      const value: unknown = JSON.parse(localStorage.getItem(storageKey) ?? '[]');
-      return Array.isArray(value) ? [...new Set(value.filter((s): s is string => typeof s === 'string' && ASSET_BY_SYMBOL.has(s)))] : [];
-    } catch {
-      return [];
-    }
+  const [legacy] = useState<string[]>(() => {
+    try { const value = JSON.parse(localStorage.getItem(storageKey) ?? '[]'); return Array.isArray(value) ? value.filter(s => typeof s === 'string' && ASSET_BY_SYMBOL.has(s)) : []; } catch { return []; }
   });
   const [storageError, setStorageError] = useState(false);
   const [search, setSearch] = useState('');
@@ -27,48 +22,18 @@ export default function WatchlistPage({ quotes, loading, onSelect }: { quotes: Q
   const watchlistRecord = store.records.find(r => r.id === 'user-watchlist' && r.kind === 'watchlist');
   const recordVersion = watchlistRecord?.version ?? 0;
 
-  // Sync cloud watchlist when record arrives or updates
-  useEffect(() => {
-    if (!watchlistRecord) return;
-    const parsed = recordSchemas.watchlist.safeParse(watchlistRecord.data);
-    if (!parsed.success) return;
-    const cloudSymbols = parsed.data.symbols.filter(s => ASSET_BY_SYMBOL.has(s));
-    setSaved(prev => {
-      const combined = [...new Set([...prev, ...cloudSymbols])];
-      if (combined.length !== prev.length || !cloudSymbols.every(s => prev.includes(s))) {
-        try { localStorage.setItem(storageKey, JSON.stringify(combined)); } catch { /* ignore */ }
-        return combined;
-      }
-      return prev;
-    });
-  }, [watchlistRecord]);
-
-  // Keep localStorage updated with user's saved list
-  useEffect(() => {
-    try {
-      localStorage.setItem(storageKey, JSON.stringify(saved));
-      setStorageError(false);
-    } catch {
-      setStorageError(true);
-    }
-  }, [saved]);
-
+  const parsedWatchlist = recordSchemas.watchlist.safeParse(watchlistRecord?.data);
+  const saved = parsedWatchlist.success ? parsedWatchlist.data.symbols : store.user ? [] : legacy;
+  const [saving, setSaving] = useState(false);
   const toggle = async (symbol: string) => {
-    const next = saved.includes(symbol)
-      ? saved.filter(s => s !== symbol)
-      : [...saved, symbol];
-    setSaved(next);
-    try {
-      localStorage.setItem(storageKey, JSON.stringify(next));
-      setStorageError(false);
-    } catch {
-      setStorageError(true);
-    }
+    if (saving) return;
+    setSaving(true);
+    const next = saved.includes(symbol) ? saved.filter(s => s !== symbol) : [...saved, symbol];
     try {
       await store.save('user-watchlist', 'watchlist', { symbols: next }, recordVersion);
-    } catch {
-      // Local fallback remains fully intact even if unauthenticated or offline
-    }
+      setStorageError(false);
+    } catch { setStorageError(true); }
+    finally { setSaving(false); }
   };
 
   const filtered = quotes.filter(q => (!onlySaved || saved.includes(q.symbol)) && (category === 'all' || q.category === category) && `${q.symbol} ${q.name}`.toLowerCase().includes(search.toLowerCase())).sort((a, b) => {
