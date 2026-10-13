@@ -10,6 +10,7 @@ import NewsSignalFeed from './components/NewsSignalFeed';
 import ScenarioSimulator from './components/ScenarioSimulator';
 import OverviewPage from './components/OverviewPage';
 import ProductDisclosuresModal from './components/ProductDisclosuresModal';
+import UpdatePrompt from './components/UpdatePrompt';
 import { ErrorNotice, Loading } from './components/Feedback';
 import { useMarketData, useNews } from './hooks/useMarketData';
 import { useAIAnalysis, analysisKey } from './hooks/useAIAnalysis';
@@ -454,6 +455,9 @@ function MainApp() {
           />
         </Suspense>
       )}
+
+      {/* PWA In-App Update Prompt */}
+      <UpdatePrompt />
     </div>
   );
 }
