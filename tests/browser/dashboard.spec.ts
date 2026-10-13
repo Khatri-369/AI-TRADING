@@ -19,6 +19,25 @@ test('desktop navigation, search, asset detail, chart table alternative, themes 
   await expect(page.getByText('matching instruments out of 42 tracked assets')).toBeVisible();
 
   // 4. Open Asset Detail for RELIANCE
+  await page.route('**/api/markets/history/RELIANCE?range=1M', (route) =>
+    route.fulfill({
+      json: {
+        symbol: 'RELIANCE',
+        range: '1M',
+        currency: 'INR',
+        points: [
+          { time: '2026-09-15T09:15:00Z', price: 2910.5 },
+          { time: '2026-09-22T09:15:00Z', price: 2945.0 },
+          { time: '2026-09-29T09:15:00Z', price: 2980.25 },
+          { time: '2026-10-06T09:15:00Z', price: 3012.0 },
+        ],
+        provider: 'upstox',
+        status: 'cached',
+        fetchedAt: '2026-10-13T10:00:00Z',
+        cached: true,
+      },
+    })
+  );
   await page.getByRole('button', { name: 'RELIANCE', exact: true }).first().click();
   await expect(page).toHaveURL(/\/asset\/RELIANCE/);
 
@@ -30,11 +49,21 @@ test('desktop navigation, search, asset detail, chart table alternative, themes 
   await expect(dialog.locator('.recharts-surface')).toBeVisible();
   // Explicit empty-session fixture: before the market opens, intraday candles
   // may legitimately be absent. Exercise that state without clock dependence.
-  await page.route('**/api/markets/history/RELIANCE?range=1D', route => route.fulfill({ json: {
-    symbol: 'RELIANCE', range: '1D', currency: 'INR', points: [],
-    provider: 'upstox', status: 'unavailable', fetchedAt: null, cached: false,
-    error: 'No intraday candles are available for this session.',
-  } }));
+  await page.route('**/api/markets/history/RELIANCE?range=1D', (route) =>
+    route.fulfill({
+      json: {
+        symbol: 'RELIANCE',
+        range: '1D',
+        currency: 'INR',
+        points: [],
+        provider: 'upstox',
+        status: 'unavailable',
+        fetchedAt: null,
+        cached: false,
+        error: 'No intraday candles are available for this session.',
+      },
+    })
+  );
   await dialog.getByRole('button', { name: '1D', exact: true }).click();
   await expect(dialog.getByText('Historical data unavailable', { exact: true })).toBeVisible();
   await dialog.getByRole('button', { name: '1M', exact: true }).click();
