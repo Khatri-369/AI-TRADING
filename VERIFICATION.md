@@ -1,7 +1,13 @@
 # Research features & Workspace upgrades — 13 October 2026
 
-Interactive Candlestick Workspace, Account-Synced Watchlists & Test Suite Expansion:
-- **Interactive OHLCV Candlestick Workspace**: Added a dedicated "Candles" mode in `AssetDetail.tsx` alongside standard "Chart" (Recharts area trend) and "Table" (accessible screen-reader table). Traders can analyze multi-timeframe candles (`5m`, `30m`, `1d`), draw support/resistance levels, trend lines, price zones and text annotations with undo/redo/locking, view SMA 20 / EMA 20 moving averages, examine volume histograms, and export PNG charts.
+Mobile-First Chart Workspace, Exchange Metadata & Account-Synced Watchlists:
+- **Mobile-First Interactive OHLCV Candlestick Workspace**: Upgraded `CandleWorkspace.tsx` to provide a dedicated, touch-ergonomic financial charting workspace powered by Lightweight Charts (Apache 2.0). Features include:
+  - Live Crosshair HUD displaying Open, High, Low, Close, Volume, and Change % on hover/touch, defaulting to the latest completed candle.
+  - Strict Touch Mode Separation: Navigation Mode enables one-finger pan and two-finger pinch-to-zoom via pointer-events pass-through. Drawing Mode captures touch events exclusively for drawing tools without unintended chart displacement.
+  - Comprehensive Drawing Toolset: Horizontal price levels, 2-point trendlines, rectangle price zones, and text annotations stored in time/price coordinates (preserving meaning on pan/zoom/reload) with edit handles, lock/unlock, delete, and 30-level undo/redo.
+  - Real Candle Moving Averages: SMA 20 (blue) and EMA 20 (amber) calculated from genuine candle closes with clear warm-up disclosures explaining that the initial 20 bars require completion before line values appear.
+  - Export & Accessibility: High-resolution PNG export with metadata watermark; accessible semantic data table alternative for screen readers; fullscreen support with browser fallback.
+  - Backend Exchange Metadata: Extended `/api/markets/candles/:symbol` to include exchange classification (`NSE`, `BSE`, `US`), exchange timezone, provider, interval, and freshness metadata without synthetic interpolation of missing sessions.
 - **Cloud-Synced Watchlists with Resilient Local Fallback**: Connected `WatchlistPage.tsx` to `useResearchStore`. Authenticated traders sync their watchlists across desktop and mobile devices via SQLite optimistic locking (`store.save('user-watchlist', 'watchlist', ...)`). Guest traders retain fast, offline-first browser storage (`localStorage`).
 - **PWA Update Reload Hardening**: Hardened `usePwaUpdate.ts` so `controllerchange` triggers a page reload strictly when the user clicks "Update Now", preventing spontaneous reload interrupts during initial Service Worker client claims.
 - **Test Suite Results**:

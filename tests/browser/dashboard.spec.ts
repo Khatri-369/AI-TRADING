@@ -29,6 +29,9 @@ test('desktop navigation, search, asset detail, chart table alternative, themes 
         timezone: 'Asia/Kolkata',
         provider: 'upstox',
         status: 'cached',
+        cached: true,
+        fetchedAt: '2026-10-13T10:00:00Z',
+        note: 'Provider candles; the latest bar may be unfinished.',
         candles: [
           { time: '2026-09-15T09:15:00Z', open: 2900.0, high: 2920.0, low: 2895.0, close: 2910.5, volume: 1200000 },
           { time: '2026-09-22T09:15:00Z', open: 2915.0, high: 2950.0, low: 2910.0, close: 2945.0, volume: 1500000 },
@@ -98,11 +101,27 @@ test('desktop navigation, search, asset detail, chart table alternative, themes 
   await dialog.getByRole('button', { name: 'Chart', exact: true }).click();
   await expect(dialog.locator('.recharts-surface')).toBeVisible();
 
-  // 6b. Test Interactive Candlestick Workspace with Drawing Tools
+  // 6b. Test Interactive Candlestick Workspace with Drawing Tools & Mobile Ergonomics
   await dialog.getByRole('button', { name: 'Candles', exact: true }).click();
+  await expect(dialog.getByLabel('RELIANCE interactive candlestick chart')).toBeVisible();
   await expect(dialog.getByRole('group', { name: 'Drawing tools' })).toBeVisible();
   await expect(dialog.getByRole('button', { name: 'level', exact: true })).toBeVisible();
   await expect(dialog.getByRole('button', { name: 'trend', exact: true })).toBeVisible();
+  await expect(dialog.getByText('Navigation Mode')).toBeVisible();
+  await expect(dialog.getByText(/Warm-up: Requires 20 completed candles/)).toBeVisible();
+  await expect(dialog.getByText('Saved locally on this device')).toBeVisible();
+
+  // Test mode separation: selecting trend switches to drawing mode
+  await dialog.getByRole('button', { name: 'trend', exact: true }).click();
+  await expect(dialog.getByText('Drawing: TREND')).toBeVisible();
+  await dialog.getByRole('button', { name: 'Done drawing' }).click();
+  await expect(dialog.getByText('Navigation Mode')).toBeVisible();
+
+  // Test accessible candle table toggle
+  await dialog.getByRole('button', { name: 'Candle table', exact: true }).click();
+  await expect(dialog.getByRole('columnheader', { name: 'Open' })).toBeVisible();
+  await expect(dialog.getByRole('columnheader', { name: 'Close' })).toBeVisible();
+  await dialog.getByRole('button', { name: 'Show candles', exact: true }).click();
 
   // Return to line chart
   await dialog.getByRole('button', { name: 'Chart', exact: true }).click();
