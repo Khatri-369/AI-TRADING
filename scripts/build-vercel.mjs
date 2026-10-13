@@ -85,6 +85,8 @@ await writeFile(
           continue: true,
         },
         { src: '/sw.js', headers: { 'Cache-Control': 'no-cache', 'Service-Worker-Allowed': '/' }, continue: true },
+        { src: '/manifest.webmanifest', headers: { 'Cache-Control': 'no-cache' }, continue: true },
+        { src: '/icons/.*', headers: { 'Cache-Control': 'no-cache' }, continue: true },
         apiRoute,
         { handle: 'filesystem' },
         { src: '/assets/.*', status: 404 },

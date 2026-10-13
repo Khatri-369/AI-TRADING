@@ -21,7 +21,7 @@ let closeVite: (() => Promise<void>) | undefined;
 if (production) {
   const clientDirectory = path.join(directory, 'client');
   app.use(express.static(clientDirectory, { index: false, maxAge: '1h', setHeaders: (res, file) => {
-    if (file.endsWith('sw.js') || file.endsWith('manifest.webmanifest')) res.setHeader('Cache-Control', 'no-cache');
+    if (file.endsWith('sw.js') || file.endsWith('manifest.webmanifest') || file.includes('icons')) res.setHeader('Cache-Control', 'no-cache');
   } }));
   app.get('*', (req, res) => {
     if (path.extname(req.path)) {
