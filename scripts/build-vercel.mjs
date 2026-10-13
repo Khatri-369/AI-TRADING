@@ -2,8 +2,13 @@ import { cp, mkdir, writeFile } from 'node:fs/promises';
 import process from 'node:process';
 import { URL } from 'node:url';
 import console from 'node:console';
+import esbuild from 'esbuild';
 
-// BACKEND_ORIGIN is an operator-controlled HTTPS origin, never a provider key.
+// 1. Prepare static frontend output
+await mkdir('.vercel/output/static', { recursive: true });
+await cp('dist/client', '.vercel/output/static', { recursive: true });
+
+// 2. Handle API routes: either proxy to BACKEND_ORIGIN or build Serverless Function
 const value = process.env.BACKEND_ORIGIN?.trim();
 let backend = null;
 
@@ -20,12 +25,45 @@ if (value) {
   ) {
     throw new Error('BACKEND_ORIGIN must be an HTTPS origin without credentials, path, query or fragment.');
   }
-} else {
-  console.warn('Notice: BACKEND_ORIGIN is not set. API requests will return 503 until BACKEND_ORIGIN is set in Vercel Environment Variables.');
 }
 
-await mkdir('.vercel/output/static', { recursive: true });
-await cp('dist/client', '.vercel/output/static', { recursive: true });
+let apiRoute;
+if (backend) {
+  apiRoute = { src: '/api/(.*)', dest: `${backend.origin}/api/$1`, headers: { 'Cache-Control': 'no-store' } };
+  console.log(`Configured API proxy to external BACKEND_ORIGIN: ${backend.origin}`);
+} else {
+  // Build Vercel Serverless Function for all /api routes
+  const funcDir = '.vercel/output/functions/api.func';
+  await mkdir(funcDir, { recursive: true });
+  await writeFile(
+    `${funcDir}/.vc-config.json`,
+    JSON.stringify(
+      {
+        runtime: 'nodejs22.x',
+        handler: 'index.mjs',
+        launcherType: 'Nodejs',
+        shouldAddHelpers: true,
+      },
+      null,
+      2
+    )
+  );
+
+  // Bundle serverless handler with esbuild JS API
+  await esbuild.build({
+    entryPoints: ['server/vercelHandler.ts'],
+    bundle: true,
+    platform: 'node',
+    format: 'esm',
+    packages: 'external',
+    outfile: `${funcDir}/index.mjs`,
+  });
+
+  apiRoute = { src: '/api(?:/(.*))?', dest: '/api' };
+  console.log('Built-in Vercel Serverless Function prepared for all /api endpoints.');
+}
+
+// 3. Write Vercel Build Output configuration
 await writeFile(
   '.vercel/output/config.json',
   JSON.stringify(
@@ -44,9 +82,7 @@ await writeFile(
           continue: true,
         },
         { src: '/sw.js', headers: { 'Cache-Control': 'no-cache', 'Service-Worker-Allowed': '/' }, continue: true },
-        ...(backend
-          ? [{ src: '/api/(.*)', dest: `${backend.origin}/api/$1`, headers: { 'Cache-Control': 'no-store' } }]
-          : [{ src: '/api/(.*)', status: 503, headers: { 'Cache-Control': 'no-store' } }]),
+        apiRoute,
         { handle: 'filesystem' },
         { src: '/assets/.*', status: 404 },
         { src: '/.*', dest: '/index.html', headers: { 'Cache-Control': 'no-cache' } },
@@ -56,8 +92,4 @@ await writeFile(
     2
   )
 );
-console.log(
-  backend
-    ? `Vercel static output prepared with same-origin API forwarding to ${backend.origin}.`
-    : 'Vercel static output prepared (API routes set to 503 pending BACKEND_ORIGIN configuration).'
-);
+console.log('Vercel Build Output API v3 bundle ready.');
