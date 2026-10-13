@@ -42,7 +42,8 @@ if (backend) {
         runtime: 'nodejs22.x',
         handler: 'index.mjs',
         launcherType: 'Nodejs',
-        shouldAddHelpers: true,
+        shouldAddHelpers: false,
+        shouldAddSourcemapSupport: true,
       },
       null,
       2
