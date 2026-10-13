@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import type { Tab, ThemeType } from '../types/market';
 import { THEMES } from '../utils/themes';
+import { usePwaInstall } from '../hooks/usePwaInstall';
 
 interface Props {
   theme: ThemeType;
@@ -66,6 +67,7 @@ export default function Header({
 }: Props) {
   const [now, setNow] = useState(() => new Date());
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const { canInstall, isInstalled, triggerInstall } = usePwaInstall();
 
   useEffect(() => {
     const timer = setInterval(() => setNow(new Date()), 30_000);
@@ -100,17 +102,17 @@ export default function Header({
               setMobileMenuOpen(false);
             }}
             className="flex items-center gap-2 text-left transition hover:opacity-85"
-            aria-label="Financial Market Research Overview"
+            aria-label="Tradexa Global Markets Research"
           >
             <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-[var(--accent-border)] bg-[var(--accent-subtle)] text-[var(--accent-primary)]">
               <TrendingUp className="h-4 w-4" />
             </div>
             <div className="min-w-0">
               <span className="block truncate text-xs font-bold tracking-tight text-[var(--text-primary)] sm:text-base max-w-[145px] sm:max-w-none">
-                Global Markets Research
+                Tradexa
               </span>
               <span className="hidden text-[11px] text-[var(--text-muted)] sm:block">
-                Verified multi-asset data · source transparency
+                Global Markets Research · verified telemetry
               </span>
             </div>
           </button>
@@ -176,6 +178,20 @@ export default function Header({
               </button>
             )}
           </div>
+
+          {/* Optional PWA Install App Button */}
+          {canInstall && !isInstalled && (
+            <button
+              type="button"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-2.5 py-1 text-xs font-medium text-emerald-400 hover:bg-emerald-500/20 hover:border-emerald-500/60 transition shadow-sm"
+              onClick={() => void triggerInstall()}
+              aria-label="Install Tradexa App"
+              title="Install Tradexa as an Android Progressive Web App"
+            >
+              <Download className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">Install App</span>
+            </button>
+          )}
 
           {/* Theme Switcher Toggle */}
           <button
@@ -307,6 +323,23 @@ export default function Header({
               );
             })}
           </div>
+
+          {canInstall && !isInstalled && (
+            <div className="mt-3 border-t border-[var(--border-subtle)] pt-3">
+              <button
+                type="button"
+                onClick={() => {
+                  setMobileMenuOpen(false);
+                  void triggerInstall();
+                }}
+                className="flex w-full items-center justify-center gap-2 rounded-lg border border-emerald-500/40 bg-emerald-500/10 py-2.5 text-xs font-semibold text-emerald-400 hover:bg-emerald-500/20 transition"
+              >
+                <Download className="h-4 w-4" />
+                <span>Install Tradexa on Android</span>
+              </button>
+            </div>
+          )}
+
           <div className="mt-3 border-t border-[var(--border-subtle)] pt-3 text-[11px] text-[var(--text-muted)]">
             <div className="flex justify-between py-1">
               <span>New York (NYSE)</span>

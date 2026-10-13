@@ -1,20 +1,64 @@
 {
+  "$schema": "https://json.schemastore.org/web-manifest-combined.json",
   "id": "/",
-  "name": "Global Markets Research",
-  "short_name": "Markets",
-  "description": "Your markets, watchlist, news and research in one workspace.",
+  "name": "Tradexa — Global Markets Research",
+  "short_name": "Tradexa",
+  "description": "Professional real-time financial market intelligence, verified multi-asset data, and breaking news alerts.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
+  "orientation": "any",
   "background_color": "#090d16",
   "theme_color": "#090d16",
+  "categories": ["finance", "business", "productivity"],
   "icons": [
-    { "src": "/icons/markets-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
-    { "src": "/icons/markets-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+    {
+      "src": "/icons/tradexa-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/tradexa-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/tradexa-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
   ],
   "shortcuts": [
-    { "name": "Watchlist", "url": "/watchlist" },
-    { "name": "Market news", "url": "/news" },
-    { "name": "All markets", "url": "/markets" }
+    {
+      "name": "Watchlist",
+      "short_name": "Watchlist",
+      "description": "Track saved instruments and price alerts",
+      "url": "/watchlist",
+      "icons": [{ "src": "/icons/tradexa-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Market News",
+      "short_name": "News",
+      "description": "Real-time verified financial headlines and AI sentiment",
+      "url": "/news",
+      "icons": [{ "src": "/icons/tradexa-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "All Markets",
+      "short_name": "Markets",
+      "description": "Browse 42 multi-asset equities, commodities, and crypto",
+      "url": "/markets",
+      "icons": [{ "src": "/icons/tradexa-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Research Desk",
+      "short_name": "Desk",
+      "description": "Interactive candlestick charts and trading journal",
+      "url": "/desk",
+      "icons": [{ "src": "/icons/tradexa-192.png", "sizes": "192x192" }]
+    }
   ]
 }

@@ -85,7 +85,8 @@ export class WorkspaceStore {
     return { id, kind, version: version + 1, data: value, updatedAt: updated };
   }
   remove(user: number, id: string, version: number) { const result = this.db.prepare('DELETE FROM records WHERE user=? AND id=? AND version=?').run(user, id, version); if (!result.changes) throw new WorkspaceError(409, 'Record changed or no longer exists. Reload before deleting.'); }
-  paper(user: number): Paper[] { return this.db.prepare('SELECT data FROM paper WHERE user=?').all(user).map(row => JSON.parse(String(row.data))); }
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  paper(user: number): Paper[] { return this.db.prepare('SELECT data FROM paper WHERE user=?').all(user).map((row: any) => JSON.parse(String(row.data))); }
   openPaper(user: number, id: string, quote: Quote, quantity: number, feeBps: number, slippageBps: number) {
     const prior = this.paper(user).find(p => p.id === id); if (prior) return prior;
     if (!usableQuote(quote) || !['india', 'us'].includes(quote.category) || ['NIFTY50', 'BANKNIFTY', 'SENSEX'].includes(quote.symbol)) throw new WorkspaceError(409, 'Practice fills need a fresh, open-session equity/ETF quote. No fill was created.');
@@ -125,7 +126,8 @@ export class WorkspaceStore {
     this.db.exec('DELETE FROM alert_events WHERE id NOT IN (SELECT id FROM alert_events ORDER BY id DESC LIMIT 10000)');
     return events;
   }
-  events(user: number) { return this.db.prepare('SELECT id,data,created FROM alert_events WHERE user=? ORDER BY id DESC LIMIT 100').all(user).map(row => ({ id: row.id, ...JSON.parse(String(row.data)), created: row.created })); }
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  events(user: number) { return this.db.prepare('SELECT id,data,created FROM alert_events WHERE user=? ORDER BY id DESC LIMIT 100').all(user).map((row: any) => ({ id: row.id, ...JSON.parse(String(row.data)), created: row.created })); }
   deleteUser(user: number) { this.db.prepare('DELETE FROM users WHERE id=?').run(user); }
   close() { this.db.close(); }
 }

@@ -1,37 +1,116 @@
-/* global self, caches, fetch, URL */
-const CACHE = 'markets-offline-v1';
+/* global self, caches, fetch, URL, Response */
+const CACHE_NAME = 'tradexa-static-v2';
+const STATIC_ASSETS = [
+  '/',
+  '/offline.html',
+  '/manifest.webmanifest',
+  '/icons/tradexa-192.png',
+  '/icons/tradexa-512.png',
+  '/icons/tradexa-maskable-512.png',
+];
+
 self.addEventListener('install', event => {
-  event.waitUntil(caches.open(CACHE).then(cache => cache.add('/offline.html')));
+  event.waitUntil(
+    caches.open(CACHE_NAME).then(cache => cache.addAll(STATIC_ASSETS)).then(() => self.skipWaiting())
+  );
 });
+
 self.addEventListener('activate', event => {
-  event.waitUntil(caches.keys().then(keys => Promise.all(keys.filter(key => key.startsWith('markets-offline-') && key !== CACHE).map(key => caches.delete(key)))).then(() => self.clients.claim()));
+  event.waitUntil(
+    caches.keys().then(keys =>
+      Promise.all(
+        keys.filter(key => key.startsWith('tradexa-') && key !== CACHE_NAME).map(key => caches.delete(key))
+      )
+    ).then(() => self.clients.claim())
+  );
 });
+
 self.addEventListener('fetch', event => {
-  // Never cache prices, AI answers, authenticated requests or API responses.
+  const url = new URL(event.request.url);
+
+  // STRICT SECURITY & FRESHNESS GUARDS:
+  // NEVER cache API responses, live prices, SSE streams, authenticated requests, or non-GET requests.
+  if (
+    event.request.method !== 'GET' ||
+    url.pathname.startsWith('/api') ||
+    url.pathname.startsWith('/api/') ||
+    event.request.headers.get('accept')?.includes('text/event-stream') ||
+    event.request.headers.get('cookie') ||
+    event.request.headers.get('authorization')
+  ) {
+    return; // Pass directly to network
+  }
+
+  // Navigation requests: network-first with graceful offline fallback
   if (event.request.mode === 'navigate') {
-    event.respondWith(fetch(event.request).catch(() => caches.match('/offline.html')));
+    event.respondWith(
+      fetch(event.request).catch(async () => {
+        const cached = await caches.match(event.request);
+        if (cached) return cached;
+        return (await caches.match('/offline.html')) || Response.error();
+      })
+    );
+    return;
+  }
+
+  // Safe static assets (JS, CSS, fonts, icons, manifest)
+  if (
+    url.origin === self.location.origin &&
+    (url.pathname.startsWith('/assets/') ||
+      url.pathname.startsWith('/icons/') ||
+      url.pathname.endsWith('.webmanifest') ||
+      url.pathname === '/offline.html')
+  ) {
+    event.respondWith(
+      caches.match(event.request).then(cachedResponse => {
+        if (cachedResponse) return cachedResponse;
+        return fetch(event.request).then(networkResponse => {
+          if (networkResponse && networkResponse.status === 200 && networkResponse.type === 'basic') {
+            const clone = networkResponse.clone();
+            caches.open(CACHE_NAME).then(cache => cache.put(event.request, clone));
+          }
+          return networkResponse;
+        });
+      })
+    );
   }
 });
+
+// Web Push event listener for mobile breaking news notifications
 self.addEventListener('push', event => {
   let message = {};
-  try { message = event.data?.json() ?? {}; } catch { /* Use a safe generic notification. */ }
-  const title = typeof message.title === 'string' ? message.title : 'Market news';
-  event.waitUntil(self.registration.showNotification(title, {
-    body: typeof message.body === 'string' ? message.body.slice(0, 180) : 'New market news is available.',
-    icon: '/icons/markets-192.png', badge: '/icons/markets-192.png',
-    tag: typeof message.tag === 'string' ? message.tag : 'market-news',
-    vibrate: [200, 100, 200],
-    data: { url: typeof message.url === 'string' ? message.url : '/news' },
-  }));
+  try {
+    message = event.data?.json() ?? {};
+  } catch {
+    /* Fallback generic payload */
+  }
+  const title = typeof message.title === 'string' && message.title ? message.title : 'Tradexa · Breaking News';
+  event.waitUntil(
+    self.registration.showNotification(title, {
+      body: typeof message.body === 'string' ? message.body.slice(0, 180) : 'New verified market intelligence is available.',
+      icon: '/icons/tradexa-192.png',
+      badge: '/icons/tradexa-192.png',
+      tag: typeof message.tag === 'string' ? message.tag : 'tradexa-news',
+      vibrate: [200, 100, 200],
+      data: { url: typeof message.url === 'string' ? message.url : '/news' },
+    })
+  );
 });
+
+// Notification click navigation handler
 self.addEventListener('notificationclick', event => {
   event.notification.close();
   const targetUrl = event.notification.data?.url === '/desk' ? '/desk' : '/news';
   const destination = new URL(targetUrl, self.location.origin).href;
-  event.waitUntil(self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(async clients => {
-    for (const client of clients) {
-      if (new URL(client.url).origin === self.location.origin) { await client.navigate(destination); return client.focus(); }
-    }
-    return self.clients.openWindow(destination);
-  }));
+  event.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(async clients => {
+      for (const client of clients) {
+        if (new URL(client.url).origin === self.location.origin) {
+          await client.navigate(destination);
+          return client.focus();
+        }
+      }
+      return self.clients.openWindow(destination);
+    })
+  );
 });
