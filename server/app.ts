@@ -9,6 +9,8 @@ import { liveStreamManager } from './market/liveStream';
 import { analyze, scenario, chat, aiProviderStatuses, AIServiceError } from './ai/index';
 import { chatInputSchema } from '../shared/chat';
 import { prepareChatContext } from './ai/chatContext';
+import { newsPush } from './push';
+import { subscriptionSchema } from './push/service';
 import { aiSpendingGuard } from './ai/spendingGuard';
 import { metrics } from './metrics';
 import { logger } from './logger';
@@ -154,6 +156,17 @@ export function createApp(config: ServerConfig, production = config.NODE_ENV ===
   );
 
   app.use(express.json({ limit: '16kb', strict: true }));
+
+  app.get('/api/notifications/config', asyncRoute(async (_req, res) => { res.json(await newsPush.status()); }));
+  const notificationLimit = rateLimit({ windowMs: 60000, limit: 10, message: { error: 'Too many notification changes. Try again shortly.' } });
+  for (const action of ['subscribe', 'unsubscribe'] as const) {
+    app.post(`/api/notifications/${action}`, notificationLimit, csrfProtection, asyncRoute(async (req, res) => {
+      const parsed = subscriptionSchema.safeParse(req.body);
+      if (!parsed.success) { res.status(400).json({ error: 'Unsupported or invalid browser push subscription.' }); return; }
+      try { await newsPush[action](parsed.data); res.json({ ok: true }); }
+      catch { res.status(503).json({ error: 'Notifications could not be updated. Check server configuration or try later.' }); }
+    }));
+  }
 
   /**
    * Sanitized Public Health Endpoint.

@@ -15,6 +15,7 @@ import {
   Loader2,
   RefreshCw,
   Info,
+  Download,
   Star,
 } from 'lucide-react';
 import type { Tab, ThemeType } from '../types/market';
@@ -34,6 +35,7 @@ interface Props {
   connected?: boolean;
   onRefresh?: () => void;
   onOpenDisclosures?: () => void;
+  onDesktop: () => void;
 }
 
 export const navItems = [
@@ -59,6 +61,7 @@ export default function Header({
   connected = false,
   onRefresh,
   onOpenDisclosures,
+  onDesktop,
 }: Props) {
   const [now, setNow] = useState(() => new Date());
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -138,6 +141,7 @@ export default function Header({
 
         {/* Action Controls */}
         <div className="flex items-center gap-1.5 sm:gap-2">
+          <button className="icon-button h-8 w-8" onClick={onDesktop} aria-label="Desktop app and news alerts" title="Install app & news alerts"><Download size={17} /></button>
           {/* Live Sync Status & Countdown Timer Pill */}
           <div className="flex items-center">
             {loading ? (

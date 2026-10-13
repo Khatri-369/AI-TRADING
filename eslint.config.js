@@ -5,6 +5,8 @@ export default tseslint.config(
   {
     ignores: [
       'dist/**',
+      '.vercel/**',
+      '.push-data/**',
       'node_modules/**',
       'test-results/**',
       'playwright-report/**',

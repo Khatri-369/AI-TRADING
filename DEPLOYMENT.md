@@ -266,3 +266,7 @@ This tests:
 - SSE stream connectivity and heartbeat reception (`/api/stream/live-ticks`).
 - Market overview quote payloads.
 - AI session quota tracking (`/api/ai/quota`).
+
+## Vercel and desktop installation
+
+For the Vercel frontend, desktop PWA and opt-in background news notifications, see [VERCEL_DEPLOYMENT.md](VERCEL_DEPLOYMENT.md). The existing single-instance operations guidance above still applies to the persistent backend.

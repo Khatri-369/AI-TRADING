@@ -1,6 +1,7 @@
 import { Component, lazy, Suspense, useEffect, useState, type ReactNode } from 'react';
 import { RefreshCw, X } from 'lucide-react';
 import Header from './components/Header';
+import DesktopAppPanel from './components/DesktopAppPanel';
 import TickerTape from './components/TickerTape';
 import SettingsPanel from './components/SettingsPanel';
 import MarketPanel from './components/MarketPanel';
@@ -77,6 +78,7 @@ function MainApp() {
   const [route, navigate] = useRouter();
   const [search, setSearch] = useState('');
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [desktopOpen, setDesktopOpen] = useState(false);
   const [chatOpen, setChatOpen] = useState(() => window.location.pathname === '/research');
   const [chatSymbol, setChatSymbol] = useState('');
   const [disclosuresOpen, setDisclosuresOpen] = useState(false);
@@ -192,6 +194,7 @@ function MainApp() {
         {/* Application Header Shell */}
         <Header
           theme={theme}
+          onDesktop={() => setDesktopOpen(true)}
           onTheme={setTheme}
           search={search}
           onSearch={setSearch}
@@ -419,6 +422,7 @@ function MainApp() {
       </footer>
 
       {/* Legal & Product Disclosures Modal */}
+      <DesktopAppPanel open={desktopOpen} onClose={() => setDesktopOpen(false)} />
       <Suspense fallback={null}><ResearchChat open={chatOpen} onOpenChange={setChatOpen} symbol={chatSymbol} onClearFocus={() => setChatSymbol('')} /></Suspense>
       <ProductDisclosuresModal open={disclosuresOpen} onClose={() => setDisclosuresOpen(false)} />
 

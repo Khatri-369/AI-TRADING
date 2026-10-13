@@ -1,5 +1,7 @@
 # Research features — 13 October 2026
 
+Desktop/PWA preparation: manifest, 192/512px icons, network-only market data, offline fallback, install controls, opt-in Web Push endpoints and a persistent single-instance news worker were added. Fifty backend tests and seven browser tests passed; both standard and Vercel-output builds passed. The Vercel output check used an example origin only, and its generated routing config was removed afterward. Vercel CLI reports logged out. No public deployment or actual device push delivery has been verified; see DEPLOYMENT.md for required infrastructure and acceptance checks.
+
 Follow-up UX change: the assistant is now a persistent bottom-right robot launcher with a compact conversation panel, Enter-to-send composer, source references and asset-detail context handoff. Its navigation item was removed; old `/research` links open the assistant over the overview. Closing the panel or navigating inside the app preserves conversation memory; reload/New conversation clears it. The overview now guides shortlist → evidence → scenario research, and movers exclude stale/unavailable quotes and enforce positive/negative change signs.
 
 - Implemented `/research` with bounded Gemini conversations, instrument focus, source references resolved on the backend, follow-up questions, cancellation and recoverable provider errors. Unknown citation IDs and client-supplied evidence are rejected. Source validation does not guarantee the correctness of model reasoning.

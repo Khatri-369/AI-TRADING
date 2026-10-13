@@ -6,16 +6,21 @@ import { fileURLToPath } from 'node:url';
 import { readFile } from 'node:fs/promises';
 import { liveStreamManager } from './server/market/liveStream';
 import { logger } from './server/logger';
+import { newsPush } from './server/push';
+import { marketService } from './server/market';
 
 const config = readConfig();
 const production = process.argv.includes('--production') || config.NODE_ENV === 'production';
 const app = createApp(config, production);
+newsPush.start(() => marketService.news());
 const directory = path.dirname(fileURLToPath(import.meta.url));
 let closeVite: (() => Promise<void>) | undefined;
 
 if (production) {
   const clientDirectory = path.join(directory, 'client');
-  app.use(express.static(clientDirectory, { index: false, maxAge: '1h' }));
+  app.use(express.static(clientDirectory, { index: false, maxAge: '1h', setHeaders: (res, file) => {
+    if (file.endsWith('sw.js') || file.endsWith('manifest.webmanifest')) res.setHeader('Cache-Control', 'no-cache');
+  } }));
   app.get('*', (req, res) => {
     if (path.extname(req.path)) {
       res.status(404).send('Not found');
@@ -58,6 +63,7 @@ for (const signal of ['SIGINT', 'SIGTERM'] as const) {
   process.once(signal, () => {
     logger.info(`Received ${signal}. Draining live connections and shutting down gracefully...`);
     liveStreamManager.stop();
+    newsPush.stop();
     server.close(() => {
       logger.info('HTTP server closed.');
       void closeVite?.().finally(() => process.exit(0));

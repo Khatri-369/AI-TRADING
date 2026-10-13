@@ -4,6 +4,8 @@ React/TypeScript market-intelligence dashboard with an Express backend. Quotes, 
 
 ## Run locally
 
+For Vercel deployment, desktop installation and opt-in background news alerts, see [DEPLOYMENT.md](DEPLOYMENT.md). The frontend runs on Vercel; an always-on Express backend with a private persistent disk handles streaming and push delivery.
+
 Requires Node.js 22.14+ and npm.
 
 ```sh
