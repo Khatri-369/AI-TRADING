@@ -56,6 +56,9 @@ if (backend) {
     bundle: true,
     platform: 'node',
     format: 'esm',
+    banner: {
+      js: "import { createRequire } from 'node:module'; const require = createRequire(import.meta.url);",
+    },
     outfile: `${funcDir}/index.mjs`,
   });
 
