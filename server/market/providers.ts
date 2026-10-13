@@ -5,6 +5,7 @@ import type { Asset, HistoryRange, MarketSession, NewsArticle } from '../../shar
 import { DataCache } from './cache';
 import { dateString, fetchBytes, fetchJson, finite, optionalNumber, positive, validTime, type Fetcher } from './http';
 import { marketSession, zonedClock } from './sessions';
+import { candleSchema as fullCandleSchema, type Candle } from '../../shared/research';
 
 export interface SourceQuote {
   symbol: string;
@@ -240,5 +241,34 @@ export class MarketProviders {
       return ensurePoints(data.data.candles.map((point) => ({ time: validTime(point[0]), price: point[4] })));
     }
     throw new Error('Metals history is unavailable in this integration; no chart is fabricated from spot quotes');
+  }
+
+  async candles(asset: Asset, interval: '5m' | '30m' | '1d', range: HistoryRange): Promise<Candle[]> {
+    if (!['india', 'us'].includes(asset.category)) throw new Error('OHLCV candles are supported for Indian and US equities only. Price-only series are not converted to candles.');
+    const days = RANGE_DAYS[range];
+    if (interval !== '1d' && days > 30) throw new Error('Intraday chart ranges are limited to one month. Select daily candles for longer ranges.');
+    let candles: Candle[];
+    if (asset.category === 'india') {
+      const key = (await this.indiaInstruments()).get(asset.symbol);
+      if (!key) throw new Error('Instrument is unavailable in the current provider directory.');
+      const encoded = encodeURIComponent(key);
+      const unit = interval === '1d' ? 'days/1' : `minutes/${interval === '5m' ? 5 : 30}`;
+      const today = zonedClock(new Date(), 'Asia/Kolkata').date;
+      const from = zonedClock(new Date(Date.now() - days * DAY), 'Asia/Kolkata').date;
+      const url = range === '1D' && interval !== '1d'
+        ? `https://api.upstox.com/v3/historical-candle/intraday/${encoded}/${unit}`
+        : `https://api.upstox.com/v3/historical-candle/${encoded}/${unit}/${today}/${from}`;
+      const data = await fetchJson(this.fetcher, url, indiaHistorySchema, this.upstoxHeaders());
+      candles = data.data.candles.map(p => ({ time: validTime(p[0]), open: p[1], high: p[2], low: p[3], close: p[4], volume: p[5] ?? null }));
+    } else {
+      const to = Math.floor(Date.now() / 1000);
+      const schema = z.object({ s: z.string(), t: z.array(positive).default([]), o: z.array(positive).default([]), h: z.array(positive).default([]), l: z.array(positive).default([]), c: z.array(positive).default([]), v: z.array(z.number().nonnegative()).default([]) });
+      const data = await fetchJson(this.fetcher, `https://finnhub.io/api/v1/stock/candle?symbol=${encodeURIComponent(asset.symbol)}&resolution=${interval === '1d' ? 'D' : interval === '5m' ? '5' : '30'}&from=${to - days * 86400}&to=${to}`, schema, this.finnhubHeaders());
+      if (data.s !== 'ok' || ![data.o, data.h, data.l, data.c, data.v].every(values => values.length === data.t.length)) throw new Error('OHLCV data is unavailable or requires provider entitlement.');
+      candles = data.t.map((t, i) => ({ time: validTime(t), open: data.o[i], high: data.h[i], low: data.l[i], close: data.c[i], volume: data.v[i] }));
+    }
+    if (!candles.length) throw new Error('No candles are available for this session and interval.');
+    const valid = z.array(fullCandleSchema).max(15000).parse(candles);
+    return [...new Map(valid.map(c => [c.time, c])).values()].sort((a, b) => a.time.localeCompare(b.time));
   }
 }

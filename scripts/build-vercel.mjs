@@ -49,13 +49,12 @@ if (backend) {
     )
   );
 
-  // Bundle serverless handler with esbuild JS API
+  // Bundle serverless handler with esbuild into a self-contained bundle
   await esbuild.build({
     entryPoints: ['server/vercelHandler.ts'],
     bundle: true,
     platform: 'node',
     format: 'esm',
-    packages: 'external',
     outfile: `${funcDir}/index.mjs`,
   });
 

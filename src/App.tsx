@@ -2,6 +2,7 @@ import { Component, lazy, Suspense, useEffect, useState, type ReactNode } from '
 import { RefreshCw, X } from 'lucide-react';
 import Header from './components/Header';
 import DesktopAppPanel from './components/DesktopAppPanel';
+import { ResearchProvider } from './hooks/useResearchStore';
 import TickerTape from './components/TickerTape';
 import SettingsPanel from './components/SettingsPanel';
 import MarketPanel from './components/MarketPanel';
@@ -45,7 +46,7 @@ class ErrorBoundary extends Component<{ children: ReactNode }, { failed: boolean
 export default function App() {
   return (
     <ErrorBoundary>
-      <MainApp />
+      <ResearchProvider><MainApp /></ResearchProvider>
     </ErrorBoundary>
   );
 }

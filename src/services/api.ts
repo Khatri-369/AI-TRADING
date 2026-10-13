@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { chatResultSchema, type ChatInput } from '../../shared/chat';
+import { candleSchema } from '../../shared/research';
 import type { AIAnalysis, Engine, HistoryRange, ScenarioResult } from '../types/market';
 
 const finite = z.number().finite();
@@ -181,6 +182,8 @@ async function request<T>(path: string, schema: z.ZodType<T>, signal: AbortSigna
 }
 
 export const getOverview = (signal: AbortSignal) => request('/api/markets/overview', overviewSchema, signal);
+export const candlesResponseSchema = z.object({ symbol: z.string(), interval: z.enum(['5m', '30m', '1d']), range: z.string(), currency: z.string(), timezone: z.string(), provider: z.string(), candles: z.array(candleSchema), fetchedAt: z.string().nullable(), status: z.string(), cached: z.boolean(), note: z.string() });
+export const getCandles = (symbol: string, interval: string, range: string, signal: AbortSignal) => request(`/api/markets/candles/${encodeURIComponent(symbol)}?interval=${encodeURIComponent(interval)}&range=${encodeURIComponent(range)}`, candlesResponseSchema, signal);
 export const askResearch = (body: ChatInput, signal: AbortSignal) => request('/api/ai/chat', chatResultSchema, signal, body);
 export const getNews = (signal: AbortSignal) => request('/api/news', newsSchema, signal);
 export const getHealth = (signal: AbortSignal) => request('/api/health', healthSchema, signal);

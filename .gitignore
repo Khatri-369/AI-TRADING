@@ -1,6 +1,7 @@
 node_modules/
 .vercel/
 .push-data/
+.workspace-data/
 data/
 build/
 dist/

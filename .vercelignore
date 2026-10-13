@@ -1,6 +1,7 @@
 .env
 .env.*
 .push-data
+.workspace-data
 node_modules
 .git
 test-results

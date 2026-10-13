@@ -1,7 +1,7 @@
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import type { Express } from 'express';
 import { readConfig } from './config';
-import { createApp, apiErrorHandler } from './app';
+import { createApp } from './app';
 
 let appInstance: Express | null = null;
 
@@ -16,14 +16,32 @@ function getApp(): Express {
       HOST: '0.0.0.0',
       PORT: '3000',
     });
-    const app = createApp(config, true);
-    app.use(apiErrorHandler);
-    appInstance = app;
+    appInstance = createApp(config, true);
   }
   return appInstance;
 }
 
 export default function handler(req: IncomingMessage, res: ServerResponse) {
+  // If Vercel rewrote the URL to /api, restore the original requested path
+  const matchedPath = req.headers['x-matched-path'];
+  if (typeof matchedPath === 'string' && matchedPath.startsWith('/api')) {
+    const urlObj = new URL(req.url || '/', 'http://localhost');
+    req.url = `${matchedPath}${urlObj.search}`;
+  }
+
+  // Defensively guard removeHeader if called on serverless response objects
+  if (res && typeof res.removeHeader === 'function') {
+    const origRemove = res.removeHeader.bind(res);
+    res.removeHeader = function (name: string) {
+      try {
+        origRemove(name);
+      } catch {
+        // Defensive no-op for uninitialized outgoing headers
+      }
+      return this;
+    };
+  }
+
   const app = getApp();
   return app(req, res);
 }

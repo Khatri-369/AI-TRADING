@@ -26,7 +26,7 @@ self.addEventListener('push', event => {
 });
 self.addEventListener('notificationclick', event => {
   event.notification.close();
-  const targetUrl = event.notification.data?.url || '/news';
+  const targetUrl = event.notification.data?.url === '/desk' ? '/desk' : '/news';
   const destination = new URL(targetUrl, self.location.origin).href;
   event.waitUntil(self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(async clients => {
     for (const client of clients) {

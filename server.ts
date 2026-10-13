@@ -8,11 +8,13 @@ import { liveStreamManager } from './server/market/liveStream';
 import { logger } from './server/logger';
 import { newsPush } from './server/push';
 import { marketService } from './server/market';
+import { startWorkspaceAlerts } from './server/workspace/worker';
 
 const config = readConfig();
 const production = process.argv.includes('--production') || config.NODE_ENV === 'production';
 const app = createApp(config, production);
 newsPush.start(() => marketService.news());
+const stopWorkspaceAlerts = startWorkspaceAlerts();
 const directory = path.dirname(fileURLToPath(import.meta.url));
 let closeVite: (() => Promise<void>) | undefined;
 
@@ -64,6 +66,7 @@ for (const signal of ['SIGINT', 'SIGTERM'] as const) {
     logger.info(`Received ${signal}. Draining live connections and shutting down gracefully...`);
     liveStreamManager.stop();
     newsPush.stop();
+    stopWorkspaceAlerts();
     server.close(() => {
       logger.info('HTTP server closed.');
       void closeVite?.().finally(() => process.exit(0));

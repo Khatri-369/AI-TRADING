@@ -20,7 +20,7 @@ export const subscriptionSchema = z.object({
   keys: z.object({ p256dh: z.string().regex(/^[A-Za-z0-9_-]{87}={0,2}$/), auth: z.string().regex(/^[A-Za-z0-9_-]{22}={0,2}$/) }).strict(),
 }).strict();
 type Subscription = z.infer<typeof subscriptionSchema>;
-const recordSchema = z.object({ subscription: subscriptionSchema, since: z.number().finite(), lastId: z.string(), lastSent: z.number().finite(), expiresAt: z.number().finite() });
+const recordSchema = z.object({ subscription: subscriptionSchema, since: z.number().finite(), lastId: z.string(), lastSent: z.number().finite(), expiresAt: z.number().finite(), owner: z.string().optional() });
 type Record = z.infer<typeof recordSchema>;
 interface Options { path?: string; publicKey?: string; privateKey?: string; subject?: string; now?: () => number; send?: (subscription: Subscription, payload: string) => Promise<unknown> }
 
@@ -58,19 +58,19 @@ export class NewsPushService {
     this.queue = next.catch(() => undefined);
     return next;
   }
-  async subscribe(input: unknown) {
+  async subscribe(input: unknown, owner?: string) {
     const subscription = subscriptionSchema.parse(input);
     return this.exclusive(async () => {
       this.records = this.records.filter(record => record.expiresAt > this.now());
       const existing = this.records.find(record => record.subscription.endpoint === subscription.endpoint);
       if (existing && JSON.stringify(existing.subscription.keys) !== JSON.stringify(subscription.keys)) throw new Error('Subscription ownership could not be verified.');
       if (!existing && this.records.length >= 1000) throw new Error('Notification capacity reached.');
-      if (existing) existing.expiresAt = this.now() + 90 * 86400000;
-      else this.records.push({ subscription, since: this.now(), lastId: '', lastSent: 0, expiresAt: this.now() + 90 * 86400000 });
+      if (existing) { existing.expiresAt = this.now() + 90 * 86400000; existing.owner = owner; }
+      else this.records.push({ subscription, since: this.now(), lastId: '', lastSent: 0, expiresAt: this.now() + 90 * 86400000, owner });
       await this.persist();
     });
   }
-  async unsubscribe(input: unknown) {
+  async unsubscribe(input: unknown, _owner?: string) {
     const subscription = subscriptionSchema.parse(input);
     return this.exclusive(async () => {
       this.records = this.records.filter(record => record.subscription.endpoint !== subscription.endpoint || JSON.stringify(record.subscription.keys) !== JSON.stringify(subscription.keys));
@@ -123,6 +123,24 @@ export class NewsPushService {
         }
       }
       await this.persist();
+    });
+  }
+  async removeOwner(owner: string) { if (!this.configured) return; return this.exclusive(async () => { this.records = this.records.filter(r => r.owner !== owner); await this.persist(); }); }
+  async notifyOwner(owner: string, body: string): Promise<string> {
+    if (!this.configured) return 'not-configured';
+    return this.exclusive(async () => {
+      const targets = this.records.filter(r => r.owner === owner && r.expiresAt > this.now());
+      if (!targets.length) return 'no-subscription';
+      let sent = 0;
+      for (const record of targets) {
+        try {
+          const payload = JSON.stringify({ body: body.slice(0, 180), title: 'Price alert', url: '/desk', tag: 'price-alert' });
+          if (this.options.send) await this.options.send(record.subscription, payload);
+          else await webpush.sendNotification(record.subscription, payload, { TTL: 300, timeout: 8000, vapidDetails: { subject: this.options.subject!, publicKey: this.options.publicKey!, privateKey: this.options.privateKey! } });
+          sent++;
+        } catch (error) { if ([404, 410].includes((error as { statusCode: number }).statusCode)) this.records = this.records.filter(r => r !== record); }
+      }
+      await this.persist(); return sent ? 'push-accepted' : 'push-failed';
     });
   }
   start(getNews: () => Promise<NewsResponse>) {

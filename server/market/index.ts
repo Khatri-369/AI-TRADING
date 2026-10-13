@@ -5,6 +5,7 @@ import { MarketProviders, type MarketEnvironment, type PricePoint, type SourceQu
 import { UpstoxWebSocketClient } from './websocket';
 import { marketSession } from './sessions';
 import type { Fetcher } from './http';
+import type { Candle } from '../../shared/research';
 
 const HOUR = 3_600_000;
 const DAY = 24 * HOUR;
@@ -23,6 +24,7 @@ export class MarketService {
   private quotesCache = new DataCache<SourceQuote[]>();
   private newsCache = new DataCache<NewsArticle[]>();
   private historyCache = new DataCache<PricePoint[]>();
+  private candleCache = new DataCache<Candle[]>();
   private observed = new Map<string, { status: string; message: string }>();
   private providers: MarketProviders;
   private upstoxWs: UpstoxWebSocketClient;
@@ -162,6 +164,16 @@ export class MarketService {
         ...(definition.configured && definition.id !== 'upstox-ws' ? this.observed.get(definition.id) : {})
       };
     });
+  }
+
+  async candles(symbol: string, interval: '5m' | '30m' | '1d', range: HistoryRange) {
+    const asset = ASSET_BY_SYMBOL.get(symbol);
+    if (!asset) throw new Error('Unknown instrument');
+    const base = { symbol, interval, range, currency: asset.currency, timezone: asset.category === 'india' ? 'Asia/Kolkata' : 'America/New_York', provider: this.providerFor(asset) };
+    try {
+      const result = await this.candleCache.get(`${symbol}:${interval}:${range}`, 60000, HOUR, () => this.providers.candles(asset, interval, range));
+      return { ...base, candles: result.value, fetchedAt: result.fetchedAt, status: result.stale ? 'stale' : 'delayed', cached: result.cached, note: 'Provider candles; the latest bar may be unfinished. Missing sessions are not interpolated.' };
+    } catch (error) { return { ...base, candles: [], fetchedAt: null, status: 'unavailable', cached: false, note: errorMessage(error) }; }
   }
 }
 

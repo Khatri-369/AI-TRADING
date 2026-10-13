@@ -11,6 +11,8 @@ import { chatInputSchema } from '../shared/chat';
 import { prepareChatContext } from './ai/chatContext';
 import { newsPush } from './push';
 import { subscriptionSchema } from './push/service';
+import { intervals } from '../shared/research';
+import { workspaceRouter, workspaceUser } from './workspace/routes';
 import { aiSpendingGuard } from './ai/spendingGuard';
 import { metrics } from './metrics';
 import { logger } from './logger';
@@ -100,6 +102,7 @@ export function createApp(config: ServerConfig, production = config.NODE_ENV ===
   // Production security headers
   app.use(
     helmet({
+      hidePoweredBy: false,
       contentSecurityPolicy: production
         ? {
             directives: {
@@ -156,6 +159,7 @@ export function createApp(config: ServerConfig, production = config.NODE_ENV ===
   );
 
   app.use(express.json({ limit: '16kb', strict: true }));
+  app.use('/api/workspace', workspaceRouter(production));
 
   app.get('/api/notifications/config', asyncRoute(async (_req, res) => { res.json(await newsPush.status()); }));
   const notificationLimit = rateLimit({ windowMs: 60000, limit: 10, message: { error: 'Too many notification changes. Try again shortly.' } });
@@ -163,7 +167,7 @@ export function createApp(config: ServerConfig, production = config.NODE_ENV ===
     app.post(`/api/notifications/${action}`, notificationLimit, csrfProtection, asyncRoute(async (req, res) => {
       const parsed = subscriptionSchema.safeParse(req.body);
       if (!parsed.success) { res.status(400).json({ error: 'Unsupported or invalid browser push subscription.' }); return; }
-      try { await newsPush[action](parsed.data); res.json({ ok: true }); }
+      try { await newsPush[action](parsed.data, workspaceUser(req)?.id.toString()); res.json({ ok: true }); }
       catch { res.status(503).json({ error: 'Notifications could not be updated. Check server configuration or try later.' }); }
     }));
   }
@@ -287,6 +291,14 @@ export function createApp(config: ServerConfig, production = config.NODE_ENV ===
       res.json(news);
     })
   );
+
+  app.get('/api/markets/candles/:symbol', asyncRoute(async (req, res) => {
+    const symbol = String(req.params.symbol);
+    const interval = z.enum(intervals).safeParse(req.query.interval ?? '1d');
+    const range = historyRange.safeParse(req.query.range ?? '1M');
+    if (!ASSET_BY_SYMBOL.has(symbol) || !interval.success || !range.success) { res.status(400).json({ error: 'Unsupported instrument, range or candle interval.' }); return; }
+    res.json(await marketService.candles(symbol, interval.data, range.data));
+  }));
 
   /**
    * AI Quota Status Check.
