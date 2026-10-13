@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
 import {
-  TrendingUp,
   Settings,
   Search,
   LayoutDashboard,
@@ -101,12 +100,14 @@ export default function Header({
               onNavigate('overview');
               setMobileMenuOpen(false);
             }}
-            className="flex items-center gap-2 text-left transition hover:opacity-85"
+            className="flex items-center gap-2.5 text-left transition hover:opacity-85"
             aria-label="Tradexa Global Markets Research"
           >
-            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-[var(--accent-border)] bg-[var(--accent-subtle)] text-[var(--accent-primary)]">
-              <TrendingUp className="h-4 w-4" />
-            </div>
+            <img
+              src="/icons/tradexa-192.png"
+              alt="Tradexa Logo"
+              className="h-8 w-8 shrink-0 rounded-lg border border-cyan-500/30 object-cover shadow-sm"
+            />
             <div className="min-w-0">
               <span className="block truncate text-xs font-bold tracking-tight text-[var(--text-primary)] sm:text-base max-w-[145px] sm:max-w-none">
                 Tradexa

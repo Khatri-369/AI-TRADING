@@ -1,9 +1,10 @@
 /* global self, caches, fetch, URL, Response */
-const CACHE_NAME = 'tradexa-static-v2';
+const CACHE_NAME = 'tradexa-static-v3';
 const STATIC_ASSETS = [
   '/',
   '/offline.html',
   '/manifest.webmanifest',
+  '/icons/tradexa-32.png',
   '/icons/tradexa-192.png',
   '/icons/tradexa-512.png',
   '/icons/tradexa-maskable-512.png',

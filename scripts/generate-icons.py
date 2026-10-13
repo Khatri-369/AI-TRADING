@@ -120,14 +120,41 @@ def draw_tradexa_icon(size, is_maskable=False):
 
     return img
 
-# Generate icons
-for size, is_maskable, filename in [
-    (192, False, 'public/icons/tradexa-192.png'),
-    (512, False, 'public/icons/tradexa-512.png'),
-    (512, True,  'public/icons/tradexa-maskable-512.png'),
-    (192, False, 'public/icons/markets-192.png'),
-    (512, False, 'public/icons/markets-512.png'),
-]:
-    icon = draw_tradexa_icon(size, is_maskable)
-    icon.save(filename, 'PNG')
-    print(f'Generated {filename} ({size}x{size}, maskable={is_maskable})')
+import os
+
+master_path = 'public/icons/tradexa-master.png'
+if os.path.exists(master_path):
+    print(f'Generating icons from master asset {master_path}...')
+    master = Image.open(master_path).convert('RGBA')
+    
+    # 512 & 192 standard icons
+    icon_512 = master.resize((512, 512), Image.Resampling.LANCZOS)
+    icon_192 = master.resize((192, 192), Image.Resampling.LANCZOS)
+    icon_32 = master.resize((32, 32), Image.Resampling.LANCZOS)
+    
+    icon_512.save('public/icons/tradexa-512.png', 'PNG')
+    icon_192.save('public/icons/tradexa-192.png', 'PNG')
+    icon_512.save('public/icons/markets-512.png', 'PNG')
+    icon_192.save('public/icons/markets-192.png', 'PNG')
+    icon_32.save('public/icons/tradexa-32.png', 'PNG')
+    icon_32.convert('RGB').save('public/favicon.ico', format='ICO')
+    
+    # Maskable 512 with safe-zone inset
+    maskable_512 = Image.new('RGBA', (512, 512), (6, 12, 22, 255))
+    scaled_inner = master.resize((430, 430), Image.Resampling.LANCZOS)
+    offset = ((512 - 430) // 2, (512 - 430) // 2)
+    maskable_512.paste(scaled_inner, offset, scaled_inner)
+    maskable_512.save('public/icons/tradexa-maskable-512.png', 'PNG')
+    print('All icons generated from master asset.')
+else:
+    # Generate procedurally
+    for size, is_maskable, filename in [
+        (192, False, 'public/icons/tradexa-192.png'),
+        (512, False, 'public/icons/tradexa-512.png'),
+        (512, True,  'public/icons/tradexa-maskable-512.png'),
+        (192, False, 'public/icons/markets-192.png'),
+        (512, False, 'public/icons/markets-512.png'),
+    ]:
+        icon = draw_tradexa_icon(size, is_maskable)
+        icon.save(filename, 'PNG')
+        print(f'Generated {filename} ({size}x{size}, maskable={is_maskable})')

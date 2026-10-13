@@ -102,7 +102,15 @@ export default function DesktopAppPanel({ open, onClose }: { open: boolean; onCl
   }
   return <dialog ref={dialog} onCancel={onClose} onClose={onClose} className="m-auto max-h-[calc(100dvh-32px)] overflow-y-auto w-[min(560px,calc(100vw-24px))] rounded-2xl border border-[var(--border-default)] bg-[var(--bg-surface)] text-[var(--text-primary)] p-5 backdrop:bg-black/50" aria-labelledby="desktop-title">
     <div className="flex items-center justify-between gap-3"><h2 id="desktop-title" className="text-lg font-semibold">Desktop app & news alerts</h2><button className="icon-button" aria-label="Close desktop settings" onClick={onClose}><X size={18} /></button></div>
-    <section className="mt-5 space-y-3"><h3 className="flex items-center gap-2 font-medium"><Download size={18} />Install Tradexa on your device</h3><p className="text-sm text-[var(--text-secondary)]">Install Tradexa as a standalone Android app or desktop shortcut for quick access to your watchlist, charts, news and research.</p>
+    <section className="mt-5 space-y-3">
+      <div className="flex items-center gap-3">
+        <img src="/icons/tradexa-192.png" alt="Tradexa Logo" className="h-10 w-10 shrink-0 rounded-xl border border-cyan-500/30 object-cover shadow-sm" />
+        <div>
+          <h3 className="flex items-center gap-2 font-medium"><Download size={16} />Install Tradexa on your device</h3>
+          <p className="text-xs text-[var(--text-secondary)]">Progressive Web App for Android and Desktop</p>
+        </div>
+      </div>
+      <p className="text-sm text-[var(--text-secondary)]">Install Tradexa as a standalone Android app or desktop shortcut for quick access to your watchlist, charts, news and research.</p>
       <button className="button-primary" disabled={installed || !install} onClick={async () => { if (!install) return; try { await install.prompt(); const choice = await install.userChoice; setMessage(choice.outcome === 'accepted' ? 'Tradexa installation requested. Your browser will finish setup.' : 'Installation dismissed. You can install from the browser menu later.'); } catch { setMessage('Use your browser menu to install Tradexa.'); } finally { setInstall(null); } }}>{installed ? 'Tradexa is installed' : 'Install Tradexa App'}</button>
       {!installed && !install && <p className="text-xs leading-5 text-[var(--text-muted)]">In Android Chrome, tap the menu (⋮) and select “Install app” or “Add to Home screen”. On desktop, use Chrome/Edge “Install Tradexa”. On iPhone/iPad, use Safari → Share → Add to Home Screen.</p>}
     </section>
