@@ -14,16 +14,27 @@ import { chartLayoutSchema, movingAverage, type Drawing } from '../../shared/res
 import { useResearchStore } from '../hooks/useResearchStore';
 import type { HistoryRange, ThemeType } from '../types/market';
 
+export interface PlanLevels {
+  entry?: number;
+  stop?: number;
+  target?: number;
+  direction?: 'long' | 'short';
+}
+
 export default function CandleWorkspace({
   symbol,
   theme,
   onPlan,
   onAlert,
+  planLevels,
+  onPlanLevelChange,
 }: {
   symbol: string;
   theme: ThemeType;
   onPlan?: () => void;
   onAlert?: (level: number) => void;
+  planLevels?: PlanLevels;
+  onPlanLevelChange?: (levelType: 'entry' | 'stop' | 'target', price: number) => void;
 }) {
   const store = useResearchStore();
   const [interval, setInterval] = useState<'5m' | '30m' | '1d'>('1d');
@@ -31,7 +42,9 @@ export default function CandleWorkspace({
   const [data, setData] = useState<Awaited<ReturnType<typeof getCandles>> | null>(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
-  const [tool, setTool] = useState<'navigate' | 'edit' | Drawing['type']>('navigate');
+  const [tool, setTool] = useState<'navigate' | 'edit' | 'plan' | Drawing['type']>(
+    planLevels ? 'plan' : 'navigate'
+  );
   const [text, setText] = useState('Key Level');
   const [name, setName] = useState('Default');
   const [layoutId, setLayoutId] = useState(`chart-${symbol}-default`);
@@ -61,6 +74,11 @@ export default function CandleWorkspace({
   drawingRef.current = drawings;
   const pending = useRef<Drawing['a'] | null>(null);
   const drag = useRef<{ id: string; anchor: 'a' | 'b'; previous: Drawing[] } | null>(null);
+  const planDrag = useRef<{ level: 'entry' | 'stop' | 'target' } | null>(null);
+  const planLevelsRef = useRef(planLevels);
+  planLevelsRef.current = planLevels;
+  const onPlanLevelChangeRef = useRef(onPlanLevelChange);
+  onPlanLevelChangeRef.current = onPlanLevelChange;
   const loaded = useRef('');
 
   // Synchronize layout with stored records
@@ -287,6 +305,62 @@ export default function CandleWorkspace({
           if (d.b) ctx.fillRect(bx - 4, by - 4, 8, 8);
         }
       }
+
+      // Render interactive trade plan levels if present
+      if (planLevelsRef.current) {
+        const { entry, stop, target } = planLevelsRef.current;
+        const levels = [
+          { key: 'entry', price: entry, label: 'ENTRY', stroke: '#0284c7', fill: '#0284c7' },
+          { key: 'stop', price: stop, label: 'STOP (INVALIDATION)', stroke: '#e11d48', fill: '#e11d48' },
+          { key: 'target', price: target, label: 'TARGET', stroke: '#059669', fill: '#059669' },
+        ] as const;
+
+        for (const item of levels) {
+          if (!item.price || item.price <= 0) continue;
+          const py = candles.priceToCoordinate(item.price);
+          if (py === null || py < 0 || py > height) continue;
+
+          // Horizontal dashed line
+          ctx.strokeStyle = item.stroke;
+          ctx.setLineDash([6, 4]);
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.moveTo(0, py);
+          ctx.lineTo(width - 65, py);
+          ctx.stroke();
+          ctx.setLineDash([]);
+
+          // Right badge
+          const badgeText = `${item.label}: ${item.price.toFixed(2)}`;
+          ctx.font = 'bold 11px system-ui, sans-serif';
+          const textMetrics = ctx.measureText(badgeText);
+          const badgeWidth = textMetrics.width + 16;
+          const badgeX = Math.max(8, width - 80 - badgeWidth);
+          const badgeY = py - 10;
+
+          ctx.fillStyle = item.fill;
+          ctx.beginPath();
+          if (typeof ctx.roundRect === 'function') {
+            ctx.roundRect(badgeX, badgeY, badgeWidth, 20, 4);
+          } else {
+            ctx.rect(badgeX, badgeY, badgeWidth, 20);
+          }
+          ctx.fill();
+
+          ctx.fillStyle = '#ffffff';
+          ctx.fillText(badgeText, badgeX + 8, py + 4);
+
+          // Draggable handle grip knob
+          ctx.fillStyle = item.fill;
+          ctx.strokeStyle = '#ffffff';
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.arc(width - 72, py, 6, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.stroke();
+        }
+      }
+
       frame = requestAnimationFrame(paint);
     }
     frame = requestAnimationFrame(paint);
@@ -311,8 +385,34 @@ export default function CandleWorkspace({
   function pointerDown(event: React.PointerEvent<HTMLCanvasElement>) {
     const p = point(event);
     if (!p) return;
+
+    const rect = event.currentTarget.getBoundingClientRect();
+    const clickY = event.clientY - rect.top;
+
+    // Check hit on draggable plan levels
+    if (
+      onPlanLevelChangeRef.current &&
+      planLevelsRef.current &&
+      (tool === 'plan' || tool === 'edit' || tool === 'navigate')
+    ) {
+      const { entry, stop, target } = planLevelsRef.current;
+      const levels = [
+        { key: 'entry' as const, price: entry },
+        { key: 'stop' as const, price: stop },
+        { key: 'target' as const, price: target },
+      ];
+      for (const item of levels) {
+        if (!item.price || item.price <= 0) continue;
+        const py = series.current?.priceToCoordinate(item.price);
+        if (py != null && Math.abs(clickY - py) < 16) {
+          planDrag.current = { level: item.key };
+          event.currentTarget.setPointerCapture(event.pointerId);
+          return;
+        }
+      }
+    }
+
     if (tool === 'edit') {
-      const rect = event.currentTarget.getBoundingClientRect();
       for (const d of [...drawings].reverse())
         for (const anchor of ['a', 'b'] as const) {
           const a = d[anchor];
@@ -332,7 +432,7 @@ export default function CandleWorkspace({
         }
       return;
     }
-    if (tool === 'navigate' || drawings.length >= 50) return;
+    if (tool === 'navigate' || tool === 'plan' || drawings.length >= 50) return;
     if ((tool === 'trend' || tool === 'zone') && !pending.current) {
       pending.current = p;
       setError('Tap the second point on chart to complete the drawing.');
@@ -548,6 +648,20 @@ export default function CandleWorkspace({
                 (Pan & pinch-to-zoom enabled)
               </span>
             </span>
+          ) : tool === 'plan' ? (
+            <span className="inline-flex items-center gap-1.5 font-medium text-sky-400">
+              <span>🎯 Plan Levels Mode</span>
+              <span className="text-[11px] text-[var(--text-muted)] font-normal">
+                (Drag Entry, Stop, Target handles on chart)
+              </span>
+              <button
+                type="button"
+                onClick={() => setTool('navigate')}
+                className="ml-2 rounded bg-sky-500/20 px-2 py-0.5 text-sky-300 hover:text-white"
+              >
+                Done adjusting
+              </button>
+            </span>
           ) : (
             <span className="inline-flex items-center gap-1.5 font-medium text-purple-400">
               <span>✏️ Drawing: {tool.toUpperCase()}</span>
@@ -567,13 +681,18 @@ export default function CandleWorkspace({
         <span className="text-[11px] text-[var(--text-muted)]">
           {tool === 'navigate'
             ? 'Touch: 1 finger pans, 2 fingers pinch to zoom'
+            : tool === 'plan'
+            ? 'Touch: drag level handles up/down to adjust prices'
             : 'Touch: tap or drag to draw without chart moving'}
         </span>
       </div>
 
       {/* Drawing Toolbar */}
       <div className="flex flex-wrap items-center gap-1" role="group" aria-label="Drawing tools">
-        {(['navigate', 'level', 'trend', 'zone', 'text', 'edit'] as const).map((t) => (
+        {(planLevels
+          ? (['navigate', 'plan', 'level', 'trend', 'zone', 'text', 'edit'] as const)
+          : (['navigate', 'level', 'trend', 'zone', 'text', 'edit'] as const)
+        ).map((t) => (
           <button
             key={t}
             type="button"
@@ -586,7 +705,7 @@ export default function CandleWorkspace({
               pending.current = null;
             }}
           >
-            {t}
+            {t === 'plan' ? 'Plan handles' : t}
           </button>
         ))}
         <button
@@ -680,9 +799,19 @@ export default function CandleWorkspace({
               style={{
                 pointerEvents: tool === 'navigate' ? 'none' : 'auto',
                 touchAction: tool === 'navigate' ? 'auto' : 'none',
+                cursor: tool === 'plan' ? 'ns-resize' : 'default',
               }}
               onPointerDown={pointerDown}
               onPointerMove={(e) => {
+                if (planDrag.current && onPlanLevelChangeRef.current && series.current) {
+                  const rect = e.currentTarget.getBoundingClientRect();
+                  const y = e.clientY - rect.top;
+                  const price = series.current.coordinateToPrice(y);
+                  if (price && price > 0) {
+                    onPlanLevelChangeRef.current(planDrag.current.level, Number(price.toFixed(2)));
+                  }
+                  return;
+                }
                 if (!drag.current) return;
                 const p = point(e);
                 if (p) {
@@ -692,6 +821,10 @@ export default function CandleWorkspace({
                 }
               }}
               onPointerUp={() => {
+                if (planDrag.current) {
+                  planDrag.current = null;
+                  return;
+                }
                 if (drag.current) {
                   setUndo((v) => [...v.slice(-29), drag.current!.previous]);
                   setRedo([]);
@@ -700,6 +833,10 @@ export default function CandleWorkspace({
                 }
               }}
               onPointerCancel={() => {
+                if (planDrag.current) {
+                  planDrag.current = null;
+                  return;
+                }
                 if (drag.current) setDrawings(drag.current.previous);
                 drag.current = null;
               }}

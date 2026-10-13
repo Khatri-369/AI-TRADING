@@ -148,6 +148,40 @@ test('desktop navigation, search, asset detail, chart table alternative, themes 
   await expect(page.getByRole('heading', { name: 'Provider connections & diagnostics' })).toBeVisible();
   await expect(page.getByText('Upstox · Indian equities and indices', { exact: true })).toBeVisible();
 
+  // 8b. Navigation to Research Desk and Trade-Planning Workspace
+  await page.getByRole('tab', { name: 'Research desk' }).click();
+  await expect(page).toHaveURL(/\/desk/);
+  await expect(page.getByRole('heading', { name: 'Research desk' })).toBeVisible();
+
+  // Switch to Plan Tab
+  await page.getByRole('button', { name: 'Plan', exact: true }).click();
+  await expect(page.getByRole('heading', { name: /New Trade Plan/ })).toBeVisible();
+  await expect(page.getByText('Interactive Chart Workspace')).toBeVisible();
+
+  // Enter Trade Plan Numerical Levels
+  await page.getByLabel('Intended entry').fill('2900');
+  await page.getByLabel(/Stop level/).fill('2850');
+  await page.getByLabel(/Target/).fill('3050');
+  await expect(page.getByText('✓ Valid Long (Stop < Entry < Target)')).toBeVisible();
+
+  // Sizing via hypothetical loss budget
+  await page.getByLabel(/Loss budget/).fill('5000');
+  await page.getByRole('button', { name: 'Derive whole units from budget' }).click();
+
+  // Fill thesis, evidence, invalidation
+  await page.getByPlaceholder(/Why this trade/).fill('Weekly cup and handle breakout with strong volume');
+  await page.getByPlaceholder(/e.g., 200 EMA support/).fill('20 EMA support confluence');
+  await page.getByPlaceholder(/Specific price action or events/).fill('Close below 2850 stop level');
+
+  // Verify calculation summary
+  await expect(page.getByText('Transparent Calculation Summary')).toBeVisible();
+  await expect(page.getByText(/Reward \/ Risk Ratio:/)).toBeVisible();
+
+  // Save the trade plan
+  await page.getByRole('button', { name: 'Save trade plan' }).click();
+  await expect(page.getByText('Saved Trade Plans (1)')).toBeVisible();
+  await expect(page.getByText('Weekly cup and handle breakout with strong volume')).toBeVisible();
+
   // 9. Light and Dark Theme Persistence
   await page.goto('/');
   const initialTheme = (await page.locator('html').getAttribute('data-theme')) ?? 'dark';

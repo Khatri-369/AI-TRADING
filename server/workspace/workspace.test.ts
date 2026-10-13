@@ -8,7 +8,11 @@ import {
   digest,
 } from './store';
 import {
+  planSchema,
   planMetrics,
+  estimatePlanCosts,
+  calculateQuantityFromBudget,
+  convertCurrency,
   journalPnl,
   movingAverage,
   recordSchemas,
@@ -224,3 +228,140 @@ test('Market quotes usability and quiet-hours filtering logic', () => {
   assert.equal(typeof digest('test-value'), 'string');
   assert.equal(digest('test-value').length, 64);
 });
+
+test('Trade-planning calculations: ordering validation, costs, budget sizing, and currency integrity', () => {
+  // 1. Long scenario level validation
+  const validLong = {
+    symbol: 'INFY',
+    exchange: 'NSE',
+    currency: 'INR',
+    createdAt: '2026-10-13T10:00:00Z',
+    direction: 'long' as const,
+    entry: 1850,
+    stop: 1800,
+    target: 1950,
+    quantity: 20,
+    costs: 0,
+    feeBps: 10,
+    slippageBps: 5,
+    thesis: 'Cup and handle breakout above 1850',
+    evidence: 'Rising volume, RSI divergence',
+    invalidation: 'Daily close below 1800 invalidates setup',
+    newsLinks: [{ title: 'Q2 earnings results', url: 'https://example.com/infy-q2' }],
+    chartSnapshot: 'chart-INFY-default',
+    status: 'watching' as const,
+  };
+  assert.ok(planSchema.safeParse(validLong).success);
+
+  // Inverted long levels (stop above entry) must fail validation
+  const invertedLong = { ...validLong, stop: 1880 };
+  assert.equal(planSchema.safeParse(invertedLong).success, false);
+
+  // Target below entry on long must fail validation
+  const invalidTargetLong = { ...validLong, target: 1820 };
+  assert.equal(planSchema.safeParse(invalidTargetLong).success, false);
+
+  // Zero distance (entry === stop) must fail validation
+  const zeroDistanceLong = { ...validLong, stop: 1850 };
+  assert.equal(planSchema.safeParse(zeroDistanceLong).success, false);
+
+  // 2. Short scenario level validation
+  const validShort = {
+    ...validLong,
+    direction: 'short' as const,
+    entry: 1850,
+    stop: 1890,
+    target: 1750,
+  };
+  assert.ok(planSchema.safeParse(validShort).success);
+
+  // Inverted short levels (stop below entry) must fail validation
+  const invertedShort = { ...validShort, stop: 1820 };
+  assert.equal(planSchema.safeParse(invertedShort).success, false);
+
+  // Target above entry on short must fail validation
+  const invalidTargetShort = { ...validShort, target: 1900 };
+  assert.equal(planSchema.safeParse(invalidTargetShort).success, false);
+
+  // 3. Costs, fee & slippage calculation
+  // Entry = 1000, Qty = 10. Round-trip BPS = (10 + 5) * 2 = 30 bps = 0.003
+  // 1000 * 10 * 0.003 = 30
+  const estimatedCosts = estimatePlanCosts(1000, 10, 10, 5);
+  assert.equal(estimatedCosts, 30);
+
+  // Plan metrics with automated costs calculation when costs = 0
+  const metricsWithAutoCosts = planMetrics(validLong);
+  assert.equal(metricsWithAutoCosts.distance, 50); // 1850 - 1800
+  assert.equal(metricsWithAutoCosts.targetDistance, 100); // 1950 - 1850
+  // Costs = 1850 * 20 * 0.003 = 111
+  assert.equal(metricsWithAutoCosts.effectiveCosts, 111);
+  assert.equal(metricsWithAutoCosts.loss, 50 * 20 + 111); // 1111
+  assert.equal(metricsWithAutoCosts.reward, 100 * 20 - 111); // 1889
+  assert.ok(Math.abs(metricsWithAutoCosts.ratio - (1889 / 1111)) < 0.001);
+
+  // 4. Budget-derived quantity calculation (Equity lot size = 1)
+  // Distance = 50, Entry = 1850, Friction per unit = 1850 * 0.003 = 5.55. Risk per unit = 55.55.
+  // Budget = 2000 -> 2000 / 55.55 = 36.003 -> 36 units
+  const budgetResult = calculateQuantityFromBudget({
+    symbol: 'INFY',
+    entry: 1850,
+    stop: 1800,
+    budget: 2000,
+    feeBps: 10,
+    slippageBps: 5,
+  });
+  assert.equal(budgetResult.supported, true);
+  assert.equal(budgetResult.quantity, 36);
+  assert.equal(budgetResult.lotSize, 1);
+  assert.ok(budgetResult.totalRisk <= 2000);
+
+  // Insufficient budget (budget < risk per unit)
+  const smallBudgetResult = calculateQuantityFromBudget({
+    symbol: 'INFY',
+    entry: 1850,
+    stop: 1800,
+    budget: 30, // less than 55.55
+  });
+  assert.equal(smallBudgetResult.quantity, 0);
+  assert.ok(smallBudgetResult.limitation?.includes('insufficient'));
+
+  // Broad index constraint (NIFTY50, BANKNIFTY, SENSEX)
+  const indexResult = calculateQuantityFromBudget({
+    symbol: 'NIFTY50',
+    entry: 25000,
+    stop: 24900,
+    budget: 5000,
+  });
+  assert.equal(indexResult.supported, false);
+  assert.ok(indexResult.limitation?.includes('Broad market index'));
+
+  // Invalid inputs throw errors
+  assert.throws(
+    () => calculateQuantityFromBudget({ symbol: 'INFY', entry: 1850, stop: 1850, budget: 1000 }),
+    /zero distance/
+  );
+  assert.throws(
+    () => calculateQuantityFromBudget({ symbol: 'INFY', entry: -100, stop: 1800, budget: 1000 }),
+    /positive valid numbers/
+  );
+  assert.throws(
+    () => calculateQuantityFromBudget({ symbol: 'INFY', entry: 1850, stop: 1800, budget: -50 }),
+    /positive number/
+  );
+
+  // 5. Currency conversion integrity
+  // Same currency identity
+  const inrToInr = convertCurrency(100, 'INR', 'INR');
+  assert.equal(inrToInr.amount, 100);
+
+  // Explicit conversion rate with timestamp
+  const usdToInr = convertCurrency(100, 'USD', 'INR', 83.5, '2026-10-13T10:00:00Z');
+  assert.equal(usdToInr.amount, 8350);
+  assert.equal(usdToInr.rate, 83.5);
+  assert.equal(usdToInr.timestamp, '2026-10-13T10:00:00Z');
+
+  // Combining currencies without rate or timestamp throws an error
+  assert.throws(() => convertCurrency(100, 'USD', 'INR'), /without an explicit/);
+  assert.throws(() => convertCurrency(100, 'USD', 'INR', 83.5), /without an explicit/);
+});
+

@@ -1,5 +1,35 @@
 # Research features & Workspace upgrades — 13 October 2026
 
+## Interactive Trade-Planning Feature Connected to Chart Workspace
+- **Research & Calculation Purpose**: Built a dedicated, non-execution trade-planning tool on the Research Desk (`/desk`) connected bidirectionally to the interactive candlestick chart workspace. Does not execute live broker orders or present AI recommendations as user choices.
+- **Saved Plan Data Schema**:
+  - `symbol`, `exchange` (NSE, BSE, US), `currency` (INR, USD), and `createdAt` ISO timestamp.
+  - Direction scenario: `long` or `short`.
+  - Intended `entry`, invalidation `stop`, and profit `target`.
+  - Level ordering validation: Long enforces `stop < entry < target`; Short enforces `target < entry < stop`; zero distance (`entry === stop`) and negative/zero prices are strictly rejected.
+  - Position sizing: user quantity (whole units) or maximum hypothetical loss budget.
+  - Instrument lot constraints: Indian cash equities enforce 1-share minimum whole unit lot sizing; broad indices (`NIFTY50`, `BANKNIFTY`, `SENSEX`) explicitly disclose that cash shares cannot be bought/sold directly and require index derivatives or ETF equivalents.
+  - Written `thesis`, supporting `evidence`, and `invalidation` conditions.
+  - Linked `newsLinks` (headline and URL) and chart drawing snapshot reference (`chartSnapshot`).
+  - Plan lifecycle states: `draft`, `watching`, `archived`, and `reviewed` with filterable tabs and status transitions.
+- **Transparent Mathematical Calculations**:
+  - Entry-to-stop distance (`|entry - stop|`).
+  - Potential loss (`distance * quantity + friction`) and potential reward (`targetDistance * quantity - friction`).
+  - Reward-to-risk ratio (`reward / loss`).
+  - Budget-derived whole unit quantity via `calculateQuantityFromBudget(...)` factoring two-sided friction per unit.
+  - Explicit editable friction assumptions: `feeBps` (default 10 bps per side) and `slippageBps` (default 5 bps per side) showing 30 bps round-trip friction.
+  - Currency integrity: currencies are isolated to instrument native currencies; `convertCurrency(...)` requires explicit timestamped exchange conversion rates.
+  - Disclaimers: Market gaps and slippage can cause actual execution losses to exceed calculated stop levels.
+- **Interactive Chart Synchronization**:
+  - `CandleWorkspace.tsx` displays color-coded dashed guidelines: Entry (Blue), Stop / Invalidation (Rose), Target (Emerald).
+  - Draggable handle knobs on chart allow adjusting levels with mouse or touch, updating the plan form numbers in real time.
+  - Numerical edits in the form immediately translate to chart coordinates on the canvas overlay.
+  - Touch mode separation: Navigation mode preserves one-finger pan and two-finger pinch-zoom; Plan Levels mode allows precise handle dragging.
+- **Test Suite Results**:
+  - Unit tests: **54 passed, 0 failed** (`npm test`), verifying long/short ordering, budget sizing, lot constraints, fees, slippage, and currency integrity.
+  - Linting: **0 errors, 0 warnings** (`npm run lint`).
+  - Browser tests: **7 passed, 0 failed** (`npm run test:browser`), verifying trade planning creation, budget derivation, validation indicators, saved plans listing, and zero horizontal overflow across 320px, 390px, 768px, and 1440px viewports in Light and Dark themes.
+
 Mobile-First Chart Workspace, Exchange Metadata & Account-Synced Watchlists:
 - **Mobile-First Interactive OHLCV Candlestick Workspace**: Upgraded `CandleWorkspace.tsx` to provide a dedicated, touch-ergonomic financial charting workspace powered by Lightweight Charts (Apache 2.0). Features include:
   - Live Crosshair HUD displaying Open, High, Low, Close, Volume, and Change % on hover/touch, defaulting to the latest completed candle.
