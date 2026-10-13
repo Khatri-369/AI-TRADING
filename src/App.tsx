@@ -11,6 +11,7 @@ import ScenarioSimulator from './components/ScenarioSimulator';
 import OverviewPage from './components/OverviewPage';
 import ProductDisclosuresModal from './components/ProductDisclosuresModal';
 import UpdatePrompt from './components/UpdatePrompt';
+import MobileBottomNav from './components/MobileBottomNav';
 import { ErrorNotice, Loading } from './components/Feedback';
 import { useMarketData, useNews } from './hooks/useMarketData';
 import { useAIAnalysis, analysisKey } from './hooks/useAIAnalysis';
@@ -234,7 +235,7 @@ function MainApp() {
         {/* Main Content Area */}
         <main
           id="main-content"
-          className="mx-auto max-w-[1440px] w-full px-4 py-5 sm:px-6 lg:px-8 space-y-6"
+          className="mx-auto max-w-[1440px] w-full px-3 py-4 sm:px-6 lg:px-8 pb-24 md:pb-8 space-y-6"
         >
           {/* Active Search Banner */}
           {search.trim() && (
@@ -458,6 +459,9 @@ function MainApp() {
 
       {/* PWA In-App Update Prompt */}
       <UpdatePrompt />
+
+      {/* Native Mobile Bottom Navigation Bar */}
+      <MobileBottomNav currentTab={route.page} onNavigate={handleNavigate} />
     </div>
   );
 }

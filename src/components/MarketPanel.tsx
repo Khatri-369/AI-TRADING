@@ -184,13 +184,55 @@ export default function MarketPanel({
           ))}
         </div>
       ) : (
-        /* Dense Analytical Table View */
-        <div
-          tabIndex={0}
-          role="region"
-          aria-label={`${title} quotes table`}
-          className="overflow-x-auto rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)]"
-        >
+        <>
+          {/* Mobile-Native Stock Rows (shown on small screens) */}
+          <div className="space-y-2 sm:hidden" role="region" aria-label={`${title} mobile quotes list`}>
+            {visible.map((quote) => (
+              <button
+                key={quote.symbol}
+                type="button"
+                onClick={() => onSelect(quote)}
+                className="w-full flex items-center justify-between rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-3 text-left transition active:scale-[0.99] hover:border-[var(--border-strong)] shadow-sm"
+              >
+                <div className="min-w-0 pr-2">
+                  <div className="flex items-center gap-1.5">
+                    <span className="font-bold text-sm text-[var(--text-primary)]">
+                      {quote.symbol}
+                    </span>
+                    {getSessionBadge(quote.session.state)}
+                  </div>
+                  <p className="mt-0.5 truncate text-xs text-[var(--text-muted)] max-w-[170px]">
+                    {quote.name}
+                  </p>
+                  <p className="mt-1 text-[10px] text-[var(--text-muted)]">
+                    {quote.provider} · {formatTime(quote.asOf)}
+                  </p>
+                </div>
+                <div className="text-right shrink-0">
+                  <p className="font-mono text-sm font-bold tabular-nums text-[var(--text-primary)]">
+                    {formatPrice(quote.price, quote.currency)}
+                  </p>
+                  <span
+                    className={`mt-1 inline-flex items-center justify-end rounded px-2 py-0.5 font-mono text-xs font-semibold tabular-nums ${
+                      (quote.changePercent ?? 0) >= 0
+                        ? 'bg-emerald-500/15 text-emerald-400'
+                        : 'bg-rose-500/15 text-rose-400'
+                    }`}
+                  >
+                    {quote.changePercent === null ? '—' : formatPercent(quote.changePercent)}
+                  </span>
+                </div>
+              </button>
+            ))}
+          </div>
+
+          {/* Dense Analytical Table View (Desktop & Tablet) */}
+          <div
+            tabIndex={0}
+            role="region"
+            aria-label={`${title} quotes table`}
+            className="hidden sm:block overflow-x-auto rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)]"
+          >
           <table className="w-full min-w-[620px] text-left text-xs">
             <thead className="border-b border-[var(--border-subtle)] bg-[var(--bg-surface-elevated)] text-[10px] uppercase tracking-wider text-[var(--text-muted)]">
               <tr>
@@ -275,7 +317,8 @@ export default function MarketPanel({
             </tbody>
           </table>
         </div>
-      )}
+      </>
+    )}
     </section>
   );
 }
