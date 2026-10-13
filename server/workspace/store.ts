@@ -1,4 +1,3 @@
-import { createRequire } from 'node:module';
 import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { randomBytes, createHash, scrypt as scryptCallback, timingSafeEqual } from 'node:crypto';
@@ -7,11 +6,12 @@ import { recordSchemas, type RecordKind, type ResearchRecord, type PriceAlert } 
 import { ASSET_BY_SYMBOL } from '../../shared/assets';
 import type { Quote } from '../../shared/types';
 
-const req = createRequire(import.meta.url);
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let DatabaseSyncConstructor: any = null;
 try {
-  DatabaseSyncConstructor = req('node:sqlite').DatabaseSync;
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const nodeSqlite = typeof require !== 'undefined' ? require('node:sqlite') : null;
+  DatabaseSyncConstructor = nodeSqlite?.DatabaseSync ?? null;
 } catch {
   // node:sqlite is an experimental feature not enabled in all runtime environments (e.g. serverless)
 }
