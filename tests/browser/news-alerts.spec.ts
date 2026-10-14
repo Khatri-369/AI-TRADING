@@ -1,0 +1,132 @@
+import { test, expect, type Page } from '@playwright/test';
+
+const stamp = '2026-10-13T10:00:00Z';
+const story = { id: 'baseline', headline: 'Earlier headline', summary: 'Fixture', source: 'Fixture', url: 'https://example.com/news', publishedAt: stamp, relatedAssets: ['RELIANCE'] };
+async function setup(page: Page) {
+  let articles = [story];
+  await page.route('**/api/news', route => route.fulfill({ json: { articles, provider: 'Fixture', status: 'delayed', cached: false, fetchedAt: stamp } }));
+  await page.route('**/api/markets/overview', route => route.fulfill({ json: { quotes: [], generatedAt: stamp } }));
+  await page.route('**/api/stream/live-ticks', route => route.abort());
+  await page.route('**/api/workspace/session', route => route.fulfill({ status: 503, json: { error: 'Account sync is unconfigured.' } }));
+  await page.addInitScript(() => {
+    localStorage.setItem('markets.watchlist.v1', '["RELIANCE"]');
+    Object.defineProperty(window, 'Notification', { value: { permission: 'default', requestPermission: async () => { document.documentElement.dataset.permissionRequested = 'yes'; return 'denied'; } }, configurable: true });
+  });
+  return (next: typeof articles) => { articles = next; };
+}
+
+test('Vercel-only headline inbox is opt-in, watchlist scoped, deduplicated and persistent on mobile', async ({ page }) => {
+  const update = await setup(page);
+  const errors: string[] = []; page.on('pageerror', e => errors.push(e.message));
+  await page.setViewportSize({ width: 320, height: 740 });
+  await page.goto('/news');
+  await expect(page.getByRole('heading', { name: /Earlier headline/ })).toBeVisible();
+  await page.getByRole('button', { name: 'News notifications', exact: true }).click();
+  const inbox = page.getByRole('region', { name: 'News notification inbox' });
+  await inbox.getByLabel('Notify me about new headlines').check();
+  await expect(inbox.getByText('Earlier headline', { exact: true })).toHaveCount(0);
+  await expect(page.locator('html')).not.toHaveAttribute('data-permission-requested');
+  await page.getByRole('button', { name: 'Close news notifications' }).click();
+  const newStory = { ...story, id: 'fresh', headline: 'Fresh Reliance headline', publishedAt: '2026-10-13T10:01:00Z' };
+  update([newStory, { ...newStory, id: 'other', headline: 'Other company', relatedAssets: ['TCS'] }, story]);
+  await page.getByRole('button', { name: 'Refresh news headlines' }).click();
+  await page.getByRole('button', { name: 'News notifications, 1 unread' }).click();
+  await expect(inbox.getByText(newStory.headline, { exact: true })).toBeVisible();
+  await expect(inbox.getByText('Other company', { exact: true })).toHaveCount(0);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await page.screenshot({ path: 'test-results/mobile-news-inbox.png' });
+  await inbox.getByRole('button', { name: 'Mark all read' }).click();
+  await page.reload();
+  await page.getByRole('button', { name: 'News notifications', exact: true }).click();
+  await expect(inbox.getByLabel('Notify me about new headlines')).toBeChecked();
+  await expect(inbox.getByText(newStory.headline, { exact: true })).toHaveCount(1);
+  await inbox.getByRole('button', { name: 'Also show device alerts' }).click();
+  await expect(page.locator('html')).toHaveAttribute('data-permission-requested', 'yes');
+  await expect(inbox.getByRole('status')).toContainText('not allowed');
+  await page.getByRole('button', { name: 'Close news notifications' }).click();
+  await page.getByRole('button', { name: 'Refresh news headlines' }).click();
+  await expect(page.getByRole('heading', { name: /Fresh Reliance headline/ })).toBeVisible();
+  await expect(page.getByRole('button', { name: /News notifications,.*unread/ })).toHaveCount(0);
+  expect(errors).toEqual([]);
+});
+
+test('quiet hours consume arrivals, disabled alerts stay quiet, and enabling never floods old headlines', async ({ page }) => {
+  const update = await setup(page);
+  await page.clock.setFixedTime(new Date('2026-10-14T23:00:00'));
+  await page.goto('/news');
+  await expect(page.getByRole('heading', { name: /Earlier headline/ })).toBeVisible();
+  const bell = page.getByRole('button', { name: 'News notifications', exact: true });
+  await bell.click();
+  const inbox = page.getByRole('region', { name: 'News notification inbox' });
+  await inbox.getByLabel('Alert coverage').selectOption('all');
+  await inbox.getByLabel('Quiet hours:', { exact: false }).check();
+  await inbox.getByLabel('Notify me about new headlines').check();
+  await page.getByRole('button', { name: 'Close news notifications' }).click();
+  update([{ ...story, id: 'quiet', headline: 'Quiet-time headline', publishedAt: '2026-10-13T10:02:00Z' }]);
+  await page.getByRole('button', { name: 'Refresh news headlines' }).click();
+  await expect(page.getByRole('heading', { name: /Quiet-time headline/ })).toBeVisible();
+  await bell.click();
+  await expect(inbox.getByText('Quiet-time headline', { exact: true })).toHaveCount(0);
+  await inbox.getByLabel('Quiet hours:', { exact: false }).uncheck();
+  await inbox.getByLabel('Notify me about new headlines').uncheck();
+  await page.getByRole('button', { name: 'Close news notifications' }).click();
+  update([{ ...story, id: 'disabled', headline: 'Disabled-time headline', publishedAt: '2026-10-13T10:03:00Z' }]);
+  await page.getByRole('button', { name: 'Refresh news headlines' }).click();
+  await expect(page.getByRole('heading', { name: /Disabled-time headline/ })).toBeVisible();
+  await bell.click();
+  await inbox.getByLabel('Notify me about new headlines').check();
+  await expect(inbox.getByText('Disabled-time headline', { exact: true })).toHaveCount(0);
+});
+
+test('markets sort real observations, preserve unavailable instruments and save watchlist across mobile panels', async ({ page }) => {
+  await setup(page);
+  const base = { name: 'Fixture', currency: 'INR', price: 100, change: 1, volume: 200, category: 'india', asOf: stamp, fetchedAt: stamp, provider: 'Fixture', status: 'delayed', cached: false, session: { state: 'CLOSED', timezone: 'Asia/Kolkata' } };
+  await page.route('**/api/markets/overview', route => route.fulfill({ json: { generatedAt: stamp, quotes: [{ ...base, symbol: 'RELIANCE', changePercent: -3 }, { ...base, symbol: 'TCS', changePercent: 2 }] } }));
+  await page.setViewportSize({ width: 320, height: 740 });
+  await page.goto('/markets');
+  const panel = page.getByRole('region', { name: 'Indian Equities & Indices', exact: true });
+  const rows = panel.getByRole('region', { name: 'Indian Equities & Indices mobile quotes list' });
+  await panel.getByLabel('Indian Equities & Indices sort order').selectOption('decliners');
+  await expect(rows.locator(':scope > div').first()).toContainText('RELIANCE');
+  await panel.getByLabel('Indian Equities & Indices sort order').selectOption('gainers');
+  await expect(rows.locator(':scope > div').first()).toContainText('TCS');
+  await rows.getByRole('button', { name: 'Save TCS to watchlist', exact: true }).click();
+  await expect(rows.getByRole('button', { name: 'Remove TCS from watchlist', exact: true })).toBeEnabled();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await panel.scrollIntoViewIfNeeded();
+  await page.screenshot({ path: 'test-results/mobile-market-directory.png' });
+  await page.getByRole('navigation', { name: 'Mobile bottom navigation' }).getByRole('button', { name: 'Watchlist' }).click();
+  await expect(page.getByLabel('Watchlist cards').getByRole('article')).toHaveCount(2);
+  await page.reload();
+  await expect(page.getByRole('button', { name: 'Unsave TCS', exact: true })).toBeVisible();
+  await page.goto('/desk?tab=Journal');
+  const tabs = page.getByRole('navigation', { name: 'Research desk tools' });
+  await tabs.getByRole('button', { name: 'Plan', exact: true }).click();
+  await expect(page.getByRole('heading', { name: /New Trade Plan/ })).toBeVisible();
+  await tabs.getByRole('button', { name: 'Account', exact: true }).click();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+});
+
+test('all-market alerts ignore an empty initial feed, old backfills and future timestamps', async ({ page }) => {
+  const update = await setup(page);
+  update([]);
+  await page.goto('/news');
+  const bell = page.getByRole('button', { name: 'News notifications', exact: true });
+  await bell.click();
+  const inbox = page.getByRole('region', { name: 'News notification inbox' });
+  await inbox.getByLabel('Alert coverage').selectOption('all');
+  await inbox.getByLabel('Notify me about new headlines').check();
+  await page.getByRole('button', { name: 'Close news notifications' }).click();
+  update([story]);
+  await page.getByRole('button', { name: 'Refresh news headlines' }).click();
+  await expect(page.getByRole('heading', { name: /Earlier headline/ })).toBeVisible();
+  await expect(page.getByRole('button', { name: /News notifications,.*unread/ })).toHaveCount(0);
+  update([{ ...story, id: 'future', headline: 'Future headline', publishedAt: '2099-01-01T00:00:00Z' }, { ...story, id: 'backfill', headline: 'Old backfill', publishedAt: '2026-10-12T10:00:00Z' }, story]);
+  await page.getByRole('button', { name: 'Refresh news headlines' }).click();
+  await expect(page.getByRole('heading', { name: /Future headline/ })).toBeVisible();
+  await expect(page.getByRole('button', { name: /News notifications,.*unread/ })).toHaveCount(0);
+  update([{ ...story, id: 'other', headline: 'Fresh TCS headline', publishedAt: '2026-10-13T10:05:00Z', relatedAssets: ['TCS'] }, story]);
+  await page.getByRole('button', { name: 'Refresh news headlines' }).click();
+  await page.getByRole('button', { name: 'News notifications, 1 unread' }).click();
+  await expect(inbox.getByText('Fresh TCS headline', { exact: true })).toBeVisible();
+});

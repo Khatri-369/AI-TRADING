@@ -10,7 +10,7 @@ export default function NewsPreferences({ onNotifications }: { onNotifications: 
   const [message, setMessage] = useState('');
   const [busy, setBusy] = useState(false);
   return <form className="research-card space-y-3" onSubmit={e => { e.preventDefault(); if (busy) return; setBusy(true); void store.save(record?.id ?? 'news-preferences', 'preferences', value, record?.version ?? 0).then(() => setMessage(store.user ? 'News preferences saved to your account.' : 'Guest preferences saved. Sign in and import to activate.')).catch(error => setMessage(error.message)).finally(() => setBusy(false)); }}>
-    <h2 className="font-semibold">News notifications</h2>
+    <h2 className="font-semibold">Background news preferences</h2><p className="text-sm text-[var(--text-secondary)]">For alerts while this app is open, use the notification bell in the header. The settings below require account sync and a persistent backend; with Vercel only they are saved as drafts.</p>
     <p className="text-sm text-[var(--text-secondary)]">Receive new headlines for your saved instruments. Matching uses the provider’s instrument tags; some relevant stories may not be tagged.</p>
     <label className="block text-xs">News coverage<select className="field block w-full" value={value.scope} onChange={e => setValue({ ...value, scope: e.target.value as typeof value.scope })}><option value="watchlist">My account watchlist</option><option value="all">All tracked market news</option></select></label>
     <label className="block text-xs">Minimum minutes between headlines<input className="field block w-full" type="number" min={5} max={1440} required value={value.frequencyMinutes} onChange={e => setValue({ ...value, frequencyMinutes: Number(e.target.value) })} /></label>

@@ -16,6 +16,7 @@ import { Empty, ErrorNotice, Loading } from './Feedback';
 import AnalysisResult from './AnalysisResult';
 import StatusBadge from './StatusBadge';
 import CandleWorkspace from './CandleWorkspace';
+import WatchlistToggle from './WatchlistToggle';
 
 interface Props {
   quote: Quote;
@@ -118,6 +119,7 @@ export default function AssetDetail({
         <div className="flex items-start justify-between gap-4 border-b border-[var(--border-subtle)] pb-4">
           <div>
             <div className="flex flex-wrap items-center gap-2">
+              <WatchlistToggle symbol={quote.symbol} />
               <button className="button-secondary mb-2" onClick={onAsk}><Bot size={16} />Ask about {quote.symbol}</button>
               <button className="button-secondary mb-2" onClick={onWorkspace}><ChartIcon size={16} />Open chart workspace</button>
               <h2 id="asset-detail-title" className="text-xl sm:text-2xl font-bold tracking-tight text-[var(--text-primary)]">

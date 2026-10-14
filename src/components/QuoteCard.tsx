@@ -1,6 +1,6 @@
 import { ArrowUpRight } from 'lucide-react';
 import type { Quote } from '../types/market';
-import { changeClass, formatPercent, formatPrice, formatTime } from '../utils/format';
+import { changeClass, formatPercent, formatPrice } from '../utils/format';
 import StatusBadge from './StatusBadge';
 
 export default function QuoteCard({

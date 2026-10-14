@@ -2,6 +2,7 @@ import type { ChatFocus } from '../shared/chat';
 import { Component, lazy, Suspense, useEffect, useState, type ReactNode } from 'react';
 import { RefreshCw, X } from 'lucide-react';
 import Header from './components/Header';
+import NewsAlerts from './components/NewsAlerts';
 import ToolsPage from './components/ToolsPage';
 import MarketBrief from './components/MarketBrief';
 import { useReadingLibrary } from './hooks/useReadingLibrary';
@@ -100,7 +101,7 @@ function MainApp() {
   const market = useMarketData();
   const news = useNews();
   const ai = useAIAnalysis();
-  const { symbols: savedSymbols } = useWatchlist();
+  const { symbols: savedSymbols, store } = useWatchlist();
   const { remember } = useReadingLibrary();
   const [historyError, setHistoryError] = useState('');
   const viewedSymbol = route.symbol ?? (route.page === 'desk' ? new URLSearchParams(window.location.search).get('symbol') : null);
@@ -156,8 +157,9 @@ function MainApp() {
         }
       : null);
 
-  // Filtered quotes based on honest search across 42 instruments
-  const filteredQuotes = market.quotes.filter((quote) =>
+  // Keep the directory usable when a provider is unavailable, without inventing prices.
+  const directory: Quote[] = [...ASSET_BY_SYMBOL.values()].map(asset => market.quotes.find(q => q.symbol === asset.symbol) ?? { ...asset, price: null, change: null, changePercent: null, volume: null, provider: 'No observation', asOf: null, fetchedAt: null, cached: false, status: 'unavailable', session: { state: 'UNKNOWN', timezone: 'UTC' } });
+  const filteredQuotes = directory.filter((quote) =>
     `${quote.symbol} ${quote.name} ${quote.sector ?? ''} ${quote.category}`
       .toLowerCase()
       .includes(search.trim().toLowerCase())
@@ -194,6 +196,7 @@ function MainApp() {
       <div>
         {/* Application Header Shell */}
         <Header
+          notifications={store.sessionReady && <NewsAlerts key={store.user?.id ?? 'guest'} storageKey={`tradexa.newsAlerts.v1.${store.user?.id ?? 'guest'}`} ready={store.sessionReady} news={news.data} symbols={savedSymbols} onNews={() => handleNavigate('news')} onBackground={() => setDesktopOpen(true)} />}
           theme={theme}
           onDesktop={() => setDesktopOpen(true)}
           onTheme={setTheme}
@@ -238,7 +241,7 @@ function MainApp() {
                   Search results for &ldquo;{search}&rdquo;:
                 </span>{' '}
                 <span className="text-[var(--text-secondary)]">
-                  {filteredQuotes.length} matching instruments out of 42 tracked assets
+                  {filteredQuotes.length} matching instruments out of {directory.length} tracked assets
                 </span>
               </div>
               <button
@@ -319,11 +322,11 @@ function MainApp() {
                 aria-label="Market Categories"
               >
                 {[
-                  { id: 'all', label: 'All Markets (42)' },
-                  { id: 'us', label: 'US Equities (8)' },
-                  { id: 'india', label: 'Indian Equities (25)' },
-                  { id: 'crypto', label: 'Digital Assets (5)' },
-                  { id: 'commodities', label: 'Metals & FX (3)' },
+                  { id: 'all', label: 'All Markets' },
+                  { id: 'us', label: 'US Equities' },
+                  { id: 'india', label: 'Indian Equities' },
+                  { id: 'crypto', label: 'Digital Assets' },
+                  { id: 'commodities', label: 'Metals & FX' },
                 ].map((cat) => (
                   <button
                     key={cat.id}
@@ -337,7 +340,7 @@ function MainApp() {
                         : 'border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[var(--text-secondary)] hover:bg-[var(--bg-surface-hover)] hover:text-[var(--text-primary)]'
                     }`}
                   >
-                    {cat.label}
+                    {cat.label} ({directory.filter(q => cat.id === 'all' || (cat.id === 'commodities' ? ['commodities', 'forex'].includes(q.category) : q.category === cat.id)).length})
                   </button>
                 ))}
               </div>

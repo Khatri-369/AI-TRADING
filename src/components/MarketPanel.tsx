@@ -4,6 +4,7 @@ import type { Quote } from '../types/market';
 import { changeClass, formatPercent, formatPrice, formatTime } from '../utils/format';
 import StatusBadge from './StatusBadge';
 import QuoteCard from './QuoteCard';
+import WatchlistToggle from './WatchlistToggle';
 import { Empty, Loading } from './Feedback';
 
 interface Props {
@@ -29,6 +30,7 @@ export default function MarketPanel({
 }: Props) {
   const [filter, setFilter] = useState('all');
   const [sector, setSector] = useState('all');
+  const [sort, setSort] = useState('directory');
   const [currentLayout, setCurrentLayout] = useState<'table' | 'cards'>(layout);
 
   const visible = quotes.filter(
@@ -37,7 +39,15 @@ export default function MarketPanel({
         (quote.changePercent !== null &&
           (filter === 'gainers' ? quote.changePercent > 0 : quote.changePercent < 0))) &&
       (sector === 'all' || quote.sector === sector)
-  );
+  ).sort((a, b) => {
+    if (sort === 'name') return a.symbol.localeCompare(b.symbol);
+    if (sort === 'directory') return 0;
+    const left = sort === 'volume' ? a.volume : a.changePercent;
+    const right = sort === 'volume' ? b.volume : b.changePercent;
+    if (left === null) return right === null ? 0 : 1;
+    if (right === null) return -1;
+    return sort === 'decliners' ? left - right : right - left;
+  });
 
   const sectorOptions = [
     ...new Set(quotes.flatMap((quote) => (quote.sector ? [quote.sector] : []))),
@@ -102,10 +112,11 @@ export default function MarketPanel({
           )}
 
           {/* Movement Filter */}
+          <label><span className="sr-only">{title} sort order</span><select className="field min-h-11 py-1 text-xs" value={sort} onChange={e => setSort(e.target.value)}><option value="directory">Directory order</option><option value="name">Name A–Z</option><option value="gainers">Biggest gain %</option><option value="decliners">Biggest decline %</option><option value="volume">Highest volume</option></select></label>
           <label>
             <span className="sr-only">{title} movement filter</span>
             <select
-              className="field h-8 py-1 text-xs"
+              className="field min-h-11 py-1 text-xs"
               value={filter}
               onChange={(e) => setFilter(e.target.value)}
             >
@@ -120,7 +131,7 @@ export default function MarketPanel({
             <label>
               <span className="sr-only">Sector filter</span>
               <select
-                className="field h-8 py-1 text-xs"
+                className="field min-h-11 py-1 text-xs"
                 value={sector}
                 onChange={(e) => setSector(e.target.value)}
               >
@@ -180,7 +191,7 @@ export default function MarketPanel({
       ) : currentLayout === 'cards' ? (
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {visible.map((quote) => (
-            <QuoteCard key={quote.symbol} quote={quote} onSelect={onSelect} />
+            <div key={quote.symbol} className="space-y-2"><QuoteCard quote={quote} onSelect={onSelect} /><WatchlistToggle symbol={quote.symbol} /></div>
           ))}
         </div>
       ) : (
@@ -188,14 +199,14 @@ export default function MarketPanel({
           {/* Mobile-Native Stock Rows (shown on small screens) */}
           <div className="space-y-2 sm:hidden" role="region" aria-label={`${title} mobile quotes list`}>
             {visible.map((quote) => (
+              <div key={quote.symbol} className="flex items-center gap-1">
               <button
-                key={quote.symbol}
                 type="button"
                 onClick={() => onSelect(quote)}
-                className="w-full flex items-center justify-between rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-3 text-left transition active:scale-[0.99] hover:border-[var(--border-strong)] shadow-sm"
+                className="min-w-0 flex-1 flex items-center justify-between gap-1 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-2 text-left hover:border-[var(--border-strong)]"
               >
                 <div className="min-w-0 pr-2">
-                  <div className="flex items-center gap-1.5">
+                  <div className="flex flex-wrap items-center gap-1.5">
                     <span className="font-bold text-sm text-[var(--text-primary)]">
                       {quote.symbol}
                     </span>
@@ -207,6 +218,7 @@ export default function MarketPanel({
                   <p className="mt-1 text-[10px] text-[var(--text-muted)]">
                     {quote.provider} · {formatTime(quote.asOf)}
                   </p>
+                  <StatusBadge status={quote.status} cached={quote.cached} />
                 </div>
                 <div className="text-right shrink-0">
                   <p className="font-mono text-sm font-bold tabular-nums text-[var(--text-primary)]">
@@ -215,14 +227,16 @@ export default function MarketPanel({
                   <span
                     className={`mt-1 inline-flex items-center justify-end rounded px-2 py-0.5 font-mono text-xs font-semibold tabular-nums ${
                       (quote.changePercent ?? 0) >= 0
-                        ? 'bg-emerald-500/15 text-emerald-400'
-                        : 'bg-rose-500/15 text-rose-400'
+                        ? 'bg-[var(--gain-bg)] text-[var(--gain-text)]'
+                        : 'bg-[var(--loss-bg)] text-[var(--loss-text)]'
                     }`}
                   >
                     {quote.changePercent === null ? '—' : formatPercent(quote.changePercent)}
                   </span>
                 </div>
               </button>
+              <WatchlistToggle symbol={quote.symbol} />
+              </div>
             ))}
           </div>
 
@@ -303,6 +317,7 @@ export default function MarketPanel({
                     )}
                   </td>
                   <td className="px-3.5 py-3 text-right">
+                    <div className="flex justify-end items-center gap-2"><WatchlistToggle symbol={quote.symbol} />
                     <button
                       type="button"
                       className="button-secondary text-[11px] py-1 px-2.5"
@@ -311,6 +326,7 @@ export default function MarketPanel({
                     >
                       Research
                     </button>
+                    </div>
                   </td>
                 </tr>
               ))}
