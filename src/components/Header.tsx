@@ -42,10 +42,9 @@ export const navItems = [
   { id: 'overview' as Tab, label: 'Overview', path: '/', icon: LayoutDashboard },
   { id: 'markets' as Tab, label: 'Markets', path: '/markets', icon: BarChart3 },
   { id: 'watchlist' as Tab, label: 'Watchlist', path: '/watchlist', icon: Star },
-  { id: 'desk' as Tab, label: 'Research desk', path: '/desk', icon: BarChart3 },
-  { id: 'news' as Tab, label: 'News & Sentiment', path: '/news', icon: Newspaper },
+  { id: 'desk' as Tab, label: 'Research Desk', path: '/desk', icon: BarChart3 },
+  { id: 'news' as Tab, label: 'News & AI', path: '/news', icon: Newspaper },
   { id: 'scenarios' as Tab, label: 'Scenarios', path: '/scenarios', icon: FlaskConical },
-  { id: 'diagnostics' as Tab, label: 'Diagnostics', path: '/diagnostics', icon: ShieldCheck },
 ];
 
 export default function Header({
@@ -66,6 +65,7 @@ export default function Header({
 }: Props) {
   const [now, setNow] = useState(() => new Date());
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [clocksOpen, setClocksOpen] = useState(false);
   const { canInstall, isInstalled, triggerInstall } = usePwaInstall();
 
   useEffect(() => {
@@ -77,8 +77,14 @@ export default function Header({
     onTheme(theme === 'dark' ? 'light' : 'dark');
   };
 
+  const timeZones = [
+    { name: 'Mumbai (NSE/BSE)', tz: 'Asia/Kolkata', flag: '🇮🇳' },
+    { name: 'New York (NYSE)', tz: 'America/New_York', flag: '🇺🇸' },
+    { name: 'London (LSE)', tz: 'Europe/London', flag: '🇬🇧' },
+  ];
+
   return (
-    <header className="relative border-b border-[var(--border-subtle)] bg-[var(--bg-surface)]">
+    <header className="relative border-b border-[var(--border-subtle)] bg-[var(--bg-surface)] select-none">
       {/* Top Global Active Progress Bar */}
       {loading && (
         <div
@@ -92,145 +98,139 @@ export default function Header({
       </a>
 
       {/* Main Top Bar */}
-      <div className="mx-auto flex max-w-[1440px] flex-wrap items-center justify-between gap-2.5 px-3 py-2.5 sm:px-6 lg:px-8">
+      <div className="mx-auto flex max-w-[1440px] items-center justify-between gap-3 px-3 py-2.5 sm:px-6 lg:px-8">
         {/* Brand / Title */}
-        <div className="flex min-w-0 items-center gap-2">
+        <div className="flex items-center gap-3">
           <button
             onClick={() => {
               onNavigate('overview');
               setMobileMenuOpen(false);
             }}
-            className="flex items-center gap-2.5 text-left transition hover:opacity-85"
+            className="flex items-center gap-2.5 text-left transition hover:opacity-90"
             aria-label="Tradexa Global Markets Research"
           >
-            <img
-              src="/icons/tradexa-192.png"
-              alt="Tradexa Logo"
-              className="h-8 w-8 shrink-0 rounded-lg border border-cyan-500/30 object-cover shadow-sm"
-            />
-            <div className="min-w-0">
-              <span className="block truncate text-xs font-bold tracking-tight text-[var(--text-primary)] sm:text-base max-w-[145px] sm:max-w-none">
+            <div className="relative flex h-8 w-8 items-center justify-center rounded-xl bg-gradient-to-br from-cyan-500 to-blue-600 shadow-md shadow-cyan-500/20 text-white font-bold text-sm">
+              T
+              <span className="absolute -bottom-0.5 -right-0.5 h-2 w-2 rounded-full bg-emerald-400 ring-2 ring-[var(--bg-surface)]" />
+            </div>
+            <div>
+              <span className="block text-sm sm:text-base font-bold tracking-tight text-[var(--text-primary)]">
                 Tradexa
               </span>
-              <span className="hidden text-[11px] text-[var(--text-muted)] sm:block">
-                Global Markets Research · verified telemetry
+              <span className="hidden sm:block text-[10px] text-[var(--text-muted)] font-medium -mt-0.5">
+                AI Trading & Market Intelligence
               </span>
             </div>
           </button>
         </div>
 
-        {/* Global Financial Clocks */}
-        <div className="hidden items-center gap-5 text-xs lg:flex" aria-label="Global market time zones">
-          {[
-            ['New York (NYSE)', 'America/New_York'],
-            ['Mumbai (NSE/BSE)', 'Asia/Kolkata'],
-            ['London (GMT)', 'Europe/London'],
-          ].map(([city, timezone]) => (
-            <div key={city} className="border-l border-[var(--border-subtle)] pl-4">
-              <span className="block text-[10px] font-medium tracking-wide text-[var(--text-muted)]">
-                {city}
-              </span>
-              <span className="font-mono text-xs font-semibold text-[var(--text-secondary)]">
-                {now.toLocaleTimeString('en-US', {
-                  timeZone: timezone,
-                  hour: '2-digit',
-                  minute: '2-digit',
-                  timeZoneName: 'short',
-                  hour12: false,
-                })}
-              </span>
-            </div>
-          ))}
+        {/* Search Bar - Center / Expanded */}
+        <div className="hidden sm:block flex-1 max-w-md mx-2">
+          <div className="relative w-full">
+            <Search className="pointer-events-none absolute left-3 top-2.5 h-3.5 w-3.5 text-[var(--text-muted)]" />
+            <input
+              value={search}
+              onChange={(e) => onSearch(e.target.value)}
+              type="search"
+              role="searchbox"
+              placeholder="Search 42 instruments (NIFTY, BTC, AAPL, Gold)..."
+              className="field h-9 pl-9 pr-3 text-xs w-full rounded-xl bg-[var(--bg-subtle)] border-[var(--border-subtle)] focus:border-[var(--accent-primary)] transition"
+            />
+          </div>
         </div>
 
-        {/* Action Controls */}
+        {/* Right Action Controls */}
         <div className="flex items-center gap-1.5 sm:gap-2">
-          <button className="icon-button h-8 w-8" onClick={onDesktop} aria-label="Desktop app and news alerts" title="Install app & news alerts"><Download size={17} /></button>
-          {/* Live Sync Status & Countdown Timer Pill */}
-          <div className="flex items-center">
-            {loading ? (
+          {/* Collapsible Market Clocks Dropdown */}
+          <div className="relative hidden md:block">
+            <button
+              type="button"
+              onClick={() => setClocksOpen((v) => !v)}
+              className="flex items-center gap-1.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-subtle)] px-2.5 py-1.5 text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[var(--border-default)] transition"
+              title="View global market trading hours"
+            >
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
+              <span className="font-mono text-[11px] font-medium">
+                {now.toLocaleTimeString('en-US', {
+                  timeZone: 'Asia/Kolkata',
+                  hour: '2-digit',
+                  minute: '2-digit',
+                  hour12: false,
+                })}{' '}
+                IST
+              </span>
+            </button>
+
+            {clocksOpen && (
               <div
-                className="flex items-center gap-1.5 rounded-full border border-[var(--accent-border)] bg-[var(--accent-subtle)] px-2.5 py-1 text-xs font-semibold text-[var(--accent-text)]"
-                title="Telemetry refresh in flight…"
-                role="status"
-                aria-live="polite"
+                className="absolute right-0 mt-1.5 w-60 rounded-xl border border-[var(--border-default)] bg-[var(--bg-surface)] p-3 shadow-xl z-50 animate-in fade-in zoom-in-95 duration-150"
+                onMouseLeave={() => setClocksOpen(false)}
               >
-                <Loader2 className="h-3.5 w-3.5 animate-spin text-[var(--accent-primary)]" />
-                <span className="text-[11px] font-semibold">Updating…</span>
+                <div className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-2">
+                  Global Trading Clocks
+                </div>
+                <div className="space-y-2">
+                  {timeZones.map((tz) => (
+                    <div key={tz.name} className="flex items-center justify-between text-xs py-0.5">
+                      <span className="text-[var(--text-secondary)] flex items-center gap-1.5">
+                        <span>{tz.flag}</span>
+                        <span>{tz.name}</span>
+                      </span>
+                      <span className="font-mono font-semibold text-[var(--text-primary)]">
+                        {now.toLocaleTimeString('en-US', {
+                          timeZone: tz.tz,
+                          hour: '2-digit',
+                          minute: '2-digit',
+                          hour12: false,
+                        })}
+                      </span>
+                    </div>
+                  ))}
+                </div>
               </div>
-            ) : (
-              <button
-                type="button"
-                onClick={onRefresh}
-                className="group flex items-center gap-1.5 rounded-full border border-[var(--border-default)] bg-[var(--bg-subtle)] px-2.5 py-1 text-xs text-[var(--text-secondary)] hover:border-[var(--accent-border)] hover:text-[var(--text-primary)] transition"
-                title={`Next market sync in ${secondsUntilRefresh}s. Click to refresh now.`}
-                aria-label={`Next sync in ${secondsUntilRefresh} seconds. Click to refresh.`}
-              >
-                <span
-                  className={`h-2 w-2 rounded-full ${
-                    connected ? 'bg-emerald-500 animate-pulse' : 'bg-[var(--accent-primary)]'
-                  }`}
-                  aria-hidden="true"
-                />
-                <span className="font-mono tabular-nums text-[11px] font-medium">
-                  Sync: {secondsUntilRefresh}s
-                </span>
-                <RefreshCw className="h-3 w-3 text-[var(--text-muted)] group-hover:rotate-180 transition duration-300" />
-              </button>
             )}
           </div>
 
-          {/* Optional PWA Install App Button */}
-          {canInstall && !isInstalled && (
-            <button
-              type="button"
-              className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-2.5 py-1 text-xs font-medium text-emerald-400 hover:bg-emerald-500/20 hover:border-emerald-500/60 transition shadow-sm"
-              onClick={() => void triggerInstall()}
-              aria-label="Install Tradexa App"
-              title="Install Tradexa as an Android Progressive Web App"
-            >
-              <Download className="h-3.5 w-3.5" />
-              <span className="hidden sm:inline">Install App</span>
-            </button>
-          )}
+          {/* Live Sync Status & Manual Refresh Pill */}
+          <button
+            type="button"
+            onClick={onRefresh}
+            className="flex items-center gap-1.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-subtle)] px-2.5 py-1.5 text-xs text-[var(--text-secondary)] hover:border-[var(--accent-border)] hover:text-[var(--text-primary)] transition"
+            title={`Telemetry auto-syncs every minute (${secondsUntilRefresh}s left). Click to refresh.`}
+          >
+            <span
+              className={`h-2 w-2 rounded-full ${
+                connected ? 'bg-emerald-500 animate-pulse' : 'bg-[var(--accent-primary)]'
+              }`}
+            />
+            <span className="font-mono text-[11px] font-medium hidden xs:inline">
+              {loading ? 'Syncing...' : `Live ${secondsUntilRefresh}s`}
+            </span>
+            <RefreshCw className={`h-3 w-3 text-[var(--text-muted)] ${loading ? 'animate-spin' : ''}`} />
+          </button>
 
           {/* Theme Switcher Toggle */}
           <button
             type="button"
-            className="icon-button h-8 w-8 sm:h-9 sm:w-9 p-1.5"
+            className="icon-button h-8 w-8 sm:h-9 sm:w-9 rounded-lg"
             onClick={toggleTheme}
             aria-label={`Switch to ${theme === 'dark' ? 'Light' : 'Dark'} mode`}
-            title={`Current: ${THEMES[theme].name}. Click to switch to ${theme === 'dark' ? 'Light' : 'Dark'} mode`}
+            title={`Switch to ${theme === 'dark' ? 'Light' : 'Dark'} mode`}
           >
-            {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+            {theme === 'dark' ? <Sun className="h-4 w-4 text-amber-400" /> : <Moon className="h-4 w-4" />}
           </button>
 
-          {/* Data Sources, Methodology & Legal Disclosures Button */}
-          {onOpenDisclosures && (
-            <button
-              type="button"
-              className="icon-button h-8 w-8 sm:h-9 sm:w-9 p-1.5"
-              onClick={onOpenDisclosures}
-              aria-label="Data sources and legal disclosures"
-              title="Data sources, exchange attribution, delay explanation & legal disclosures"
-            >
-              <Info className="h-4 w-4" />
-            </button>
-          )}
-
-          {/* Provider Settings / Diagnostics Button */}
+          {/* Settings / Diagnostics Button */}
           <button
             type="button"
-            className={`icon-button h-8 w-8 sm:h-9 sm:w-9 p-1.5 ${
+            className={`icon-button h-8 w-8 sm:h-9 sm:w-9 rounded-lg ${
               settingsOpen || tab === 'diagnostics'
                 ? 'border-[var(--accent-primary)] text-[var(--accent-primary)]'
                 : ''
             }`}
             onClick={onSettings}
-            aria-label="Provider settings"
-            aria-expanded={settingsOpen || tab === 'diagnostics'}
-            aria-controls="provider-settings"
-            title="System health, access quota and operator diagnostics"
+            aria-label="Settings"
+            title="API Keys, Diagnostics & Settings"
           >
             <Settings className="h-4 w-4" />
           </button>
@@ -238,30 +238,27 @@ export default function Header({
           {/* Mobile menu toggle */}
           <button
             type="button"
-            className="icon-button h-8 w-8 sm:h-9 sm:w-9 p-1.5 md:hidden"
+            className="icon-button h-8 w-8 sm:h-9 sm:w-9 rounded-lg md:hidden"
             onClick={() => setMobileMenuOpen((v) => !v)}
             aria-label={mobileMenuOpen ? 'Close navigation menu' : 'Open navigation menu'}
-            aria-expanded={mobileMenuOpen}
           >
             {mobileMenuOpen ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
           </button>
         </div>
+      </div>
 
-        {/* Honest Search Input (wrapped on mobile, regular width on desktop) */}
-        <div className="w-full sm:w-48 lg:w-64 order-last sm:order-none">
-          <div className="relative w-full">
-            <span className="sr-only">Search 42 tracked instruments and news</span>
-            <Search className="pointer-events-none absolute left-3 top-2 h-3.5 w-3.5 text-[var(--text-muted)]" />
-            <input
-              value={search}
-              onChange={(e) => onSearch(e.target.value)}
-              type="search"
-              role="searchbox"
-              placeholder="Search 42 assets or news…"
-              className="field h-8 sm:h-9 pl-8 sm:pl-9 pr-3 text-xs w-full"
-              title="Search across 42 tracked instruments (US, India, Crypto, Metals, FX) and news"
-            />
-          </div>
+      {/* Mobile Search Row (visible on small mobile screens) */}
+      <div className="block sm:hidden px-3 pb-2.5">
+        <div className="relative w-full">
+          <Search className="pointer-events-none absolute left-3 top-2.5 h-3.5 w-3.5 text-[var(--text-muted)]" />
+          <input
+            value={search}
+            onChange={(e) => onSearch(e.target.value)}
+            type="search"
+            role="searchbox"
+            placeholder="Search assets (NIFTY, BTC, Apple)..."
+            className="field h-8 pl-8 pr-3 text-xs w-full rounded-lg bg-[var(--bg-subtle)] border-[var(--border-subtle)]"
+          />
         </div>
       </div>
 

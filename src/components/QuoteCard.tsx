@@ -84,33 +84,26 @@ export default function QuoteCard({
       <div className="mt-auto border-t border-[var(--border-subtle)] pt-3 text-xs">
         <div className="flex items-center justify-between gap-2">
           <StatusBadge status={quote.status} cached={quote.cached} />
-          <span className="text-[10px] text-[var(--text-muted)]">{quote.provider}</span>
-        </div>
-
-        <div className="my-2 space-y-0.5 text-[11px] text-[var(--text-muted)]">
-          <p>Quote: {formatTime(quote.asOf)}</p>
-          <p>Fetched: {formatTime(quote.fetchedAt)}</p>
-          {quote.volume !== null && (
-            <p>
-              24h Vol:{' '}
-              <span className="font-mono tabular-nums text-[var(--text-secondary)]">
-                {Number(quote.volume).toLocaleString(undefined, { notation: 'compact' })}
-              </span>
-            </p>
+          {quote.volume !== null ? (
+            <span className="text-[10px] text-[var(--text-muted)] font-mono">
+              Vol: {Number(quote.volume).toLocaleString(undefined, { notation: 'compact' })}
+            </span>
+          ) : (
+            <span className="text-[10px] text-[var(--text-muted)]">{quote.provider}</span>
           )}
         </div>
 
         {quote.error && (
-          <p className="mb-2 text-xs text-[var(--delayed-text)]">{quote.error}</p>
+          <p className="mt-2 text-xs text-[var(--delayed-text)]">{quote.error}</p>
         )}
 
         <button
-          className="mt-1 flex w-full items-center justify-between rounded-md border border-[var(--border-default)] bg-[var(--bg-surface-elevated)] px-3 py-1.5 text-xs font-semibold text-[var(--text-secondary)] hover:bg-[var(--bg-surface-hover)] hover:text-[var(--text-primary)] transition"
+          className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-lg border border-[var(--border-default)] bg-[var(--bg-surface-elevated)] px-3 py-1.5 text-xs font-semibold text-[var(--text-secondary)] hover:border-[var(--accent-primary)] hover:text-[var(--text-primary)] transition"
           onClick={() => onSelect(quote)}
-          aria-label={`View ${quote.symbol} details`}
+          aria-label={`View ${quote.symbol} chart and research`}
         >
-          <span>Research & History</span>
-          <ArrowUpRight className="h-3.5 w-3.5" />
+          <span>Interactive Chart</span>
+          <ArrowUpRight className="h-3.5 w-3.5 text-[var(--accent-primary)]" />
         </button>
       </div>
     </article>
