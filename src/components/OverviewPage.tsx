@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState } from 'react';
 import {
   Activity,
   ArrowRight,
@@ -41,20 +41,6 @@ function BenchmarkCard({
   quote: Quote;
   onSelect: (quote: Quote) => void;
 }) {
-  const prevPriceRef = useRef<number | null>(quote.price);
-  const [flash, setFlash] = useState<'up' | 'down' | null>(null);
-
-  useEffect(() => {
-    if (prevPriceRef.current !== null && quote.price !== null && prevPriceRef.current !== quote.price) {
-      const direction = quote.price > prevPriceRef.current ? 'up' : 'down';
-      setFlash(direction);
-      const timer = setTimeout(() => setFlash(null), 800);
-      prevPriceRef.current = quote.price;
-      return () => clearTimeout(timer);
-    }
-    prevPriceRef.current = quote.price;
-  }, [quote.price]);
-
   const hasChange = quote.changePercent !== null && Number.isFinite(quote.changePercent);
   const isGain = (quote.changePercent ?? 0) >= 0;
   const isLive = quote.status === 'live';
@@ -72,13 +58,7 @@ function BenchmarkCard({
     <button
       type="button"
       onClick={() => onSelect(quote)}
-      className={`group flex flex-col justify-between rounded-xl border p-3 text-left transition-all duration-200 hover:border-[var(--accent-primary)] hover:shadow-md cursor-pointer ${
-        flash === 'up'
-          ? 'flash-up border-emerald-500/50 bg-emerald-500/10'
-          : flash === 'down'
-          ? 'flash-down border-rose-500/50 bg-rose-500/10'
-          : 'border-[var(--border-subtle)] bg-[var(--bg-surface)] hover:bg-[var(--bg-surface-hover)]'
-      }`}
+      className="group flex flex-col justify-between rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-3 text-left transition-colors duration-150 hover:border-[var(--accent-primary)] hover:bg-[var(--bg-surface-hover)] hover:shadow-md cursor-pointer"
     >
       <div className="flex items-center justify-between gap-1 w-full">
         <div className="flex items-center gap-1.5 min-w-0">

@@ -1,4 +1,3 @@
-import { useEffect, useRef, useState } from 'react';
 import { ArrowUpRight } from 'lucide-react';
 import type { Quote } from '../types/market';
 import { changeClass, formatPercent, formatPrice, formatTime } from '../utils/format';
@@ -11,31 +10,11 @@ export default function QuoteCard({
   quote: Quote;
   onSelect: (quote: Quote) => void;
 }) {
-  const prevPriceRef = useRef<number | null>(quote.price);
-  const [flash, setFlash] = useState<'up' | 'down' | null>(null);
-
-  useEffect(() => {
-    if (prevPriceRef.current !== null && quote.price !== null && prevPriceRef.current !== quote.price) {
-      const direction = quote.price > prevPriceRef.current ? 'up' : 'down';
-      setFlash(direction);
-      const timer = setTimeout(() => setFlash(null), 600);
-      prevPriceRef.current = quote.price;
-      return () => clearTimeout(timer);
-    }
-    prevPriceRef.current = quote.price;
-  }, [quote.price]);
-
   const isOpen = quote.session.state === 'OPEN';
 
   return (
     <article
-      className={`relative flex min-w-0 flex-col rounded-lg border p-4 transition-colors duration-200 ${
-        flash === 'up'
-          ? 'border-[var(--gain-border)] bg-[var(--gain-bg)]'
-          : flash === 'down'
-          ? 'border-[var(--loss-border)] bg-[var(--loss-bg)]'
-          : 'border-[var(--border-subtle)] bg-[var(--bg-surface)] hover:border-[var(--border-strong)]'
-      }`}
+      className="relative flex min-w-0 flex-col rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] hover:border-[var(--border-strong)] p-4 transition-colors duration-150"
     >
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2">
