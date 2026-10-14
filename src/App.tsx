@@ -222,9 +222,6 @@ function MainApp() {
             ['SPY', 'NIFTY50', 'SENSEX', 'BTC', 'ETH', 'XAU', 'XAG', 'USD/INR'].includes(q.symbol)
           )}
           loading={market.loading}
-          paused={market.paused}
-          secondsUntilRefresh={market.secondsUntilRefresh}
-          onRefresh={refreshAll}
           onSelect={handleSelectAsset}
         /></div>}
 

@@ -22,7 +22,7 @@ export function useMarketData() {
       source.onmessage = (event) => {
         try {
           const parsed = quoteSchema.safeParse(JSON.parse(event.data));
-          if (parsed.success && parsed.data.provider === 'upstox') {
+          if (parsed.success) {
             setTicks((previous) => ({ ...previous, [parsed.data.symbol]: parsed.data }));
           }
         } catch {

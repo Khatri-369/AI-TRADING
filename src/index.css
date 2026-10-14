@@ -346,3 +346,34 @@ select {
   .button-primary, .button-secondary { min-height: 44px; }
   input, select, textarea { font-size: 16px; }
 }
+
+/* Continuous smooth ticker tape marquee */
+@keyframes ticker-marquee {
+  0% {
+    transform: translate3d(0, 0, 0);
+  }
+  100% {
+    transform: translate3d(-50%, 0, 0);
+  }
+}
+
+.ticker-track {
+  display: flex;
+  width: max-content;
+  animation: ticker-marquee 32s linear infinite;
+  will-change: transform;
+}
+
+.ticker-track:hover,
+.ticker-track:focus-within,
+.ticker-track:active {
+  animation-play-state: paused;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ticker-track {
+    animation: none;
+  }
+}
+
+

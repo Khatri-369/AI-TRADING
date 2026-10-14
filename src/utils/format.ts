@@ -13,8 +13,17 @@ export function formatPrice(value: number | null, currency: string) {
   }
 }
 
-export const formatPercent = (value: number | null) =>
-  value === null ? 'Change unavailable' : `${value > 0 ? '+' : ''}${value.toFixed(2)}%`;
+export const formatPercent = (value: number | null, fallback = '0.00%') =>
+  value === null ? fallback : `${value > 0 ? '+' : ''}${value.toFixed(2)}%`;
+
+export const formatChange = (value: number | null, currency = 'USD') => {
+  if (value === null || !Number.isFinite(value)) return '—';
+  const prefix = value > 0 ? '+' : '';
+  const symbol = currency === 'INR' ? '₹' : currency === 'USD' ? '$' : '';
+  const abs = Math.abs(value);
+  const formatted = abs >= 1 ? abs.toFixed(2) : abs.toFixed(4);
+  return `${prefix}${value < 0 ? '-' : ''}${symbol}${formatted}`;
+};
 
 export const changeClass = (value: number | null) =>
   value === null || value === 0
