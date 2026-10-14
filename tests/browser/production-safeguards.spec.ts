@@ -6,9 +6,10 @@ test('production safeguards: legal disclosures modal, session AI allowance, and 
 
   // 1. Visit main dashboard
   await page.goto('/');
-  await expect(page.getByRole('heading', { name: 'Market Intelligence', exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Watchlist', exact: true })).toBeVisible();
 
   // 2. Open Product Disclosures & Methodology Modal via header button
+  await page.getByRole('button', { name: 'Open navigation menu' }).click();
   const disclosuresButton = page.getByRole('button', { name: 'Data sources and legal disclosures' });
   await expect(disclosuresButton).toBeVisible();
   await disclosuresButton.click();
@@ -25,6 +26,7 @@ test('production safeguards: legal disclosures modal, session AI allowance, and 
   await expect(disclosuresDialog).toHaveCount(0);
 
   // 3. Open Settings & Provider Diagnostics
+  await page.getByRole('button', { name: 'Open navigation menu' }).click();
   await page.getByRole('button', { name: 'Provider settings' }).click();
   await expect(page.getByRole('heading', { name: 'Provider connections & diagnostics' })).toBeVisible();
 
@@ -37,7 +39,7 @@ test('production safeguards: legal disclosures modal, session AI allowance, and 
   await expect(page.locator('#provider-settings')).toHaveCount(0);
 
   // 4. Test footer disclosures button
-  const footerButton = page.getByRole('button', { name: 'Data Sources, Attribution, Methodology & Legal Disclosures' });
+  const footerButton = page.getByRole('button', { name: 'Data sources & disclosures' });
   await expect(footerButton).toBeVisible();
   await footerButton.click();
   await expect(disclosuresDialog).toBeVisible();
@@ -61,7 +63,8 @@ test('deep linking, page refresh, browser back/forward history, and unknown rout
   expect(page.url()).toContain('/markets');
 
   // 3. Navigate to /scenarios
-  await page.getByRole('tab', { name: 'Scenarios' }).click();
+  await page.getByRole('button', { name: 'Open navigation menu' }).click();
+  await page.getByRole('button', { name: 'Scenarios', exact: true }).click();
   await expect(page).toHaveURL(/\/scenarios/);
   await expect(page.getByRole('heading', { name: 'Macro Scenario Laboratory' })).toBeVisible();
 

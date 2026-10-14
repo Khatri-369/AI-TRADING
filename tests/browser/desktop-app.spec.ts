@@ -3,6 +3,7 @@ import { test, expect } from '@playwright/test';
 test('desktop installation and news opt-in disclose missing setup without prompting permission', async ({ page, request }) => {
   await page.route('**/api/notifications/config', route => route.fulfill({ json: { configured: false, publicKey: null, intervalMinutes: 5 } }));
   await page.goto('/');
+  await page.getByRole('button', { name: 'Open navigation menu' }).click();
   await page.getByRole('button', { name: 'Desktop app and news alerts' }).click();
   await expect(page.getByRole('heading', { name: 'Desktop app & news alerts' })).toBeVisible();
   await expect(page.getByText('Background alerts are not configured on this server yet.', { exact: false })).toBeVisible();

@@ -3,13 +3,13 @@
   "id": "/",
   "name": "Tradexa — Global Markets Research",
   "short_name": "Tradexa",
-  "description": "Professional real-time financial market intelligence, verified multi-asset data, and breaking news alerts.",
+  "description": "Track your watchlist, study charts and follow market news in one place.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
   "orientation": "any",
-  "background_color": "#090d16",
-  "theme_color": "#090d16",
+  "background_color": "#101216",
+  "theme_color": "#101216",
   "categories": ["finance", "business", "productivity"],
   "icons": [
     {
@@ -42,7 +42,7 @@
     {
       "name": "Market News",
       "short_name": "News",
-      "description": "Real-time verified financial headlines and AI sentiment",
+      "description": "Market headlines and optional analysis",
       "url": "/news",
       "icons": [{ "src": "/icons/tradexa-192.png", "sizes": "192x192" }]
     },
@@ -54,10 +54,10 @@
       "icons": [{ "src": "/icons/tradexa-192.png", "sizes": "192x192" }]
     },
     {
-      "name": "Research Desk",
-      "short_name": "Desk",
+      "name": "Research Tools",
+      "short_name": "Tools",
       "description": "Interactive candlestick charts and trading journal",
-      "url": "/desk",
+      "url": "/tools",
       "icons": [{ "src": "/icons/tradexa-192.png", "sizes": "192x192" }]
     }
   ]

@@ -1,4 +1,5 @@
 import NewsPreferences from './NewsPreferences';
+import { useReadingLibrary } from '../hooks/useReadingLibrary';
 import JournalAnalytics from './JournalAnalytics';
 import PracticeSummary from './PracticeSummary';
 import type { Quote } from '../../shared/types';
@@ -69,6 +70,7 @@ type Event = {
 export default function ResearchDesk({
   theme,
   initialSymbol = 'RELIANCE',
+  initialTab = 'Chart',
   onAsk,
   onNotifications,
   quotes,
@@ -77,15 +79,21 @@ export default function ResearchDesk({
   onNotifications: () => void;
   quotes: Quote[];
   initialSymbol?: string;
+  initialTab?: string;
   onAsk?: (focus: ChatFocus) => void;
 }) {
   const store = useResearchStore();
   const [symbol, setSymbol] = useState(
     ASSET_BY_SYMBOL.has(initialSymbol) ? initialSymbol : 'RELIANCE'
   );
-  const [tab, setTab] = useState('Chart');
+  const [tab, setTab] = useState(['Chart', 'Plan', 'Alerts', 'Journal', 'Practice', 'Account'].includes(initialTab) ? initialTab : 'Chart');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  const { remember } = useReadingLibrary();
+  useEffect(() => {
+    if (tab !== 'Chart' && tab !== 'Plan') return;
+    try { remember(symbol); } catch { setError('Recent charts could not be saved in this browser.'); }
+  }, [symbol, tab, remember]);
   const [plan, setPlan] = useState(initialPlan);
   const [editing, setEditing] = useState<ResearchRecord | null>(null);
   const [budget, setBudget] = useState('');

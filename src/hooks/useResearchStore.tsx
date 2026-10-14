@@ -16,11 +16,12 @@ function loadLocal(): ResearchRecord[] {
   } catch { return []; }
 }
 type User = { id: number; username: string };
-interface Store { records: ResearchRecord[]; user: User | null; status: string; save: (id: string, kind: RecordKind, data: unknown, version: number) => Promise<void>; remove: (record: ResearchRecord) => Promise<void>; refresh: () => Promise<void>; auth: (action: 'login' | 'register', username: string, password: string) => Promise<void>; logout: () => Promise<void>; importLocal: () => Promise<void> }
+interface Store { sessionReady: boolean; records: ResearchRecord[]; user: User | null; status: string; save: (id: string, kind: RecordKind, data: unknown, version: number) => Promise<void>; remove: (record: ResearchRecord) => Promise<void>; refresh: () => Promise<void>; auth: (action: 'login' | 'register', username: string, password: string) => Promise<void>; logout: () => Promise<void>; importLocal: () => Promise<void> }
 const Context = createContext<Store | null>(null);
 export function ResearchProvider({ children }: { children: ReactNode }) {
   const [records, setRecords] = useState<ResearchRecord[]>(loadLocal);
   const [user, setUser] = useState<User | null>(null);
+  const [sessionReady, setSessionReady] = useState(false);
   const [status, setStatus] = useState('Guest · saved on this browser');
   const initialized = useRef(false);
   const identity = useRef<number | null>(null);
@@ -31,6 +32,7 @@ export function ResearchProvider({ children }: { children: ReactNode }) {
       const session = await workspaceRequest<{ user: User | null }>('/session');
       if (request !== sequence.current) return;
       initialized.current = true;
+      setSessionReady(true);
       if (identity.current !== (session.user?.id ?? null)) setRecords([]);
       identity.current = session.user?.id ?? null;
       setUser(session.user);
@@ -38,7 +40,7 @@ export function ResearchProvider({ children }: { children: ReactNode }) {
       const value = await workspaceRequest<{ records: ResearchRecord[] }>('/records');
       if (request !== sequence.current) return;
       setUser(session.user); setRecords(value.records); setStatus('Account workspace synced');
-    } catch (error) { if (request !== sequence.current) return; if ((error as { status?: number }).status === 503 && identity.current === null) initialized.current = true; setStatus(error instanceof Error ? error.message : 'Sync unavailable'); }
+    } catch (error) { if (request !== sequence.current) return; if ((error as { status?: number }).status === 503 && identity.current === null) { initialized.current = true; setSessionReady(true); } setStatus(error instanceof Error ? error.message : 'Sync unavailable'); }
   }
   useEffect(() => { void refresh(); const onFocus = () => { void refresh(); }; window.addEventListener('focus', onFocus); return () => window.removeEventListener('focus', onFocus); }, []);
   async function save(id: string, kind: RecordKind, data: unknown, version: number) {
@@ -85,6 +87,6 @@ export function ResearchProvider({ children }: { children: ReactNode }) {
     }
     await refresh(); // Originals stay on the browser as a recovery copy.
   }
-  return <Context.Provider value={{ records, user, status, save, remove, refresh, auth, logout, importLocal }}>{children}</Context.Provider>;
+  return <Context.Provider value={{ sessionReady, records, user, status, save, remove, refresh, auth, logout, importLocal }}>{children}</Context.Provider>;
 }
 export function useResearchStore() { const value = useContext(Context); if (!value) throw new Error('ResearchProvider is required.'); return value; }
