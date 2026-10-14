@@ -5,7 +5,7 @@ test('desktop navigation, search, asset detail, chart table alternative, themes 
   page.on('pageerror', (error) => errors.push(error.message));
 
   // 1. Overview Page
-  await page.goto('/overview');
+  await page.goto('/');
   await expect(page.getByRole('heading', { name: 'Market Dashboard', exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: 'RELIANCE', exact: false }).first()).toBeVisible({ timeout: 15000 });
 
@@ -135,23 +135,21 @@ test('desktop navigation, search, asset detail, chart table alternative, themes 
   await page.getByRole('searchbox').fill('');
 
   // 8. Navigation to other focused pages
-  await page.getByRole('tab', { name: 'News', exact: true }).click();
+  await page.getByRole('tab', { name: /News/ }).click();
   await expect(page).toHaveURL(/\/news/);
-  await expect(page.getByRole('heading', { name: 'News', exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Financial News & Sentiment' })).toBeVisible();
 
-  await page.getByRole('button', { name: 'Open navigation menu' }).click();
-  await page.getByRole('button', { name: 'Scenarios', exact: true }).click();
+  await page.getByRole('tab', { name: 'Scenarios' }).click();
   await expect(page).toHaveURL(/\/scenarios/);
   await expect(page.getByRole('heading', { name: 'Macro Scenario Laboratory' })).toBeVisible();
 
-  await page.getByRole('button', { name: 'Open navigation menu' }).click();
-  await page.getByRole('button', { name: 'Provider settings' }).click();
+  await page.getByRole('tab', { name: 'Diagnostics' }).click();
+  await expect(page).toHaveURL(/\/diagnostics/);
   await expect(page.getByRole('heading', { name: 'Provider connections & diagnostics' })).toBeVisible();
   await expect(page.getByText('Upstox · Indian equities and indices', { exact: true })).toBeVisible();
 
   // 8b. Navigation to Research Desk and Trade-Planning Workspace
-  await page.getByRole('tab', { name: 'Tools', exact: true }).click();
-  await page.getByRole('button', { name: /^Charts/ }).click();
+  await page.getByRole('tab', { name: /Research [dD]esk/i }).click();
   await expect(page).toHaveURL(/\/desk/);
   await expect(page.getByRole('heading', { name: 'Research desk' })).toBeVisible();
 
@@ -223,7 +221,7 @@ test('responsive layouts at 320px, 390px, 768px, and 1440px have zero horizontal
   for (const bp of breakpoints) {
     await page.setViewportSize({ width: bp.width, height: bp.height });
     await page.goto('/');
-    await expect(page.getByRole('heading', { name: 'Watchlist', exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Market Dashboard', exact: true })).toBeVisible();
 
     // Assert strictly no horizontal overflow
     const noOverflow = await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth);
@@ -238,12 +236,11 @@ test('responsive layouts at 320px, 390px, 768px, and 1440px have zero horizontal
   const menuButton = page.getByRole('button', { name: 'Open navigation menu' });
   if (await menuButton.isVisible()) {
     await menuButton.click();
-    await expect(page.getByRole('navigation', { name: 'More navigation' })).toBeVisible();
+    await expect(page.getByRole('navigation', { name: 'Mobile primary navigation' })).toBeVisible();
     await page.getByRole('button', { name: 'Close navigation menu' }).click();
   }
 
   // Provider Settings on Mobile
-  await page.getByRole('button', { name: 'Open navigation menu' }).click();
   await page.getByRole('button', { name: 'Provider settings' }).click();
   await expect(page.getByRole('heading', { name: 'Provider connections & diagnostics' })).toBeVisible();
   const settingsNoOverflow = await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth);

@@ -39,10 +39,6 @@ for (const theme of ['light', 'dark']) {
     await page.getByRole('button', { name: 'Save RELIANCE', exact: true }).click();
     await page.reload();
     await expect(page.getByRole('button', { name: 'Unsave RELIANCE', exact: true })).toBeVisible();
-    await page.getByRole('button', { name: 'Add symbols', exact: true }).click();
-    await page.getByLabel('Watchlist options', { exact: true }).click();
-    await page.getByLabel('Compare instruments', { exact: true }).check();
-    await page.getByLabel('Watchlist options', { exact: true }).click();
     for (const symbol of ['RELIANCE', 'NIFTY50', 'BANKNIFTY']) await page.getByLabel(`Compare ${symbol}`, { exact: true }).check();
     await expect(page.getByLabel('Compare TCS', { exact: true })).toBeDisabled();
     await expect(page.getByRole('heading', { name: 'Compare instruments (3/3)' })).toBeVisible();

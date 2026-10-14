@@ -105,17 +105,6 @@ AI-generated signals are informational and are not financial advice. Market data
 ## Advanced research tools
 
 - Bottom-right robot button: Gemini conversation with follow-up questions, optional instrument focus, and references resolved from backend quotes/news. Source timestamps and limitations accompany answers. Current scope does not include web search, financial statements or historical series in chat.
-- `/` (also `/watchlist`): watchlist-first home with compact stock cards. New visitors see a clearly labeled starter list; stars save their own selection. Add symbols opens the instrument directory. Sorting and three-instrument comparison live under Watchlist options. Guest lists stay on the browser; signed-in lists sync through the persistent account backend.
-- Four main destinations: Watchlist, Markets, News and Tools, with a fixed safe-area-aware bottom navigation on phones. `/news` offers All news and My watchlist filters. `/tools` opens charts, plans, alerts, journal, practice and account directly. Overview, scenarios, installation and data settings remain in the More menu.
-- Both light and dark themes use compact navigation and honest unavailable/delayed/cached quote states. `tests/browser/mobile-home.spec.ts` covers the phone journey, persistence, matching news, tool deep links and missing prices with deterministic fixtures.
+- `/watchlist`: browser-local saved instruments, market/search filters, change sorting, and a three-instrument comparison with currencies, provider freshness and observation times. Watchlists do not sync between devices.
 - `POST /api/ai/chat`: accepts `{ message, history?, symbols? }`; validates bounded input and output, rejects client-supplied market evidence, uses the existing access/CSRF/quota gates and never exposes provider credentials. Recent conversation turns are sent to Gemini as untrusted context. Conversations remain in app memory across navigation and closing the panel, and clear on reload or New conversation; successful answers may be cached briefly in bounded server memory.
 - Tests: `npm test` covers the chat provider and HTTP contracts. `npm run test:browser -- tests/browser/research.spec.ts` verifies both themes, source references, follow-up error recovery, saved-list persistence and comparison limits using explicit test fixtures. These fixtures are not production data.
-
-
-## Personal briefing and reading library
-
-The watchlist home keeps prices first, then shows recent charts and a brief of up to three provider headlines matched to saved instruments. Its equity-move summary uses reported previous-close changes, excludes unavailable/stale quotes and shows the observation time; it is not a prediction or a fresh-session claim. Users can hide and restore the brief.
-
-News supports saved stories, read/unread filtering, instrument links, explicit native sharing (clipboard fallback), and batches of 12 headlines with a clear end. Saved snapshots survive removal from the current provider feed. The browser-local reading library is separated by account identity and guest use; it does not sync across devices. Limits: 100 saved stories, 300 read IDs, five recent symbols. Clearing reading history retains bookmarks. Storage failures leave the last saved state intact and show an error. Alerts remain an explicit opt-in with the existing quiet-hour and frequency controls.
-
-`tests/browser/return-visit.spec.ts` covers persistence, feed removal, hide/restore, history clearing, sharing, account separation, storage failures and mobile layouts with provider fixtures.

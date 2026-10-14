@@ -9,9 +9,8 @@ export interface RouteState {
 
 export function parseRoute(pathname: string): RouteState {
   const clean = pathname.replace(/\/+$/, '') || '/';
-  if (clean === '/' || clean === '/watchlist') return { page: 'watchlist', symbol: null, path: clean };
-  if (clean === '/tools') return { page: 'tools', symbol: null, path: clean };
   if (clean === '/desk') return { page: 'desk', symbol: null, path: clean };
+  if (clean === '/watchlist') return { page: 'watchlist', symbol: null, path: clean };
   if (clean.startsWith('/asset/')) {
     const raw = clean.slice('/asset/'.length);
     const symbol = decodeURIComponent(raw).trim();
@@ -29,8 +28,8 @@ export function parseRoute(pathname: string): RouteState {
   if (clean === '/diagnostics') {
     return { page: 'diagnostics', symbol: null, path: clean };
   }
-  // Keep the overview as a secondary destination; unknown paths return home.
-  return { page: clean === '/overview' ? 'overview' : 'watchlist', symbol: null, path: clean === '/overview' ? '/overview' : '/' };
+  // Default to overview for / or /overview or any other path
+  return { page: 'overview', symbol: null, path: clean === '/overview' ? '/overview' : '/' };
 }
 
 export function navigate(to: string, { replace = false }: { replace?: boolean } = {}) {
@@ -40,7 +39,6 @@ export function navigate(to: string, { replace = false }: { replace?: boolean } 
     window.history.pushState(null, '', to);
   }
   window.dispatchEvent(new PopStateEvent('popstate'));
-  window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
 }
 
 export function useRouter(): [RouteState, (to: string, options?: { replace?: boolean }) => void] {

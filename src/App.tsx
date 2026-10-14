@@ -2,10 +2,6 @@ import type { ChatFocus } from '../shared/chat';
 import { Component, lazy, Suspense, useEffect, useState, type ReactNode } from 'react';
 import { RefreshCw, X } from 'lucide-react';
 import Header from './components/Header';
-import ToolsPage from './components/ToolsPage';
-import MarketBrief from './components/MarketBrief';
-import { useReadingLibrary } from './hooks/useReadingLibrary';
-import { useWatchlist } from './hooks/useWatchlist';
 import DesktopAppPanel from './components/DesktopAppPanel';
 import { ResearchProvider } from './hooks/useResearchStore';
 import TickerTape from './components/TickerTape';
@@ -86,6 +82,9 @@ function MainApp() {
   // Client-side router managing clean URLs with browser history
   const [route, navigate] = useRouter();
   const [search, setSearch] = useState('');
+  const [showTicker, setShowTicker] = useState(() => {
+    return localStorage.getItem('hide_ticker_tape') !== 'true';
+  });
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [desktopOpen, setDesktopOpen] = useState(false);
   const [chatOpen, setChatOpen] = useState(() => window.location.pathname === '/research');
@@ -100,14 +99,6 @@ function MainApp() {
   const market = useMarketData();
   const news = useNews();
   const ai = useAIAnalysis();
-  const { symbols: savedSymbols } = useWatchlist();
-  const { remember } = useReadingLibrary();
-  const [historyError, setHistoryError] = useState('');
-  const viewedSymbol = route.symbol ?? (route.page === 'desk' ? new URLSearchParams(window.location.search).get('symbol') : null);
-  useEffect(() => {
-    if (!viewedSymbol) return;
-    try { remember(viewedSymbol); setHistoryError(''); } catch { setHistoryError('Recent charts could not be saved in this browser.'); }
-  }, [viewedSymbol, remember]);
 
   const handleSelectAsset = (quote: Quote) => {
     navigate(`/asset/${encodeURIComponent(quote.symbol)}`);
@@ -122,9 +113,27 @@ function MainApp() {
   };
 
   const handleNavigate = (page: Tab) => {
-    setSearch('');
-    setSettingsOpen(false);
-    navigate(page === 'watchlist' ? '/' : `/${page}`);
+    switch (page) {
+      case 'watchlist':
+      case 'desk':
+        navigate(`/${page}`);
+        break;
+      case 'overview':
+        navigate('/');
+        break;
+      case 'markets':
+        navigate('/markets');
+        break;
+      case 'news':
+        navigate('/news');
+        break;
+      case 'scenarios':
+        navigate('/scenarios');
+        break;
+      case 'diagnostics':
+        navigate('/diagnostics');
+        break;
+    }
   };
 
   const refreshAll = () => {
@@ -189,7 +198,7 @@ function MainApp() {
   return (
     <div
       data-theme={theme}
-      className="app-shell min-h-screen bg-[var(--bg-canvas)] text-[var(--text-primary)] flex flex-col justify-between"
+      className="min-h-screen bg-[var(--bg-canvas)] text-[var(--text-primary)] flex flex-col justify-between"
     >
       <div>
         {/* Application Header Shell */}
@@ -216,22 +225,28 @@ function MainApp() {
           onOpenDisclosures={() => setDisclosuresOpen(true)}
         />
 
-        {/* Global Benchmark Ticker Tape */}
-        {(route.page === 'overview' || route.page === 'markets') && <div className="hidden md:block"><TickerTape
-          quotes={market.quotes.filter((q) =>
-            ['SPY', 'NIFTY50', 'SENSEX', 'BTC', 'ETH', 'XAU', 'XAG', 'USD/INR'].includes(q.symbol)
-          )}
-          loading={market.loading}
-          onSelect={handleSelectAsset}
-        /></div>}
+        {/* Global Movable Benchmark Ticker Tape */}
+        {showTicker && (
+          <TickerTape
+            quotes={market.quotes.filter((q) =>
+              ['SPY', 'NIFTY50', 'SENSEX', 'BTC', 'ETH', 'XAU', 'XAG', 'USD/INR', 'SOL', 'QQQ'].includes(q.symbol)
+            )}
+            loading={market.loading}
+            onSelect={handleSelectAsset}
+            onClose={() => {
+              setShowTicker(false);
+              localStorage.setItem('hide_ticker_tape', 'true');
+            }}
+          />
+        )}
 
         {/* Main Content Area */}
         <main
           id="main-content"
-          className="mx-auto max-w-[1200px] w-full px-4 py-6 sm:px-6 lg:px-8 pb-8 space-y-6"
+          className="mx-auto max-w-[1440px] w-full px-3 py-4 sm:px-6 lg:px-8 pb-24 md:pb-8 space-y-6"
         >
           {/* Active Search Banner */}
-          {route.page === 'markets' && search.trim() && (
+          {search.trim() && (
             <div className="flex items-center justify-between gap-3 rounded-lg border border-[var(--border-default)] bg-[var(--bg-surface-elevated)] px-4 py-2 text-xs">
               <div>
                 <span className="font-semibold text-[var(--text-primary)]">
@@ -268,13 +283,11 @@ function MainApp() {
             <ErrorNotice message={market.error} onRetry={market.refresh} />
           )}
 
-          {historyError && <p role="status" className="text-xs text-[var(--text-secondary)]">{historyError}</p>}
           {/* PAGE ROUTING */}
-          {route.page === 'desk' && <Suspense fallback={<Loading label="Loading research desk…" />}><ResearchDesk key={window.location.search} initialTab={new URLSearchParams(window.location.search).get('tab') ?? undefined} quotes={market.quotes} onNotifications={() => setDesktopOpen(true)} onAsk={focus => { setChatFocus(focus); setChatSymbol(focus.symbol); setChatOpen(true); }} theme={theme} initialSymbol={new URLSearchParams(window.location.search).get('symbol') ?? 'RELIANCE'} /></Suspense>}
-          {route.page === 'watchlist' && <Suspense fallback={<Loading label="Loading watchlist…" />}><WatchlistPage quotes={market.quotes} loading={market.loading} onSelect={handleSelectAsset} onRefresh={market.refresh} onNews={() => handleNavigate('news')} onAccount={() => navigate('/desk?tab=Account')}><MarketBrief quotes={market.quotes} symbols={savedSymbols} news={news.data} newsLoading={news.loading} newsError={news.error} onOpen={navigate} /></WatchlistPage></Suspense>}
-          {route.page === 'tools' && <ToolsPage onOpen={navigate} onNotifications={() => setDesktopOpen(true)} />}
+          {route.page === 'desk' && <Suspense fallback={<Loading label="Loading research desk…" />}><ResearchDesk quotes={market.quotes} onNotifications={() => setDesktopOpen(true)} onAsk={focus => { setChatFocus(focus); setChatSymbol(focus.symbol); setChatOpen(true); }} theme={theme} initialSymbol={new URLSearchParams(window.location.search).get('symbol') ?? 'RELIANCE'} /></Suspense>}
+          {route.page === 'watchlist' && <Suspense fallback={<Loading label="Loading watchlist…" />}><WatchlistPage quotes={market.quotes} loading={market.loading} onSelect={handleSelectAsset} /></Suspense>}
           {route.page === 'overview' && (
-            <div role="tabpanel" id="panel-overview" aria-label="Market overview">
+            <div role="tabpanel" id="panel-overview" aria-labelledby="tab-overview">
               <OverviewPage
                 quotes={filteredQuotes}
                 loading={market.loading}
@@ -296,7 +309,7 @@ function MainApp() {
                     <span>Markets Directory</span>
                   </h2>
                   <p className="mt-0.5 text-xs text-[var(--text-secondary)]">
-                    Browse stocks, indices, crypto, metals and currencies.
+                    Comprehensive multi-asset coverage across 42 verified instruments.
                   </p>
                 </div>
 
@@ -331,7 +344,7 @@ function MainApp() {
                     role="tab"
                     aria-selected={marketCategory === cat.id}
                     onClick={() => setMarketCategory(cat.id as typeof marketCategory)}
-                    className={`min-h-11 rounded-md px-3 py-1.5 text-xs font-semibold transition ${
+                    className={`rounded-md px-3 py-1.5 text-xs font-semibold transition ${
                       marketCategory === cat.id
                         ? 'bg-[var(--accent-primary)] text-white'
                         : 'border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[var(--text-secondary)] hover:bg-[var(--bg-surface-hover)] hover:text-[var(--text-primary)]'
@@ -379,9 +392,6 @@ function MainApp() {
           {route.page === 'news' && (
             <div role="tabpanel" id="panel-news" aria-labelledby="tab-news">
               <NewsSignalFeed
-                key={window.location.search}
-                initialView={new URLSearchParams(window.location.search).get('view') === 'saved' ? 'saved' : 'all'}
-                onOpenAsset={symbol => navigate(`/asset/${encodeURIComponent(symbol)}`)}
                 data={news.data}
                 loading={news.loading}
                 error={news.error}
@@ -396,7 +406,7 @@ function MainApp() {
           )}
 
           {route.page === 'scenarios' && (
-            <div role="tabpanel" id="panel-scenarios" aria-label="Market scenarios">
+            <div role="tabpanel" id="panel-scenarios" aria-labelledby="tab-scenarios">
               <ScenarioSimulator />
             </div>
           )}
@@ -406,8 +416,22 @@ function MainApp() {
       {/* Footer */}
       <footer className="mt-8 border-t border-[var(--border-subtle)] bg-[var(--bg-surface)] py-5 text-center text-xs leading-relaxed text-[var(--text-muted)]">
         <div className="mx-auto max-w-[1440px] px-4 sm:px-6 lg:px-8 space-y-1.5">
-          <p>Market data may be delayed. Research and practice; no real orders.</p>
-          <button type="button" onClick={() => setDisclosuresOpen(true)} className="min-h-11 text-[var(--accent-text)] hover:underline">Data sources & disclosures</button>
+          <p>
+            Market telemetry is sourced directly from authenticated provider integrations. Real-time observations may experience session delays outside open market hours.
+          </p>
+          <div className="flex flex-wrap items-center justify-center gap-3 text-[11px]">
+            <button
+              type="button"
+              onClick={() => setDisclosuresOpen(true)}
+              className="font-semibold text-[var(--accent-text)] hover:underline"
+            >
+              Data Sources, Attribution, Methodology & Legal Disclosures
+            </button>
+            <span>·</span>
+            <span>Educational Research Prototype</span>
+            <span>·</span>
+            <span>No Automated Trading Execution</span>
+          </div>
         </div>
       </footer>
 
