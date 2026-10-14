@@ -82,6 +82,9 @@ function MainApp() {
   // Client-side router managing clean URLs with browser history
   const [route, navigate] = useRouter();
   const [search, setSearch] = useState('');
+  const [showTicker, setShowTicker] = useState(() => {
+    return localStorage.getItem('hide_ticker_tape') !== 'true';
+  });
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [desktopOpen, setDesktopOpen] = useState(false);
   const [chatOpen, setChatOpen] = useState(() => window.location.pathname === '/research');
@@ -222,17 +225,20 @@ function MainApp() {
           onOpenDisclosures={() => setDisclosuresOpen(true)}
         />
 
-        {/* Global Benchmark Ticker Tape */}
-        <TickerTape
-          quotes={market.quotes.filter((q) =>
-            ['SPY', 'NIFTY50', 'SENSEX', 'BTC', 'ETH', 'XAU', 'XAG', 'USD/INR'].includes(q.symbol)
-          )}
-          loading={market.loading}
-          paused={market.paused}
-          secondsUntilRefresh={market.secondsUntilRefresh}
-          onRefresh={refreshAll}
-          onSelect={handleSelectAsset}
-        />
+        {/* Global Movable Benchmark Ticker Tape */}
+        {showTicker && (
+          <TickerTape
+            quotes={market.quotes.filter((q) =>
+              ['SPY', 'NIFTY50', 'SENSEX', 'BTC', 'ETH', 'XAU', 'XAG', 'USD/INR', 'SOL', 'QQQ'].includes(q.symbol)
+            )}
+            loading={market.loading}
+            onSelect={handleSelectAsset}
+            onClose={() => {
+              setShowTicker(false);
+              localStorage.setItem('hide_ticker_tape', 'true');
+            }}
+          />
+        )}
 
         {/* Main Content Area */}
         <main

@@ -92,6 +92,29 @@ export class MarketProviders {
   }
 
   async forexQuote(): Promise<SourceQuote[]> {
+    try {
+      const sevenDaysAgo = new Date(Date.now() - 7 * DAY).toISOString().slice(0, 10);
+      const historySchema = z.object({
+        amount: z.number(),
+        base: z.string(),
+        rates: z.record(z.string(), z.record(z.string(), z.number())),
+      });
+      const data = await fetchJson(this.fetcher, `https://api.frankfurter.dev/v1/${sevenDaysAgo}..?from=USD&to=INR`, historySchema);
+      const dates = Object.keys(data.rates).sort();
+      if (dates.length >= 2) {
+        const lastDate = dates[dates.length - 1];
+        const prevDate = dates[dates.length - 2];
+        const current = data.rates[lastDate]?.INR;
+        const prev = data.rates[prevDate]?.INR;
+        if (current && prev) {
+          const change = +(current - prev).toFixed(4);
+          const changePercent = +((change / prev) * 100).toFixed(2);
+          return [{ symbol: 'USD/INR', price: current, change, changePercent, volume: null, asOf: validTime(lastDate) }];
+        }
+      }
+    } catch {
+      // Graceful fallback to simple rate endpoint if range fails
+    }
     const data = await fetchJson(this.fetcher, 'https://api.frankfurter.dev/v2/rate/USD/INR', fxSchema);
     return [{ symbol: 'USD/INR', price: data.rate, change: null, changePercent: null, volume: null, asOf: validTime(data.date) }];
   }
@@ -107,7 +130,21 @@ export class MarketProviders {
     const schema = z.object({ price: positive, symbol: z.string(), currency: z.literal('USD'), updatedAt: dateString });
     const data = await fetchJson(this.fetcher, `https://api.gold-api.com/price/${symbol}`, schema);
     if (data.symbol !== symbol) throw new Error('Provider returned a different metal');
-    return [{ symbol, price: data.price, change: null, changePercent: null, volume: null, asOf: validTime(data.updatedAt) }];
+    let change: number | null = null;
+    let changePercent: number | null = null;
+    if (symbol === 'XAU') {
+      try {
+        const binanceSchema = z.object({ priceChange: z.string(), priceChangePercent: z.string() });
+        const paxg = await fetchJson(this.fetcher, 'https://api.binance.com/api/v3/ticker/24hr?symbol=PAXGUSDT', binanceSchema);
+        const cp = parseFloat(paxg.priceChangePercent);
+        const ch = parseFloat(paxg.priceChange);
+        if (Number.isFinite(cp)) changePercent = +cp.toFixed(2);
+        if (Number.isFinite(ch)) change = +ch.toFixed(2);
+      } catch {
+        // Fallback without 24h change
+      }
+    }
+    return [{ symbol, price: data.price, change, changePercent, volume: null, asOf: validTime(data.updatedAt) }];
   }
 
   async indiaInstruments(): Promise<Map<string, string>> {

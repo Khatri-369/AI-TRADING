@@ -3,6 +3,7 @@ import type { Asset, AssetCategory, DataStatus, HistoryRange, HistoryResponse, M
 import { DataCache, type CachedValue } from './cache';
 import { MarketProviders, type MarketEnvironment, type PricePoint, type SourceQuote } from './providers';
 import { UpstoxWebSocketClient } from './websocket';
+import { CryptoStreamClient } from './cryptoStream';
 import { marketSession } from './sessions';
 import type { Fetcher } from './http';
 import type { Candle } from '../../shared/research';
@@ -28,6 +29,7 @@ export class MarketService {
   private observed = new Map<string, { status: string; message: string }>();
   private providers: MarketProviders;
   private upstoxWs: UpstoxWebSocketClient;
+  private cryptoWs: CryptoStreamClient;
   private listeners = new Set<(quote: Quote) => void>();
   private streamQuotes = new Map<string, Quote>();
   private instrumentSymbols = new Map<string, string>();
@@ -45,10 +47,15 @@ export class MarketService {
       this.streamQuotes.set(asset.symbol, quote);
       for (const listener of this.listeners) listener(quote);
     });
+    this.cryptoWs = new CryptoStreamClient(quote => {
+      this.streamQuotes.set(quote.symbol, quote);
+      for (const listener of this.listeners) listener(quote);
+    });
   }
 
   subscribe(listener: (quote: Quote) => void) {
     this.listeners.add(listener);
+    this.cryptoWs.start();
     if (!this.streamStarting && this.providers.env.UPSTOX_ANALYTICS_TOKEN) {
       this.streamStarting = this.providers.indiaInstruments().then(async instruments => {
         this.instrumentSymbols = new Map([...instruments].map(([symbol, key]) => [key, symbol]));
@@ -57,7 +64,11 @@ export class MarketService {
     }
     return () => { this.listeners.delete(listener); if (!this.listeners.size) this.stopStreaming(); };
   }
-  stopStreaming() { this.upstoxWs.stop(); this.streamQuotes.clear(); }
+  stopStreaming() {
+    this.upstoxWs.stop();
+    this.cryptoWs.stop();
+    this.streamQuotes.clear();
+  }
 
   private providerFor(asset: Asset): string {
     return ({ us: 'finnhub', india: 'upstox', crypto: 'coingecko', commodities: this.providers.metalsProvider, forex: 'frankfurter' })[asset.category];

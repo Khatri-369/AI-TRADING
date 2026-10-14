@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   Activity,
   ArrowRight,
@@ -13,7 +13,7 @@ import {
   ChevronRight,
 } from 'lucide-react';
 import type { NewsArticle, Quote, Tab } from '../types/market';
-import { changeClass, formatPercent, formatPrice, formatTime } from '../utils/format';
+import { changeClass, formatChange, formatPercent, formatPrice, formatTime } from '../utils/format';
 import { Loading } from './Feedback';
 
 interface Props {
@@ -33,6 +33,105 @@ const CATEGORY_MAP: Record<string, { label: string; icon: string }> = {
   crypto: { label: 'Digital Assets', icon: '🪙' },
   commodities: { label: 'Metals & FX', icon: '🏆' },
 };
+
+function BenchmarkCard({
+  quote,
+  onSelect,
+}: {
+  quote: Quote;
+  onSelect: (quote: Quote) => void;
+}) {
+  const prevPriceRef = useRef<number | null>(quote.price);
+  const [flash, setFlash] = useState<'up' | 'down' | null>(null);
+
+  useEffect(() => {
+    if (prevPriceRef.current !== null && quote.price !== null && prevPriceRef.current !== quote.price) {
+      const direction = quote.price > prevPriceRef.current ? 'up' : 'down';
+      setFlash(direction);
+      const timer = setTimeout(() => setFlash(null), 800);
+      prevPriceRef.current = quote.price;
+      return () => clearTimeout(timer);
+    }
+    prevPriceRef.current = quote.price;
+  }, [quote.price]);
+
+  const hasChange = quote.changePercent !== null && Number.isFinite(quote.changePercent);
+  const isGain = (quote.changePercent ?? 0) >= 0;
+  const isLive = quote.status === 'live';
+
+  const flag =
+    quote.category === 'india'
+      ? '🇮🇳'
+      : quote.category === 'us'
+      ? '🇺🇸'
+      : quote.category === 'crypto'
+      ? '🪙'
+      : '🏆';
+
+  return (
+    <button
+      type="button"
+      onClick={() => onSelect(quote)}
+      className={`group flex flex-col justify-between rounded-xl border p-3 text-left transition-all duration-200 hover:border-[var(--accent-primary)] hover:shadow-md cursor-pointer ${
+        flash === 'up'
+          ? 'flash-up border-emerald-500/50 bg-emerald-500/10'
+          : flash === 'down'
+          ? 'flash-down border-rose-500/50 bg-rose-500/10'
+          : 'border-[var(--border-subtle)] bg-[var(--bg-surface)] hover:bg-[var(--bg-surface-hover)]'
+      }`}
+    >
+      <div className="flex items-center justify-between gap-1 w-full">
+        <div className="flex items-center gap-1.5 min-w-0">
+          <span className="font-bold text-xs text-[var(--text-primary)] group-hover:text-[var(--accent-text)] transition truncate">
+            {quote.symbol}
+          </span>
+          {isLive && (
+            <span className="relative flex h-1.5 w-1.5 shrink-0" title="Live streaming real-time quote">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+              <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500" />
+            </span>
+          )}
+        </div>
+        <span className="text-xs shrink-0">{flag}</span>
+      </div>
+
+      <span className="truncate text-[11px] text-[var(--text-muted)] mt-0.5 block w-full">
+        {quote.name}
+      </span>
+
+      <div className="mt-2.5">
+        <div className="font-mono text-sm sm:text-base font-bold tabular-nums text-[var(--text-primary)]">
+          {formatPrice(quote.price, quote.currency)}
+        </div>
+        <div className="mt-1 flex items-center gap-1.5 flex-wrap">
+          <span
+            className={`inline-flex items-center gap-0.5 rounded-md px-1.5 py-0.5 font-mono text-[10px] font-semibold tabular-nums ${
+              !hasChange
+                ? 'bg-[var(--bg-subtle)] text-[var(--text-muted)] border border-[var(--border-subtle)]'
+                : isGain
+                ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                : 'bg-rose-500/10 text-rose-400 border border-rose-500/20'
+            }`}
+          >
+            {hasChange && (
+              isGain ? (
+                <TrendingUp className="h-2.5 w-2.5 shrink-0" />
+              ) : (
+                <TrendingDown className="h-2.5 w-2.5 shrink-0" />
+              )
+            )}
+            {formatPercent(quote.changePercent)}
+          </span>
+          {quote.change !== null && Number.isFinite(quote.change) && (
+            <span className="font-mono text-[10px] text-[var(--text-muted)] tabular-nums hidden xs:inline">
+              {formatChange(quote.change, quote.currency)}
+            </span>
+          )}
+        </div>
+      </div>
+    </button>
+  );
+}
 
 export default function OverviewPage({
   quotes,
@@ -151,47 +250,13 @@ export default function OverviewPage({
           <Loading label="Loading market indices…" />
         ) : (
           <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-6">
-            {benchmarks.map((quote) => {
-              const isGain = (quote.changePercent ?? 0) >= 0;
-              return (
-                <button
-                  key={quote.symbol}
-                  type="button"
-                  onClick={() => onSelectAsset(quote)}
-                  className="group flex flex-col justify-between rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-3 text-left transition hover:border-[var(--accent-primary)] hover:shadow-md cursor-pointer"
-                >
-                  <div className="flex items-center justify-between gap-1">
-                    <span className="font-bold text-xs text-[var(--text-primary)] group-hover:text-[var(--accent-text)] transition">
-                      {quote.symbol}
-                    </span>
-                    <span className="text-[10px] text-[var(--text-muted)]">
-                      {quote.category === 'india' ? '🇮🇳' : quote.category === 'us' ? '🇺🇸' : quote.category === 'crypto' ? '🪙' : '🏆'}
-                    </span>
-                  </div>
-
-                  <span className="truncate text-[11px] text-[var(--text-muted)] mt-0.5">
-                    {quote.name}
-                  </span>
-
-                  <div className="mt-2.5">
-                    <div className="font-mono text-sm sm:text-base font-bold tabular-nums text-[var(--text-primary)]">
-                      {formatPrice(quote.price, quote.currency)}
-                    </div>
-                    <div className="mt-1 flex items-center">
-                      <span
-                        className={`inline-flex items-center rounded-md px-1.5 py-0.5 font-mono text-[10px] font-semibold tabular-nums ${
-                          isGain
-                            ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
-                            : 'bg-rose-500/10 text-rose-400 border border-rose-500/20'
-                        }`}
-                      >
-                        {formatPercent(quote.changePercent)}
-                      </span>
-                    </div>
-                  </div>
-                </button>
-              );
-            })}
+            {benchmarks.map((quote) => (
+              <BenchmarkCard
+                key={quote.symbol}
+                quote={quote}
+                onSelect={onSelectAsset}
+              />
+            ))}
           </div>
         )}
       </section>

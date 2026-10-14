@@ -330,3 +330,68 @@ select {
   touch-action: manipulation;
   -webkit-tap-highlight-color: transparent;
 }
+
+/* Continuous smooth ticker tape marquee */
+@keyframes ticker-marquee {
+  0% {
+    transform: translate3d(0, 0, 0);
+  }
+  100% {
+    transform: translate3d(-50%, 0, 0);
+  }
+}
+
+.ticker-track {
+  display: flex;
+  width: max-content;
+  animation: ticker-marquee 32s linear infinite;
+  will-change: transform;
+}
+
+.ticker-track:hover,
+.ticker-track:focus-within,
+.ticker-track:active {
+  animation-play-state: paused;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ticker-track {
+    animation: none;
+  }
+}
+
+/* Real-time price update flash animations */
+@keyframes flash-green-glow {
+  0% {
+    background-color: rgba(16, 185, 129, 0.28);
+    border-color: rgba(16, 185, 129, 0.7);
+    box-shadow: 0 0 14px rgba(16, 185, 129, 0.25);
+  }
+  100% {
+    background-color: var(--bg-surface);
+    border-color: var(--border-subtle);
+    box-shadow: none;
+  }
+}
+
+@keyframes flash-red-glow {
+  0% {
+    background-color: rgba(244, 63, 94, 0.28);
+    border-color: rgba(244, 63, 94, 0.7);
+    box-shadow: 0 0 14px rgba(244, 63, 94, 0.25);
+  }
+  100% {
+    background-color: var(--bg-surface);
+    border-color: var(--border-subtle);
+    box-shadow: none;
+  }
+}
+
+.flash-up {
+  animation: flash-green-glow 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.flash-down {
+  animation: flash-red-glow 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
