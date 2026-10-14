@@ -1,9 +1,8 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { BarChart3, ChartNoAxesColumn, Star, Newspaper, Grid2X2, Sun, Moon, Menu, X, Search, Download, Settings, Info, LayoutDashboard, FlaskConical } from 'lucide-react';
 import type { Tab, ThemeType } from '../types/market';
 
 interface Props {
-  notifications?: ReactNode;
   theme: ThemeType; onTheme: (theme: ThemeType) => void;
   search: string; onSearch: (value: string) => void;
   tab: Tab; onNavigate: (tab: Tab) => void;
@@ -17,7 +16,7 @@ export const navItems = [
   { id: 'news' as Tab, label: 'News', icon: Newspaper },
   { id: 'tools' as Tab, label: 'Tools', icon: Grid2X2 },
 ];
-export default function Header({ notifications, theme, onTheme, search, onSearch, tab, onNavigate, onSettings, onOpenDisclosures, onDesktop }: Props) {
+export default function Header({ theme, onTheme, search, onSearch, tab, onNavigate, onSettings, onOpenDisclosures, onDesktop }: Props) {
   const [open, setOpen] = useState(false);
   const menu = useRef<HTMLDivElement>(null);
   const trigger = useRef<HTMLButtonElement>(null);
@@ -40,7 +39,6 @@ export default function Header({ notifications, theme, onTheme, search, onSearch
         {navItems.map(({ id, label, icon: Icon }) => <button key={id} role="tab" id={`tab-${id}`} aria-selected={tab === id || id === 'tools' && tab === 'desk'} onClick={() => go(id)} className={`flex items-center gap-2 min-h-11 px-4 rounded-lg text-sm font-medium ${tab === id || id === 'tools' && tab === 'desk' ? 'bg-[var(--accent-subtle)] text-[var(--accent-text)]' : 'text-[var(--text-secondary)] hover:bg-[var(--bg-surface-hover)]'}`}><Icon size={17} />{label}</button>)}
       </nav>
       <div className="flex gap-1 items-center">
-        {notifications}
         <button className="icon-button !border-transparent !bg-transparent min-h-11 min-w-11" aria-label={`Switch to ${theme === 'dark' ? 'Light' : 'Dark'} mode`} onClick={() => onTheme(theme === 'dark' ? 'light' : 'dark')}>{theme === 'dark' ? <Sun size={20} /> : <Moon size={20} />}</button>
         <div ref={menu} className="relative">
           <button ref={trigger} className="icon-button !border-transparent !bg-transparent min-h-11 min-w-11" aria-label={open ? 'Close navigation menu' : 'Open navigation menu'} aria-expanded={open} aria-controls="more-navigation" onClick={() => setOpen(!open)}>{open ? <X size={20} /> : <Menu size={20} />}</button>

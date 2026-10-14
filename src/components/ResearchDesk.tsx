@@ -224,7 +224,7 @@ export default function ResearchDesk({
   const tabButton = (name: string) => (
     <button
       key={name}
-      className={`button-secondary ${tab === name ? "!bg-[var(--accent-subtle)] !text-[var(--accent-text)] !border-[var(--accent-primary)]" : ""}`}
+      className="button-secondary"
       aria-pressed={tab === name}
       onClick={() => {
         setTab(name);
@@ -331,7 +331,7 @@ export default function ResearchDesk({
         </label>
       </header>
 
-      <nav aria-label="Research desk tools" className="flex gap-2 overflow-x-auto pb-2 [&>button]:shrink-0 [&>button]:min-h-11">
+      <nav aria-label="Research desk tools" className="flex flex-wrap gap-2">
         {['Chart', 'Plan', 'Alerts', 'Journal', 'Practice', 'Account'].map(tabButton)}
       </nav>
 

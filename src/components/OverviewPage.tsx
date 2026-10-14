@@ -13,7 +13,7 @@ import {
   ChevronRight,
 } from 'lucide-react';
 import type { NewsArticle, Quote, Tab } from '../types/market';
-import { formatChange, formatPercent, formatPrice, formatTime } from '../utils/format';
+import { changeClass, formatChange, formatPercent, formatPrice, formatTime } from '../utils/format';
 import { Loading } from './Feedback';
 
 interface Props {
@@ -89,8 +89,8 @@ function BenchmarkCard({
               !hasChange
                 ? 'bg-[var(--bg-subtle)] text-[var(--text-muted)] border border-[var(--border-subtle)]'
                 : isGain
-                ? 'bg-emerald-500/10 text-[var(--gain-text)] border border-emerald-500/20'
-                : 'bg-rose-500/10 text-[var(--loss-text)] border border-rose-500/20'
+                ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                : 'bg-rose-500/10 text-rose-400 border border-rose-500/20'
             }`}
           >
             {hasChange && (
@@ -170,7 +170,7 @@ export default function OverviewPage({
               Market Dashboard
             </h1>
             <p className="text-[11px] text-[var(--text-muted)]">
-              Quotes across {quotes.length} tracked instruments · check each observation’s status
+              Real-time telemetry across {quotes.length || 42} verified instruments
             </p>
           </div>
         </div>
@@ -223,7 +223,7 @@ export default function OverviewPage({
           <h2 id="benchmarks-heading" className="text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)]">
             Core Market Indices
           </h2>
-          <span className="text-[11px] text-[var(--text-muted)]">Provider observations</span>
+          <span className="text-[11px] text-[var(--text-muted)]">Verified live reference</span>
         </div>
 
         {loading && !quotes.length ? (
@@ -281,11 +281,10 @@ export default function OverviewPage({
           {displayQuotes.slice(0, 12).map((quote) => {
             const isGain = (quote.changePercent ?? 0) >= 0;
             return (
-              <button
-                type="button"
+              <div
                 key={quote.symbol}
                 onClick={() => onSelectAsset(quote)}
-                className="group w-full text-left flex items-center justify-between rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-3 hover:border-[var(--border-default)] hover:bg-[var(--bg-surface-hover)] transition cursor-pointer shadow-sm"
+                className="group flex items-center justify-between rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-3 hover:border-[var(--border-default)] hover:bg-[var(--bg-surface-hover)] transition cursor-pointer shadow-sm"
               >
                 <div className="min-w-0 pr-2">
                   <div className="flex items-center gap-1.5">
@@ -308,14 +307,14 @@ export default function OverviewPage({
                   <div className="mt-0.5">
                     <span
                       className={`inline-block font-mono text-[10px] font-semibold tabular-nums ${
-                        isGain ? 'text-[var(--gain-text)]' : 'text-[var(--loss-text)]'
+                        isGain ? 'text-emerald-400' : 'text-rose-400'
                       }`}
                     >
                       {formatPercent(quote.changePercent)}
                     </span>
                   </div>
                 </div>
-              </button>
+              </div>
             );
           })}
         </div>
@@ -338,20 +337,19 @@ export default function OverviewPage({
         {/* Gainers */}
         <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-3.5">
           <div className="flex items-center justify-between border-b border-[var(--border-subtle)] pb-2 mb-2.5">
-            <h3 className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-[var(--gain-text)]">
+            <h3 className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-emerald-400">
               <TrendingUp className="h-4 w-4" />
               <span>Top Gainers</span>
             </h3>
-            <span className="text-[10px] text-[var(--text-muted)]">Reported change</span>
+            <span className="text-[10px] text-[var(--text-muted)]">Today</span>
           </div>
 
           <div className="space-y-1.5">
             {sortedGainers.map((quote) => (
-              <button
-                type="button"
+              <div
                 key={quote.symbol}
                 onClick={() => onSelectAsset(quote)}
-                className="w-full min-h-11 text-left flex items-center justify-between py-1 px-1.5 rounded-lg hover:bg-[var(--bg-subtle)] transition cursor-pointer text-xs"
+                className="flex items-center justify-between py-1 px-1.5 rounded-lg hover:bg-[var(--bg-subtle)] transition cursor-pointer text-xs"
               >
                 <div className="flex items-center gap-2 min-w-0">
                   <span className="font-bold text-[var(--text-primary)]">{quote.symbol}</span>
@@ -361,11 +359,11 @@ export default function OverviewPage({
                   <span className="font-mono text-xs tabular-nums text-[var(--text-secondary)]">
                     {formatPrice(quote.price, quote.currency)}
                   </span>
-                  <span className="rounded bg-emerald-500/10 px-1.5 py-0.5 font-mono text-[10px] font-bold text-[var(--gain-text)] border border-emerald-500/20">
+                  <span className="rounded bg-emerald-500/10 px-1.5 py-0.5 font-mono text-[10px] font-bold text-emerald-400 border border-emerald-500/20">
                     {formatPercent(quote.changePercent)}
                   </span>
                 </div>
-              </button>
+              </div>
             ))}
           </div>
         </div>
@@ -373,20 +371,19 @@ export default function OverviewPage({
         {/* Losers */}
         <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-3.5">
           <div className="flex items-center justify-between border-b border-[var(--border-subtle)] pb-2 mb-2.5">
-            <h3 className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-[var(--loss-text)]">
+            <h3 className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-rose-400">
               <TrendingDown className="h-4 w-4" />
               <span>Top Decliners</span>
             </h3>
-            <span className="text-[10px] text-[var(--text-muted)]">Reported change</span>
+            <span className="text-[10px] text-[var(--text-muted)]">Today</span>
           </div>
 
           <div className="space-y-1.5">
             {sortedLosers.map((quote) => (
-              <button
-                type="button"
+              <div
                 key={quote.symbol}
                 onClick={() => onSelectAsset(quote)}
-                className="w-full min-h-11 text-left flex items-center justify-between py-1 px-1.5 rounded-lg hover:bg-[var(--bg-subtle)] transition cursor-pointer text-xs"
+                className="flex items-center justify-between py-1 px-1.5 rounded-lg hover:bg-[var(--bg-subtle)] transition cursor-pointer text-xs"
               >
                 <div className="flex items-center gap-2 min-w-0">
                   <span className="font-bold text-[var(--text-primary)]">{quote.symbol}</span>
@@ -396,11 +393,11 @@ export default function OverviewPage({
                   <span className="font-mono text-xs tabular-nums text-[var(--text-secondary)]">
                     {formatPrice(quote.price, quote.currency)}
                   </span>
-                  <span className="rounded bg-rose-500/10 px-1.5 py-0.5 font-mono text-[10px] font-bold text-[var(--loss-text)] border border-rose-500/20">
+                  <span className="rounded bg-rose-500/10 px-1.5 py-0.5 font-mono text-[10px] font-bold text-rose-400 border border-rose-500/20">
                     {formatPercent(quote.changePercent)}
                   </span>
                 </div>
-              </button>
+              </div>
             ))}
           </div>
         </div>

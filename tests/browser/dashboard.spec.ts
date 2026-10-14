@@ -6,7 +6,7 @@ test('desktop navigation, search, asset detail, chart table alternative, themes 
 
   // 1. Overview Page
   await page.goto('/overview');
-  await expect(page.getByRole('heading', { name: 'Market Dashboard', exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Market Intelligence', exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: 'RELIANCE', exact: false }).first()).toBeVisible({ timeout: 15000 });
 
   // 2. Navigation to Markets Page
@@ -16,7 +16,7 @@ test('desktop navigation, search, asset detail, chart table alternative, themes 
 
   // 3. Search for RELIANCE
   await page.getByRole('searchbox').fill('RELIANCE');
-  await expect(page.getByText(/matching instruments out of \d+ tracked assets/)).toBeVisible();
+  await expect(page.getByText('matching instruments out of 42 tracked assets')).toBeVisible();
 
   // 4. Open Asset Detail for RELIANCE
   await page.route('**/api/markets/candles/RELIANCE*', (route) =>
