@@ -281,10 +281,11 @@ export default function OverviewPage({
           {displayQuotes.slice(0, 12).map((quote) => {
             const isGain = (quote.changePercent ?? 0) >= 0;
             return (
-              <div
+              <button
+                type="button"
                 key={quote.symbol}
                 onClick={() => onSelectAsset(quote)}
-                className="group flex items-center justify-between rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-3 hover:border-[var(--border-default)] hover:bg-[var(--bg-surface-hover)] transition cursor-pointer shadow-sm"
+                className="group w-full text-left flex items-center justify-between rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-3 hover:border-[var(--border-default)] hover:bg-[var(--bg-surface-hover)] transition cursor-pointer shadow-sm"
               >
                 <div className="min-w-0 pr-2">
                   <div className="flex items-center gap-1.5">
@@ -314,7 +315,7 @@ export default function OverviewPage({
                     </span>
                   </div>
                 </div>
-              </div>
+              </button>
             );
           })}
         </div>
@@ -346,10 +347,11 @@ export default function OverviewPage({
 
           <div className="space-y-1.5">
             {sortedGainers.map((quote) => (
-              <div
+              <button
+                type="button"
                 key={quote.symbol}
                 onClick={() => onSelectAsset(quote)}
-                className="flex items-center justify-between py-1 px-1.5 rounded-lg hover:bg-[var(--bg-subtle)] transition cursor-pointer text-xs"
+                className="w-full text-left flex items-center justify-between py-1 px-1.5 rounded-lg hover:bg-[var(--bg-subtle)] transition cursor-pointer text-xs"
               >
                 <div className="flex items-center gap-2 min-w-0">
                   <span className="font-bold text-[var(--text-primary)]">{quote.symbol}</span>
@@ -363,7 +365,7 @@ export default function OverviewPage({
                     {formatPercent(quote.changePercent)}
                   </span>
                 </div>
-              </div>
+              </button>
             ))}
           </div>
         </div>
@@ -380,10 +382,11 @@ export default function OverviewPage({
 
           <div className="space-y-1.5">
             {sortedLosers.map((quote) => (
-              <div
+              <button
+                type="button"
                 key={quote.symbol}
                 onClick={() => onSelectAsset(quote)}
-                className="flex items-center justify-between py-1 px-1.5 rounded-lg hover:bg-[var(--bg-subtle)] transition cursor-pointer text-xs"
+                className="w-full text-left flex items-center justify-between py-1 px-1.5 rounded-lg hover:bg-[var(--bg-subtle)] transition cursor-pointer text-xs"
               >
                 <div className="flex items-center gap-2 min-w-0">
                   <span className="font-bold text-[var(--text-primary)]">{quote.symbol}</span>
@@ -397,7 +400,7 @@ export default function OverviewPage({
                     {formatPercent(quote.changePercent)}
                   </span>
                 </div>
-              </div>
+              </button>
             ))}
           </div>
         </div>
