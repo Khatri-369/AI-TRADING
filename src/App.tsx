@@ -100,7 +100,15 @@ function MainApp() {
   const news = useNews();
   const ai = useAIAnalysis();
 
+  // Redirect to Watchlist if chosen as default landing page
+  useEffect(() => {
+    if (window.location.pathname === '/' && localStorage.getItem('default_landing_page') === 'watchlist') {
+      navigate('/watchlist');
+    }
+  }, [navigate]);
+
   const handleSelectAsset = (quote: Quote) => {
+    localStorage.setItem('last_chart_symbol', quote.symbol);
     navigate(`/asset/${encodeURIComponent(quote.symbol)}`);
   };
 
@@ -223,6 +231,7 @@ function MainApp() {
           connected={market.connected}
           onRefresh={refreshAll}
           onOpenDisclosures={() => setDisclosuresOpen(true)}
+          newsArticles={news.data?.articles ?? []}
         />
 
         {/* Global Movable Benchmark Ticker Tape */}
@@ -253,7 +262,7 @@ function MainApp() {
                   Search results for &ldquo;{search}&rdquo;:
                 </span>{' '}
                 <span className="text-[var(--text-secondary)]">
-                  {filteredQuotes.length} matching instruments out of 42 tracked assets
+                  {filteredQuotes.length} matching instruments out of {market.quotes.length || ASSET_BY_SYMBOL.size} tracked assets
                 </span>
               </div>
               <button
@@ -309,7 +318,7 @@ function MainApp() {
                     <span>Markets Directory</span>
                   </h2>
                   <p className="mt-0.5 text-xs text-[var(--text-secondary)]">
-                    Comprehensive multi-asset coverage across 42 verified instruments.
+                    Multi-asset coverage across {market.quotes.length || ASSET_BY_SYMBOL.size} instruments.
                   </p>
                 </div>
 
@@ -332,11 +341,11 @@ function MainApp() {
                 aria-label="Market Categories"
               >
                 {[
-                  { id: 'all', label: 'All Markets (42)' },
-                  { id: 'us', label: 'US Equities (8)' },
-                  { id: 'india', label: 'Indian Equities (25)' },
-                  { id: 'crypto', label: 'Digital Assets (5)' },
-                  { id: 'commodities', label: 'Metals & FX (3)' },
+                  { id: 'all', label: `All Markets (${market.quotes.length || ASSET_BY_SYMBOL.size})` },
+                  { id: 'india', label: `Indian Equities (${market.quotes.filter((q) => q.category === 'india').length || 25})` },
+                  { id: 'us', label: `US Equities (${market.quotes.filter((q) => q.category === 'us').length || 8})` },
+                  { id: 'crypto', label: `Digital Assets (${market.quotes.filter((q) => q.category === 'crypto').length || 5})` },
+                  { id: 'commodities', label: `Metals & FX (${market.quotes.filter((q) => ['commodities', 'forex'].includes(q.category)).length || 3})` },
                 ].map((cat) => (
                   <button
                     key={cat.id}
