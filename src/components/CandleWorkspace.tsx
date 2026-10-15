@@ -1,5 +1,6 @@
 import type { ChatFocus } from '../../shared/chat';
 import { useEffect, useRef, useState, useCallback } from 'react';
+import { Maximize2, Minimize2 } from 'lucide-react';
 import {
   createChart,
   CandlestickSeries,
@@ -33,7 +34,7 @@ export default function CandleWorkspace({
 }: {
   symbol: string;
   theme: ThemeType;
-  onPlan?: () => void;
+  onPlan?: (levels?: { entry?: number; stop?: number; target?: number; direction?: 'long' | 'short' }) => void;
   onAsk?: (focus: ChatFocus) => void;
   onAlert?: (level: number) => void;
   planLevels?: PlanLevels;
@@ -58,6 +59,7 @@ export default function CandleWorkspace({
   const [redo, setRedo] = useState<Drawing[][]>([]);
   const [dirty, setDirty] = useState(false);
   const [table, setTable] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(false);
   const [hoveredCandle, setHoveredCandle] = useState<{
     time: string;
     open: number;
@@ -67,6 +69,15 @@ export default function CandleWorkspace({
     volume: number | null;
     changePercent: number;
   } | null>(null);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('last_chart_symbol', symbol);
+      localStorage.setItem('last_chart_interval', interval);
+    } catch {
+      // Ignore
+    }
+  }, [symbol, interval]);
 
   const root = useRef<HTMLDivElement>(null);
   const host = useRef<HTMLDivElement>(null);
@@ -517,7 +528,11 @@ export default function CandleWorkspace({
   return (
     <div
       ref={root}
-      className="space-y-3 bg-[var(--bg-surface)] p-3 sm:p-4 rounded-xl border border-[var(--border-default)]"
+      className={
+        isExpanded
+          ? 'fixed inset-0 z-50 bg-[var(--bg-canvas)] p-3 sm:p-4 flex flex-col h-full w-full overflow-y-auto space-y-3'
+          : 'space-y-3 bg-[var(--bg-surface)] p-3 sm:p-4 rounded-xl border border-[var(--border-default)]'
+      }
     >
       {/* Header & Instrument Metadata */}
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--border-subtle)] pb-2.5">
@@ -620,23 +635,25 @@ export default function CandleWorkspace({
         <div className="flex flex-wrap items-center gap-1.5">
           <button
             type="button"
-            className="button-secondary"
+            className="button-secondary min-h-[44px]"
             onClick={() => chart.current?.timeScale().fitContent()}
           >
             Reset view
           </button>
           <button
             type="button"
-            className="button-secondary"
-            onClick={() => {
-              void root.current
-                ?.requestFullscreen()
-                .catch(() => setError('Full-screen is restricted in this browser session.'));
-            }}
+            className="button-secondary min-h-[44px] flex items-center gap-1.5"
+            onClick={() => setIsExpanded((v) => !v)}
+            aria-label={isExpanded ? 'Exit full screen' : 'Full screen'}
           >
-            Full screen
+            {isExpanded ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
+            <span>{isExpanded ? 'Exit full screen' : 'Full screen'}</span>
           </button>
-          <button type="button" className="button-secondary" onClick={() => setTable((v) => !v)}>
+          <button
+            type="button"
+            className="button-secondary min-h-[44px]"
+            onClick={() => setTable((v) => !v)}
+          >
             {table ? 'Show candles' : 'Candle table'}
           </button>
           <button
@@ -801,7 +818,9 @@ export default function CandleWorkspace({
           </div>
         ) : (
           <div
-            className="relative h-[380px] w-full min-w-0 rounded-lg overflow-hidden border border-[var(--border-subtle)]"
+            className={`relative w-full min-w-0 rounded-lg overflow-hidden border border-[var(--border-subtle)] ${
+              isExpanded ? 'flex-1 min-h-[380px] h-[calc(100vh-220px)]' : 'h-[380px]'
+            }`}
             aria-label={`${symbol} interactive candlestick chart`}
           >
             <div ref={host} className="h-full w-full" />
@@ -1009,8 +1028,37 @@ export default function CandleWorkspace({
 
       {/* Action to create trade plan */}
       {onAsk && <button className="button-secondary" onClick={() => onAsk({ symbol, interval, range, drawings: drawings.slice(0, 10) })}>Ask assistant about this chart</button>}
-        {onPlan && (
-        <button type="button" className="button-primary" onClick={() => { if (dirty) { setError('Save chart changes before opening a plan.'); return; } onPlan(); }}>
+      {onPlan && (
+        <button
+          type="button"
+          className="button-primary min-h-[44px]"
+          onClick={() => {
+            if (dirty) {
+              setError('Save chart changes before opening a plan.');
+              return;
+            }
+            const levelDrawings = drawings.filter((d) => d.type === 'level').map((d) => d.a.price);
+            const latestClose = data?.candles.at(-1)?.close;
+            const entry = planLevels?.entry ?? latestClose ?? (levelDrawings.length ? levelDrawings[0] : undefined);
+            const sorted = [...levelDrawings].sort((a, b) => a - b);
+            let stop = planLevels?.stop;
+            let target = planLevels?.target;
+            if (entry && !stop && sorted.length) {
+              const lower = sorted.filter((p) => p < entry).pop();
+              if (lower) stop = lower;
+            }
+            if (entry && !target && sorted.length) {
+              const higher = sorted.filter((p) => p > entry)[0];
+              if (higher) target = higher;
+            }
+            onPlan({
+              entry,
+              stop,
+              target,
+              direction: planLevels?.direction ?? (target && stop ? (target > entry! ? 'long' : 'short') : 'long'),
+            });
+          }}
+        >
           Create a trade plan
         </button>
       )}
