@@ -15,7 +15,7 @@ import {
   Download,
   Star,
 } from 'lucide-react';
-import type { NewsArticle, Tab, ThemeType } from '../types/market';
+import type { NewsArticle, Quote, Tab, ThemeType } from '../types/market';
 import { usePwaInstall } from '../hooks/usePwaInstall';
 import NewsAlerts from './NewsAlerts';
 
@@ -35,6 +35,8 @@ interface Props {
   onOpenDisclosures?: () => void;
   onDesktop: () => void;
   newsArticles?: NewsArticle[];
+  quotes?: Quote[];
+  onSelectAsset?: (quote: Quote) => void;
 }
 
 export const navItems = [
@@ -63,6 +65,8 @@ export default function Header({
   onOpenDisclosures,
   onDesktop,
   newsArticles = [],
+  quotes = [],
+  onSelectAsset,
 }: Props) {
   const [now, setNow] = useState(() => new Date());
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -213,6 +217,8 @@ export default function Header({
           {/* Foreground News Alerts Inbox Bell */}
           <NewsAlerts
             newsArticles={newsArticles}
+            quotes={quotes}
+            onSelectAsset={onSelectAsset}
             onOpenNews={() => onNavigate('news')}
             onOpenBackgroundSetup={onDesktop}
           />

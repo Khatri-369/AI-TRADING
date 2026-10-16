@@ -232,6 +232,8 @@ function MainApp() {
           onRefresh={refreshAll}
           onOpenDisclosures={() => setDisclosuresOpen(true)}
           newsArticles={news.data?.articles ?? []}
+          quotes={market.quotes}
+          onSelectAsset={handleSelectAsset}
         />
 
         {/* Global Movable Benchmark Ticker Tape */}

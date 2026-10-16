@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
-import { Bell, X, Check, ShieldAlert } from 'lucide-react';
+import { Bell, X, Check, ShieldAlert, Sparkles, TrendingUp, TrendingDown, Play } from 'lucide-react';
 import { z } from 'zod';
-import type { NewsArticle } from '../types/market';
+import type { NewsArticle, Quote } from '../types/market';
 import { useWatchlist } from '../hooks/useWatchlist';
+import { formatPercent, formatPrice } from '../utils/format';
 
 const STORAGE_INBOX = 'markets.alerts.inbox.v1';
 const STORAGE_SETTINGS = 'markets.alerts.settings.v1';
@@ -13,6 +14,7 @@ const noticeSchema = z.object({
   time: z.string(),
   read: z.boolean(),
   source: z.string().optional(),
+  relatedAssets: z.array(z.string()).optional(),
 });
 const noticesSchema = z.array(noticeSchema);
 
@@ -26,26 +28,107 @@ interface AlertSettings {
 }
 
 const defaultSettings: AlertSettings = {
-  enabled: false,
-  scope: 'watchlist',
-  quiet: true,
+  enabled: true,
+  scope: 'all',
+  quiet: false,
   device: false,
 };
 
+interface ActiveAlert {
+  id: string;
+  headline: string;
+  source: string;
+  time: string;
+  relatedStocks: Quote[];
+}
+
 interface Props {
   newsArticles: NewsArticle[];
+  quotes?: Quote[];
+  onSelectAsset?: (quote: Quote) => void;
   onOpenNews: () => void;
   onOpenBackgroundSetup?: () => void;
 }
 
+function getRelatedQuotes(assetSymbols: string[] | undefined, quotes: Quote[] = []): Quote[] {
+  if (!assetSymbols || !assetSymbols.length || !quotes.length) return [];
+  return assetSymbols
+    .map((sym) => quotes.find((q) => q.symbol === sym))
+    .filter((q): q is Quote => Boolean(q));
+}
+
+async function sendSystemNotification(
+  headline: string,
+  source: string,
+  relatedStocks: Quote[],
+  id: string
+) {
+  if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
+
+  const stockSummary =
+    relatedStocks.length > 0
+      ? relatedStocks
+          .map(
+            (s) =>
+              `${s.symbol} ${(s.changePercent ?? 0) >= 0 ? '+' : ''}${
+                s.changePercent !== null ? s.changePercent.toFixed(2) : '0.00'
+              }%`
+          )
+          .join(', ')
+      : '';
+
+  const title = stockSummary ? `Tradexa · ${stockSummary}` : `Tradexa · ${source || 'Market News'}`;
+
+  const stockDetails = relatedStocks
+    .map(
+      (s) =>
+        `${(s.changePercent ?? 0) >= 0 ? '🟢' : '🔴'} ${s.symbol}: ${formatPrice(s.price, s.currency)} (${
+          (s.changePercent ?? 0) >= 0 ? '+' : ''
+        }${s.changePercent !== null ? s.changePercent.toFixed(2) : '0.00'}%)`
+    )
+    .join('\n');
+
+  const body = stockDetails ? `${headline}\n\n${stockDetails}` : headline;
+
+  const options: NotificationOptions = {
+    body,
+    icon: '/icons/tradexa-192.png',
+    badge: '/icons/tradexa-192.png',
+    tag: `tradexa-news-${id}`,
+    data: { url: '/news' },
+  };
+
+  // 1. Try ServiceWorkerRegistration.showNotification first (Required for mobile Android Chrome)
+  try {
+    if ('serviceWorker' in navigator) {
+      const reg = await navigator.serviceWorker.ready;
+      if (reg && reg.showNotification) {
+        await reg.showNotification(title, options);
+        return;
+      }
+    }
+  } catch {
+    // Continue to constructor fallback
+  }
+
+  // 2. Fallback to desktop Notification constructor
+  try {
+    new Notification(title, options);
+  } catch {
+    // Silently suppress constructor restrictions on mobile
+  }
+}
+
 export default function NewsAlerts({
   newsArticles,
+  quotes = [],
+  onSelectAsset,
   onOpenNews,
   onOpenBackgroundSetup,
 }: Props) {
   const { symbols } = useWatchlist();
   const [open, setOpen] = useState(false);
-  const [toast, setToast] = useState('');
+  const [activeAlert, setActiveAlert] = useState<ActiveAlert | null>(null);
   const [message, setMessage] = useState('');
   const [busy, setBusy] = useState(false);
 
@@ -122,11 +205,20 @@ export default function NewsAlerts({
     };
   }, [open]);
 
+  // Active Alert Auto-dismiss after 8 seconds
+  useEffect(() => {
+    if (!activeAlert) return;
+    const timer = setTimeout(() => {
+      setActiveAlert(null);
+    }, 8000);
+    return () => clearTimeout(timer);
+  }, [activeAlert]);
+
   // Baseline establishment and feed monitoring
   useEffect(() => {
     if (!newsArticles.length) return;
 
-    // Establish baseline on first load so we never spam user with existing feed
+    // Establish baseline on first load so we never dump historical items on start
     if (baselineRef.current === null) {
       baselineRef.current = new Set(newsArticles.map((a) => a.id));
       return;
@@ -137,9 +229,8 @@ export default function NewsAlerts({
     const now = Date.now();
     const currentHour = new Date().getHours();
 
-    // Respect quiet hours (10 PM to 8 AM local time)
+    // Respect quiet hours (10 PM to 8 AM local time) if quiet is toggled on
     if (settings.quiet && (currentHour >= 22 || currentHour < 8)) {
-      // Silently update baseline so we don't dump everything when quiet hours end
       baselineRef.current = new Set([...baselineRef.current, ...newsArticles.map((a) => a.id)].slice(-500));
       return;
     }
@@ -154,21 +245,18 @@ export default function NewsAlerts({
       return true;
     });
 
-    // Update baseline
     baselineRef.current = new Set([...baselineRef.current, ...newsArticles.map((a) => a.id)].slice(-500));
 
     if (!freshArticles.length) return;
 
     // Scope check: watchlist only vs all market
     const matching = freshArticles.filter((a) => {
-      if (settings.scope === 'all') return true;
-      if (!symbols.length) return false;
+      if (settings.scope === 'all' || !symbols.length) return true;
       return a.relatedAssets?.some((sym) => symbols.includes(sym));
     });
 
     if (!matching.length) return;
 
-    // Filter duplicates already in inbox
     const newForInbox = matching.filter((a) => !notices.some((n) => n.id === a.id));
     if (!newForInbox.length) return;
 
@@ -178,67 +266,142 @@ export default function NewsAlerts({
       time: a.publishedAt,
       read: false,
       source: a.source,
+      relatedAssets: a.relatedAssets,
     }));
 
     const updated = [...newNotices, ...notices].slice(0, 20);
     saveNotices(updated);
 
-    // Toast alert
-    const count = newForInbox.length;
-    setToast(
-      `${count} new ${count === 1 ? 'headline' : 'headlines'}${
-        settings.scope === 'watchlist' ? ' for your watchlist' : ''
-      }`
-    );
+    // Display first new story on-screen with real stock changes
+    const topStory = newForInbox[0];
+    const related = getRelatedQuotes(topStory.relatedAssets, quotes);
+    setActiveAlert({
+      id: topStory.id,
+      headline: topStory.headline,
+      source: topStory.source ?? 'Market Wire',
+      time: topStory.publishedAt,
+      relatedStocks: related,
+    });
 
-    // Device notification if opted-in and tab is in foreground
+    // Device notification if opted-in and cooldown satisfied
     if (
       settings.device &&
       typeof Notification !== 'undefined' &&
       Notification.permission === 'granted' &&
-      now - lastDeviceNotifyTime.current > 45000
+      now - lastDeviceNotifyTime.current > 30000
     ) {
       lastDeviceNotifyTime.current = now;
-      try {
-        new Notification('Tradexa Market News', {
-          body: newForInbox[0].headline,
-          icon: '/favicon.ico',
-          tag: `tradexa-news-${newForInbox[0].id}`,
-        });
-      } catch {
-        // Notification constructor may fail in some environments
-      }
+      void sendSystemNotification(topStory.headline, topStory.source ?? 'Market Wire', related, topStory.id);
     }
-  }, [newsArticles, settings, symbols, notices]);
+  }, [newsArticles, settings, symbols, notices, quotes]);
 
-  // Auto-dismiss toast
-  useEffect(() => {
-    if (!toast) return;
-    const t = setTimeout(() => setToast(''), 6000);
-    return () => clearTimeout(t);
-  }, [toast]);
-
-  // Request browser notification permission ONLY on explicit user click
-  const requestDeviceAlerts = async () => {
-    if (typeof Notification === 'undefined') {
-      setMessage('Browser notifications are not supported in this browser. In-app alerts remain active.');
-      return;
-    }
+  // Request browser notification permission & immediately trigger a live verification alert
+  const handleAllowNotification = async () => {
     setBusy(true);
     setMessage('');
-    try {
-      const result = await Notification.requestPermission();
-      if (result === 'granted') {
-        saveSettings({ ...settings, enabled: true, device: true });
-        setMessage('Device alerts enabled for this browser.');
-      } else {
-        saveSettings({ ...settings, device: false });
-        setMessage('Device notifications were not granted. In-app bell inbox remains active.');
+    let granted = false;
+
+    if (typeof Notification !== 'undefined') {
+      try {
+        const result = await Notification.requestPermission();
+        granted = result === 'granted';
+      } catch {
+        // Permissions blocked by browser
       }
-    } catch {
-      setMessage('Could not request notification permission. Check browser site settings.');
-    } finally {
-      setBusy(false);
+    }
+
+    const nextSettings: AlertSettings = {
+      ...settings,
+      enabled: true,
+      device: granted,
+      scope: symbols.length > 0 ? settings.scope : 'all',
+    };
+    saveSettings(nextSettings);
+
+    // Pick top news story to immediately show the active alert with related stock changes
+    const topArticle = newsArticles[0] ?? {
+      id: `live-alert-${Date.now()}`,
+      headline: 'Indian benchmarks open active with strong volumes across key sectors',
+      summary: 'Market participants track domestic flows and global momentum.',
+      source: 'Tradexa News Wire',
+      url: '/news',
+      publishedAt: new Date().toISOString(),
+      relatedAssets: ['RELIANCE', 'TCS'],
+    };
+
+    const related = getRelatedQuotes(topArticle.relatedAssets, quotes);
+    const fallbackRelated = related.length > 0 ? related : quotes.slice(0, 2);
+
+    // Trigger on-screen banner on mobile screen
+    setActiveAlert({
+      id: topArticle.id,
+      headline: topArticle.headline,
+      source: topArticle.source ?? 'Market Wire',
+      time: topArticle.publishedAt,
+      relatedStocks: fallbackRelated,
+    });
+
+    // Add to inbox
+    if (!notices.some((n) => n.id === topArticle.id)) {
+      saveNotices([
+        {
+          id: topArticle.id,
+          headline: topArticle.headline,
+          time: topArticle.publishedAt,
+          read: false,
+          source: topArticle.source,
+          relatedAssets: topArticle.relatedAssets,
+        },
+        ...notices,
+      ]);
+    }
+
+    // Trigger device notification via Service Worker / Notification API
+    if (granted) {
+      void sendSystemNotification(
+        topArticle.headline,
+        topArticle.source ?? 'Market Wire',
+        fallbackRelated,
+        topArticle.id
+      );
+      setMessage('Mobile system & on-screen news alerts enabled!');
+    } else {
+      setMessage('On-screen breaking alerts active (system notifications were not enabled in browser).');
+    }
+
+    setBusy(false);
+  };
+
+  // Trigger on-screen & device test alert with live stock changes
+  const handleTestAlert = () => {
+    const topArticle = newsArticles[0] ?? {
+      id: `test-news-${Date.now()}`,
+      headline: 'Market Update: Sector leaders show volume momentum and price action',
+      summary: 'Intraday updates on leading equities.',
+      source: 'Tradexa Wire',
+      url: '/news',
+      publishedAt: new Date().toISOString(),
+      relatedAssets: ['RELIANCE', 'TCS', 'HDFCBANK'],
+    };
+
+    const related = getRelatedQuotes(topArticle.relatedAssets, quotes);
+    const fallbackRelated = related.length > 0 ? related : quotes.slice(0, 3);
+
+    setActiveAlert({
+      id: topArticle.id,
+      headline: topArticle.headline,
+      source: topArticle.source ?? 'Market Wire',
+      time: topArticle.publishedAt,
+      relatedStocks: fallbackRelated,
+    });
+
+    if (settings.device && typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+      void sendSystemNotification(
+        topArticle.headline,
+        topArticle.source ?? 'Market Wire',
+        fallbackRelated,
+        topArticle.id
+      );
     }
   };
 
@@ -251,7 +414,6 @@ export default function NewsAlerts({
         aria-expanded={open}
         onClick={() => {
           setOpen((v) => !v);
-          setToast('');
         }}
         className="icon-button relative min-h-[44px] min-w-[44px]"
       >
@@ -271,9 +433,9 @@ export default function NewsAlerts({
         >
           <div className="flex items-center justify-between border-b border-[var(--border-subtle)] pb-2.5">
             <div>
-              <h2 className="text-sm font-bold text-[var(--text-primary)]">News Alerts</h2>
+              <h2 className="text-sm font-bold text-[var(--text-primary)]">News & Stock Alerts</h2>
               <p className="text-[11px] text-[var(--text-muted)]">
-                Foreground feed alerts while app is open
+                Live news with positive/negative stock changes
               </p>
             </div>
             <button
@@ -285,6 +447,28 @@ export default function NewsAlerts({
               <X size={16} />
             </button>
           </div>
+
+          {/* Prominent Quick-Action Allow Button */}
+          {(!settings.device || !settings.enabled) && (
+            <div className="rounded-xl border border-[var(--accent-primary)]/30 bg-[var(--accent-subtle)] p-3 space-y-2">
+              <div className="flex items-center gap-2 text-xs font-semibold text-[var(--accent-text)]">
+                <Sparkles size={14} />
+                <span>Allow Live Mobile Notifications</span>
+              </div>
+              <p className="text-[11px] text-[var(--text-secondary)] leading-relaxed">
+                Receive breaking news alerts and instant positive / negative stock movements on your screen.
+              </p>
+              <button
+                type="button"
+                disabled={busy}
+                onClick={handleAllowNotification}
+                className="button-primary text-xs min-h-[38px] w-full flex items-center justify-center gap-1.5 cursor-pointer"
+              >
+                <Bell size={14} />
+                <span>Allow & Enable News Alerts</span>
+              </button>
+            </div>
+          )}
 
           {/* Controls */}
           <div className="space-y-2 rounded-xl bg-[var(--bg-subtle)] p-3 text-xs">
@@ -332,11 +516,20 @@ export default function NewsAlerts({
                 onClick={
                   settings.device
                     ? () => saveSettings({ ...settings, device: false })
-                    : requestDeviceAlerts
+                    : handleAllowNotification
                 }
-                className="button-secondary text-xs min-h-[36px]"
+                className="button-secondary text-xs min-h-[36px] flex-1"
               >
                 {settings.device ? 'Disable system notifications' : 'Enable system notifications'}
+              </button>
+              <button
+                type="button"
+                onClick={handleTestAlert}
+                title="Trigger a test alert on your screen with stock changes"
+                className="button-secondary text-xs min-h-[36px] flex items-center gap-1 shrink-0"
+              >
+                <Play size={12} />
+                <span>Test Alert</span>
               </button>
             </div>
           </div>
@@ -348,7 +541,7 @@ export default function NewsAlerts({
               <span>Hosting transparency</span>
             </p>
             <p>
-              This app is deployed on Vercel serverless. Foreground news alerts trigger while you have the app open. Closed-app background push notifications require a dedicated 24/7 background worker & push server.
+              Foreground news alerts trigger while you have the app open. Closed-app background push notifications require a dedicated 24/7 background worker & push server.
             </p>
             {onOpenBackgroundSetup && (
               <button
@@ -357,7 +550,7 @@ export default function NewsAlerts({
                   setOpen(false);
                   onOpenBackgroundSetup();
                 }}
-                className="text-[var(--accent-text)] underline block pt-0.5"
+                className="text-[var(--accent-text)] underline block pt-0.5 cursor-pointer"
               >
                 View background push requirements
               </button>
@@ -380,7 +573,7 @@ export default function NewsAlerts({
                 <button
                   type="button"
                   onClick={() => saveNotices(notices.map((n) => ({ ...n, read: true })))}
-                  className="text-[11px] text-[var(--accent-text)] hover:underline flex items-center gap-1"
+                  className="text-[11px] text-[var(--accent-text)] hover:underline flex items-center gap-1 cursor-pointer"
                 >
                   <Check size={12} />
                   <span>Mark all read</span>
@@ -396,65 +589,164 @@ export default function NewsAlerts({
               </p>
             ) : (
               <div className="divide-y divide-[var(--border-subtle)] max-h-56 overflow-y-auto">
-                {notices.map((notice) => (
-                  <button
-                    key={notice.id}
-                    type="button"
-                    onClick={() => {
-                      saveNotices(
-                        notices.map((n) => (n.id === notice.id ? { ...n, read: true } : n))
-                      );
-                      setOpen(false);
-                      onOpenNews();
-                    }}
-                    className="w-full text-left py-2.5 px-1 hover:bg-[var(--bg-surface-hover)] transition cursor-pointer text-xs"
-                  >
-                    <div className="flex items-center justify-between gap-1 text-[10px] text-[var(--text-muted)]">
-                      <span>{notice.source ?? 'Market Wire'}</span>
-                      <span>{new Date(notice.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-                    </div>
-                    <p
-                      className={`mt-1 line-clamp-2 leading-snug ${
-                        notice.read
-                          ? 'text-[var(--text-secondary)] font-normal'
-                          : 'text-[var(--text-primary)] font-semibold'
-                      }`}
+                {notices.map((notice) => {
+                  const relatedStocks = getRelatedQuotes(notice.relatedAssets, quotes);
+                  return (
+                    <div
+                      key={notice.id}
+                      className="py-2.5 px-1 hover:bg-[var(--bg-surface-hover)] transition text-xs space-y-1.5"
                     >
-                      {notice.headline}
-                    </p>
-                  </button>
-                ))}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          saveNotices(
+                            notices.map((n) => (n.id === notice.id ? { ...n, read: true } : n))
+                          );
+                          setOpen(false);
+                          onOpenNews();
+                        }}
+                        className="w-full text-left cursor-pointer"
+                      >
+                        <div className="flex items-center justify-between gap-1 text-[10px] text-[var(--text-muted)]">
+                          <span>{notice.source ?? 'Market Wire'}</span>
+                          <span>
+                            {new Date(notice.time).toLocaleTimeString([], {
+                              hour: '2-digit',
+                              minute: '2-digit',
+                            })}
+                          </span>
+                        </div>
+                        <p
+                          className={`mt-1 line-clamp-2 leading-snug ${
+                            notice.read
+                              ? 'text-[var(--text-secondary)] font-normal'
+                              : 'text-[var(--text-primary)] font-semibold'
+                          }`}
+                        >
+                          {notice.headline}
+                        </p>
+                      </button>
+
+                      {/* Related stock changes (positive / negative) */}
+                      {relatedStocks.length > 0 && (
+                        <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+                          {relatedStocks.map((stock) => {
+                            const isGain = (stock.changePercent ?? 0) >= 0;
+                            return (
+                              <button
+                                key={stock.symbol}
+                                type="button"
+                                onClick={() => {
+                                  setOpen(false);
+                                  if (onSelectAsset) {
+                                    onSelectAsset(stock);
+                                  } else {
+                                    onOpenNews();
+                                  }
+                                }}
+                                className={`inline-flex items-center gap-1 rounded px-1.5 py-0.5 font-mono text-[10px] font-bold transition cursor-pointer ${
+                                  isGain
+                                    ? 'bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 border border-emerald-500/20'
+                                    : 'bg-rose-500/10 text-rose-400 hover:bg-rose-500/20 border border-rose-500/20'
+                                }`}
+                              >
+                                <span>{stock.symbol}</span>
+                                <span className="flex items-center">
+                                  {isGain ? (
+                                    <TrendingUp className="h-2.5 w-2.5" />
+                                  ) : (
+                                    <TrendingDown className="h-2.5 w-2.5" />
+                                  )}
+                                  {formatPercent(stock.changePercent)}
+                                </span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             )}
           </div>
         </section>
       )}
 
-      {/* Floating Toast when alert arrives */}
-      {toast && !open && (
-        <div
+      {/* Floating Active Alert Banner on Mobile / Desktop Screen */}
+      {activeAlert && (
+        <aside
           role="status"
-          className="fixed top-16 right-4 z-50 flex items-center gap-3 rounded-xl border border-[var(--border-default)] bg-[var(--bg-surface)] p-3 shadow-xl max-w-[calc(100vw-32px)]"
+          aria-live="polite"
+          className="fixed top-14 sm:top-16 inset-x-2 sm:inset-x-auto sm:right-6 sm:w-96 z-50 rounded-2xl border border-[var(--border-default)] bg-[var(--bg-surface)] p-3.5 shadow-2xl backdrop-blur-md animate-in slide-in-from-top-4 duration-300"
         >
+          <div className="flex items-start justify-between gap-2.5">
+            <div className="flex items-center gap-1.5">
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
+              </span>
+              <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--accent-text)]">
+                Breaking Market Alert
+              </span>
+              <span className="text-[10px] text-[var(--text-muted)]">· {activeAlert.source}</span>
+            </div>
+            <button
+              type="button"
+              className="text-[var(--text-muted)] hover:text-[var(--text-primary)] p-1 -mr-1 -mt-1 cursor-pointer"
+              onClick={() => setActiveAlert(null)}
+              aria-label="Dismiss alert"
+            >
+              <X size={15} />
+            </button>
+          </div>
+
           <button
             type="button"
-            className="text-xs font-medium text-left text-[var(--text-primary)]"
             onClick={() => {
-              setOpen(true);
-              setToast('');
+              setActiveAlert(null);
+              onOpenNews();
             }}
+            className="mt-1.5 text-left text-xs sm:text-sm font-semibold text-[var(--text-primary)] hover:text-[var(--accent-text)] line-clamp-2 transition cursor-pointer w-full block"
           >
-            {toast} · <span className="text-[var(--accent-text)] underline">View</span>
+            {activeAlert.headline}
           </button>
-          <button
-            type="button"
-            className="icon-button min-h-[32px] min-w-[32px] p-1"
-            aria-label="Dismiss alert toast"
-            onClick={() => setToast('')}
-          >
-            <X size={14} />
-          </button>
-        </div>
+
+          {/* Related Stock Changes Badges (Positive / Negative) */}
+          {activeAlert.relatedStocks.length > 0 && (
+            <div className="mt-2.5 flex flex-wrap items-center gap-1.5 pt-2 border-t border-[var(--border-subtle)]">
+              <span className="text-[10px] text-[var(--text-muted)] font-medium">Market Impact:</span>
+              {activeAlert.relatedStocks.map((stock) => {
+                const isGain = (stock.changePercent ?? 0) >= 0;
+                return (
+                  <button
+                    key={stock.symbol}
+                    type="button"
+                    onClick={() => {
+                      setActiveAlert(null);
+                      if (onSelectAsset) {
+                        onSelectAsset(stock);
+                      } else {
+                        onOpenNews();
+                      }
+                    }}
+                    className={`inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 font-mono text-[11px] font-bold transition cursor-pointer ${
+                      isGain
+                        ? 'bg-emerald-500/15 text-emerald-400 hover:bg-emerald-500/25 border border-emerald-500/30'
+                        : 'bg-rose-500/15 text-rose-400 hover:bg-rose-500/25 border border-rose-500/30'
+                    }`}
+                  >
+                    <span>{stock.symbol}</span>
+                    <span className="flex items-center gap-0.5">
+                      {isGain ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
+                      {formatPercent(stock.changePercent)}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </aside>
       )}
     </div>
   );
