@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { TrendingUp, TrendingDown, X, Play, Pause } from 'lucide-react';
 import type { Quote } from '../types/market';
-import { formatPercent, formatPrice, formatTime } from '../utils/format';
+import { formatPercent, formatPrice, formatTime, isIndexInstrument } from '../utils/format';
 
 const ASSET_ICONS: Record<string, string> = {
   NIFTY50: '🇮🇳',
@@ -61,11 +61,10 @@ export default function TickerTape({
       {/* Sleek Minimal Status Tag on Desktop, subtle pulse on mobile (NO duplicate sync button) */}
       <div className="flex shrink-0 items-center gap-1.5 border-r border-[var(--border-subtle)] bg-[var(--bg-subtle)] px-2.5 py-2 z-10">
         <span className="relative flex h-2 w-2">
-          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-          <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
+          <span className="relative inline-flex rounded-full h-2 w-2 bg-[var(--text-muted)]" />
         </span>
         <span className="font-mono text-[10px] font-bold tracking-widest text-[var(--text-secondary)] uppercase hidden sm:inline">
-          Live Markets
+          Benchmarks
         </span>
       </div>
 
@@ -81,7 +80,7 @@ export default function TickerTape({
         >
           {loading && quotes.length === 0 ? (
             <span className="text-xs text-[var(--text-muted)] px-3">
-              Syncing live benchmark stream…
+              Loading benchmark quotes…
             </span>
           ) : (
             tickerItems.map((quote, idx) => {
@@ -95,7 +94,7 @@ export default function TickerTape({
                   type="button"
                   onClick={() => onSelect(quote)}
                   className="group flex shrink-0 items-center gap-1.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-2.5 py-1 text-xs transition hover:border-[var(--accent-primary)] hover:bg-[var(--bg-surface-hover)] cursor-pointer"
-                  title={`${quote.name} · ${quote.category.toUpperCase()} · As of ${formatTime(quote.asOf)}`}
+                  title={`${quote.name} · ${quote.status} · ${quote.provider} · As of ${formatTime(quote.asOf)}`}
                 >
                   <span className="text-xs shrink-0">{icon}</span>
                   <span className="font-bold text-[var(--text-primary)] group-hover:text-[var(--accent-text)] transition-colors">
@@ -103,7 +102,7 @@ export default function TickerTape({
                   </span>
 
                   <span className="font-mono font-semibold tabular-nums text-[var(--text-primary)] ml-0.5">
-                    {formatPrice(quote.price, quote.currency)}
+                    {formatPrice(quote.price, quote.currency, isIndexInstrument(quote.symbol, quote.sector, quote.currency))}
                   </span>
 
                   <span

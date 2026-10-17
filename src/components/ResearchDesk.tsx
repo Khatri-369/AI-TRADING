@@ -84,6 +84,9 @@ export default function ResearchDesk({
     ASSET_BY_SYMBOL.has(initialSymbol) ? initialSymbol : 'RELIANCE'
   );
   const [tab, setTab] = useState('Chart');
+  useEffect(() => {
+    try { localStorage.setItem('last_chart_symbol', symbol); } catch { /* Chart stays usable without persistent storage. */ }
+  }, [symbol]);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [plan, setPlan] = useState(initialPlan);

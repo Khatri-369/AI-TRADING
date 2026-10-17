@@ -25,6 +25,15 @@ const ResearchChat = lazy(() => import('./components/ResearchChat'));
 const WatchlistPage = lazy(() => import('./components/WatchlistPage'));
 const ResearchDesk = lazy(() => import('./components/ResearchDesk'));
 
+function resumeChartSymbol() {
+  const explicit = new URLSearchParams(window.location.search).get('symbol');
+  if (explicit && ASSET_BY_SYMBOL.has(explicit)) return explicit;
+  try {
+    const saved = localStorage.getItem('last_chart_symbol');
+    return saved && ASSET_BY_SYMBOL.has(saved) ? saved : 'RELIANCE';
+  } catch { return 'RELIANCE'; }
+}
+
 class ErrorBoundary extends Component<{ children: ReactNode }, { failed: boolean }> {
   state = { failed: false };
   static getDerivedStateFromError() {
@@ -238,7 +247,7 @@ function MainApp() {
 
         {/* Global Movable Benchmark Ticker Tape */}
         {showTicker && (
-          <TickerTape
+          <div className="hidden md:block"><TickerTape
             quotes={market.quotes.filter((q) =>
               ['SPY', 'NIFTY50', 'SENSEX', 'BTC', 'ETH', 'XAU', 'XAG', 'USD/INR', 'SOL', 'QQQ'].includes(q.symbol)
             )}
@@ -248,7 +257,7 @@ function MainApp() {
               setShowTicker(false);
               localStorage.setItem('hide_ticker_tape', 'true');
             }}
-          />
+          /></div>
         )}
 
         {/* Main Content Area */}
@@ -297,7 +306,7 @@ function MainApp() {
           )}
 
           {/* PAGE ROUTING */}
-          {route.page === 'desk' && <Suspense fallback={<Loading label="Loading research desk…" />}><ResearchDesk quotes={market.quotes} onNotifications={() => setDesktopOpen(true)} onAsk={focus => { setChatFocus(focus); setChatSymbol(focus.symbol); setChatOpen(true); }} theme={theme} initialSymbol={new URLSearchParams(window.location.search).get('symbol') ?? 'RELIANCE'} /></Suspense>}
+          {route.page === 'desk' && <Suspense fallback={<Loading label="Loading research desk…" />}><ResearchDesk quotes={market.quotes} onNotifications={() => setDesktopOpen(true)} onAsk={focus => { setChatFocus(focus); setChatSymbol(focus.symbol); setChatOpen(true); }} theme={theme} initialSymbol={resumeChartSymbol()} /></Suspense>}
           {route.page === 'watchlist' && <Suspense fallback={<Loading label="Loading watchlist…" />}><WatchlistPage quotes={market.quotes} loading={market.loading} onSelect={handleSelectAsset} /></Suspense>}
           {route.page === 'overview' && (
             <div role="tabpanel" id="panel-overview" aria-labelledby="tab-overview">
