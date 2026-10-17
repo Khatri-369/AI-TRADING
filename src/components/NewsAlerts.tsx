@@ -5,8 +5,19 @@ import type { NewsArticle, Quote } from '../types/market';
 import { useWatchlist } from '../hooks/useWatchlist';
 import { formatPercent, formatPrice } from '../utils/format';
 
-const STORAGE_INBOX = 'markets.alerts.inbox.v1';
-const STORAGE_SETTINGS = 'markets.alerts.settings.v1';
+import {
+  STORAGE_ALERT_SETTINGS,
+  STORAGE_ALERT_INBOX,
+  AlertSettings,
+  defaultAlertSettings,
+  getStoredAlertSettings,
+  saveStoredAlertSettings,
+  sendSystemNotification,
+  MarketAlertTriggerPayload,
+} from '../utils/notifications';
+
+const STORAGE_INBOX = STORAGE_ALERT_INBOX;
+const STORAGE_SETTINGS = STORAGE_ALERT_SETTINGS;
 
 const noticeSchema = z.object({
   id: z.string(),
@@ -19,20 +30,6 @@ const noticeSchema = z.object({
 const noticesSchema = z.array(noticeSchema);
 
 type Notice = z.infer<typeof noticeSchema>;
-
-interface AlertSettings {
-  enabled: boolean;
-  scope: 'watchlist' | 'all';
-  quiet: boolean;
-  device: boolean;
-}
-
-const defaultSettings: AlertSettings = {
-  enabled: true,
-  scope: 'all',
-  quiet: false,
-  device: false,
-};
 
 interface ActiveAlert {
   id: string;
@@ -57,68 +54,6 @@ function getRelatedQuotes(assetSymbols: string[] | undefined, quotes: Quote[] = 
     .filter((q): q is Quote => Boolean(q));
 }
 
-async function sendSystemNotification(
-  headline: string,
-  source: string,
-  relatedStocks: Quote[],
-  id: string
-) {
-  if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
-
-  const stockSummary =
-    relatedStocks.length > 0
-      ? relatedStocks
-          .map(
-            (s) =>
-              `${s.symbol} ${(s.changePercent ?? 0) >= 0 ? '+' : ''}${
-                s.changePercent !== null ? s.changePercent.toFixed(2) : '0.00'
-              }%`
-          )
-          .join(', ')
-      : '';
-
-  const title = stockSummary ? `Tradexa · ${stockSummary}` : `Tradexa · ${source || 'Market News'}`;
-
-  const stockDetails = relatedStocks
-    .map(
-      (s) =>
-        `${(s.changePercent ?? 0) >= 0 ? '🟢' : '🔴'} ${s.symbol}: ${formatPrice(s.price, s.currency)} (${
-          (s.changePercent ?? 0) >= 0 ? '+' : ''
-        }${s.changePercent !== null ? s.changePercent.toFixed(2) : '0.00'}%)`
-    )
-    .join('\n');
-
-  const body = stockDetails ? `${headline}\n\n${stockDetails}` : headline;
-
-  const options: NotificationOptions = {
-    body,
-    icon: '/icons/tradexa-192.png',
-    badge: '/icons/tradexa-192.png',
-    tag: `tradexa-news-${id}`,
-    data: { url: '/news' },
-  };
-
-  // 1. Try ServiceWorkerRegistration.showNotification first (Required for mobile Android Chrome)
-  try {
-    if ('serviceWorker' in navigator) {
-      const reg = await navigator.serviceWorker.ready;
-      if (reg && reg.showNotification) {
-        await reg.showNotification(title, options);
-        return;
-      }
-    }
-  } catch {
-    // Continue to constructor fallback
-  }
-
-  // 2. Fallback to desktop Notification constructor
-  try {
-    new Notification(title, options);
-  } catch {
-    // Silently suppress constructor restrictions on mobile
-  }
-}
-
 export default function NewsAlerts({
   newsArticles,
   quotes = [],
@@ -133,15 +68,7 @@ export default function NewsAlerts({
   const [busy, setBusy] = useState(false);
 
   // Settings
-  const [settings, setSettings] = useState<AlertSettings>(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_SETTINGS);
-      if (saved) return { ...defaultSettings, ...JSON.parse(saved) };
-    } catch {
-      // Ignore
-    }
-    return defaultSettings;
-  });
+  const [settings, setSettings] = useState<AlertSettings>(getStoredAlertSettings);
 
   // Persistent inbox
   const [notices, setNotices] = useState<Notice[]>(() => {
@@ -166,12 +93,76 @@ export default function NewsAlerts({
 
   const saveSettings = (next: AlertSettings) => {
     setSettings(next);
-    try {
-      localStorage.setItem(STORAGE_SETTINGS, JSON.stringify(next));
-    } catch {
-      setMessage('Settings could not be saved to browser storage.');
-    }
+    saveStoredAlertSettings(next);
   };
+
+  // Sync with global settings updates and handle test notification triggers
+  useEffect(() => {
+    const handleSettingsChanged = (e: Event) => {
+      const custom = e as CustomEvent<AlertSettings>;
+      if (custom.detail) {
+        setSettings(custom.detail);
+      }
+    };
+
+    const handleTriggerTest = (e: Event) => {
+      const custom = e as CustomEvent<MarketAlertTriggerPayload>;
+      const payload = custom.detail || {};
+      const fallbackArticle = newsArticles[0] ?? {
+        id: `test-news-${Date.now()}`,
+        headline: 'Market Update: Sector leaders show volume momentum and price action',
+        summary: 'Intraday updates on leading equities.',
+        source: 'Tradexa News Wire',
+        url: '/news',
+        publishedAt: new Date().toISOString(),
+        relatedAssets: ['RELIANCE', 'TCS', 'HDFCBANK'],
+      };
+
+      const headline = payload.headline || fallbackArticle.headline;
+      const source = payload.source || fallbackArticle.source || 'Tradexa Wire';
+      const time = payload.time || fallbackArticle.publishedAt || new Date().toISOString();
+      const id = payload.id || fallbackArticle.id || `test-${Date.now()}`;
+      const relatedStocks = payload.relatedStocks?.length
+        ? payload.relatedStocks
+        : getRelatedQuotes(fallbackArticle.relatedAssets, quotes);
+
+      const resolvedStocks = relatedStocks.length ? relatedStocks : quotes.slice(0, 3);
+
+      setActiveAlert({
+        id,
+        headline,
+        source,
+        time,
+        relatedStocks: resolvedStocks,
+      });
+
+      // Add to inbox
+      setNotices((prev) => {
+        const nextNotice: Notice = {
+          id,
+          headline,
+          time,
+          read: false,
+          source,
+          relatedAssets: resolvedStocks.map((s) => s.symbol),
+        };
+        const updated = [nextNotice, ...prev.filter((n) => n.id !== id)].slice(0, 20);
+        try {
+          localStorage.setItem(STORAGE_INBOX, JSON.stringify(updated));
+        } catch {
+          // Ignore
+        }
+        return updated;
+      });
+    };
+
+    window.addEventListener('market-alert-settings-changed', handleSettingsChanged);
+    window.addEventListener('market-alert-trigger-test', handleTriggerTest);
+    return () => {
+      window.removeEventListener('market-alert-settings-changed', handleSettingsChanged);
+      window.removeEventListener('market-alert-trigger-test', handleTriggerTest);
+    };
+  }, [newsArticles, quotes]);
 
   const saveNotices = (next: Notice[]) => {
     const bounded = next.slice(0, 20);

@@ -282,6 +282,8 @@ function MainApp() {
           {/* Provider Settings / Diagnostics Panel (when drawer opened or route is /diagnostics) */}
           {(settingsOpen || route.page === 'diagnostics') && (
             <SettingsPanel
+              quotes={market.quotes}
+              newsArticles={news.data?.articles}
               onClose={() => {
                 setSettingsOpen(false);
                 if (route.page === 'diagnostics') navigate('/');

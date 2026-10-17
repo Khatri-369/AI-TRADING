@@ -119,7 +119,7 @@ export default function MobileBottomNav({ currentTab, onNavigate, onOpenDisclosu
                 }`}
               >
                 <Settings className="h-4 w-4 text-[var(--accent-primary)]" />
-                <span>Diagnostics & APIs</span>
+                <span>Settings & Diagnostics</span>
               </button>
 
               {onOpenDisclosures && (
