@@ -1,7 +1,8 @@
 import { ArrowUpRight } from 'lucide-react';
 import type { Quote } from '../types/market';
-import { changeClass, formatPercent, formatPrice, formatTime } from '../utils/format';
+import { changeClass, formatPercent, formatPrice, isIndexInstrument } from '../utils/format';
 import StatusBadge from './StatusBadge';
+import WatchlistToggle from './WatchlistToggle';
 
 export default function QuoteCard({
   quote,
@@ -11,17 +12,18 @@ export default function QuoteCard({
   onSelect: (quote: Quote) => void;
 }) {
   const isOpen = quote.session.state === 'OPEN';
+  const isIndex = isIndexInstrument(quote.symbol, quote.sector, quote.currency);
 
   return (
     <article
-      className="relative flex min-w-0 flex-col rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] hover:border-[var(--border-strong)] p-4 transition-colors duration-150"
+      className="relative flex min-w-0 flex-col rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] hover:border-[var(--border-strong)] p-4 transition-colors duration-150"
     >
       <div className="flex items-center justify-between gap-2">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 min-w-0">
           <button
             type="button"
             onClick={() => onSelect(quote)}
-            className="text-left font-bold tracking-tight text-[var(--text-primary)] hover:text-[var(--accent-text)] transition"
+            className="text-left font-bold tracking-tight text-[var(--text-primary)] hover:text-[var(--accent-text)] transition truncate cursor-pointer"
           >
             {quote.symbol}
           </button>
@@ -31,16 +33,19 @@ export default function QuoteCard({
             </span>
           )}
         </div>
-        <span
-          className={`inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${
-            isOpen
-              ? 'border border-[var(--gain-border)] bg-[var(--gain-bg)] text-[var(--gain-text)]'
-              : 'border border-[var(--border-subtle)] bg-[var(--bg-subtle)] text-[var(--text-muted)]'
-          }`}
-        >
-          {isOpen && <span className="h-1.5 w-1.5 rounded-full bg-[var(--gain-text)]" />}
-          {quote.session.state}
-        </span>
+        <div className="flex items-center gap-1.5 shrink-0">
+          <WatchlistToggle symbol={quote.symbol} compact />
+          <span
+            className={`inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${
+              isOpen
+                ? 'border border-[var(--gain-border)] bg-[var(--gain-bg)] text-[var(--gain-text)]'
+                : 'border border-[var(--border-subtle)] bg-[var(--bg-subtle)] text-[var(--text-muted)]'
+            }`}
+          >
+            {isOpen && <span className="h-1.5 w-1.5 rounded-full bg-[var(--gain-text)]" />}
+            {quote.session.state}
+          </span>
+        </div>
       </div>
 
       <h3 className="mt-1 truncate text-xs text-[var(--text-secondary)]" title={quote.name}>
@@ -53,7 +58,7 @@ export default function QuoteCard({
             quote.price === null ? 'text-[var(--text-muted)]' : 'text-[var(--text-primary)]'
           }`}
         >
-          {formatPrice(quote.price, quote.currency)}
+          {formatPrice(quote.price, quote.currency, isIndex)}
         </p>
         <p className={`mt-0.5 font-mono text-xs tabular-nums ${changeClass(quote.changePercent)}`}>
           {formatPercent(quote.changePercent)}

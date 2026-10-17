@@ -10,16 +10,14 @@ import {
   Moon,
   Menu,
   X,
-  ShieldCheck,
-  Loader2,
   RefreshCw,
   Info,
   Download,
   Star,
 } from 'lucide-react';
-import type { Tab, ThemeType } from '../types/market';
-import { THEMES } from '../utils/themes';
+import type { NewsArticle, Quote, Tab, ThemeType } from '../types/market';
 import { usePwaInstall } from '../hooks/usePwaInstall';
+import NewsAlerts from './NewsAlerts';
 
 interface Props {
   theme: ThemeType;
@@ -36,6 +34,9 @@ interface Props {
   onRefresh?: () => void;
   onOpenDisclosures?: () => void;
   onDesktop: () => void;
+  newsArticles?: NewsArticle[];
+  quotes?: Quote[];
+  onSelectAsset?: (quote: Quote) => void;
 }
 
 export const navItems = [
@@ -63,6 +64,9 @@ export default function Header({
   onRefresh,
   onOpenDisclosures,
   onDesktop,
+  newsArticles = [],
+  quotes = [],
+  onSelectAsset,
 }: Props) {
   const [now, setNow] = useState(() => new Date());
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -99,7 +103,7 @@ export default function Header({
       </a>
 
       {/* Main Top Bar */}
-      <div className="mx-auto flex max-w-[1440px] items-center justify-between gap-3 px-3 py-2.5 sm:px-6 lg:px-8">
+      <div className="mx-auto flex max-w-[1440px] items-center justify-between gap-3 px-3 py-2 sm:px-6 lg:px-8">
         {/* Brand / Title */}
         <div className="flex items-center gap-3">
           <button
@@ -107,10 +111,10 @@ export default function Header({
               onNavigate('overview');
               setMobileMenuOpen(false);
             }}
-            className="flex items-center gap-2.5 text-left transition hover:opacity-90"
+            className="flex items-center gap-2.5 text-left transition hover:opacity-90 min-h-[44px]"
             aria-label="Tradexa Global Markets Research"
           >
-            <div className="relative flex h-8 w-8 items-center justify-center rounded-xl bg-gradient-to-br from-cyan-500 to-blue-600 shadow-md shadow-cyan-500/20 text-white font-bold text-sm">
+            <div className="relative flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--accent-primary)] text-white font-bold text-sm shadow-sm">
               T
               <span className="absolute -bottom-0.5 -right-0.5 h-2 w-2 rounded-full bg-emerald-400 ring-2 ring-[var(--bg-surface)]" />
             </div>
@@ -119,7 +123,7 @@ export default function Header({
                 Tradexa
               </span>
               <span className="hidden sm:block text-[10px] text-[var(--text-muted)] font-medium -mt-0.5">
-                AI Trading & Market Intelligence
+                Market Research & Intelligence
               </span>
             </div>
           </button>
@@ -134,23 +138,23 @@ export default function Header({
               onChange={(e) => onSearch(e.target.value)}
               type="search"
               role="searchbox"
-              placeholder="Search 42 instruments (NIFTY, BTC, AAPL, Gold)..."
+              placeholder="Search instruments (NIFTY, RELIANCE, TCS, BTC)..."
               className="field h-9 pl-9 pr-3 text-xs w-full rounded-xl bg-[var(--bg-subtle)] border-[var(--border-subtle)] focus:border-[var(--accent-primary)] transition"
             />
           </div>
         </div>
 
         {/* Right Action Controls */}
-        <div className="flex items-center gap-1.5 sm:gap-2">
+        <div className="flex items-center gap-1 sm:gap-1.5">
           {/* Collapsible Market Clocks Dropdown */}
           <div className="relative hidden md:block">
             <button
               type="button"
               onClick={() => setClocksOpen((v) => !v)}
-              className="flex items-center gap-1.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-subtle)] px-2.5 py-1.5 text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[var(--border-default)] transition"
+              className="flex items-center gap-1.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-subtle)] px-2.5 py-1.5 text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[var(--border-default)] transition min-h-[44px]"
               title="View global market trading hours"
             >
-              <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
               <span className="font-mono text-[11px] font-medium">
                 {now.toLocaleTimeString('en-US', {
                   timeZone: 'Asia/Kolkata',
@@ -196,12 +200,12 @@ export default function Header({
           <button
             type="button"
             onClick={onRefresh}
-            className="flex items-center gap-1.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-subtle)] px-2.5 py-1.5 text-xs text-[var(--text-secondary)] hover:border-[var(--accent-border)] hover:text-[var(--text-primary)] transition"
+            className="flex items-center gap-1.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-subtle)] px-2.5 py-1.5 text-xs text-[var(--text-secondary)] hover:border-[var(--accent-border)] hover:text-[var(--text-primary)] transition min-h-[44px]"
             title={`Telemetry auto-syncs every minute (${secondsUntilRefresh}s left). Click to refresh.`}
           >
             <span
               className={`h-2 w-2 rounded-full ${
-                connected ? 'bg-emerald-500 animate-pulse' : 'bg-[var(--accent-primary)]'
+                connected ? 'bg-emerald-500' : 'bg-[var(--accent-primary)]'
               }`}
             />
             <span className="font-mono text-[11px] font-medium hidden xs:inline">
@@ -210,10 +214,19 @@ export default function Header({
             <RefreshCw className={`h-3 w-3 text-[var(--text-muted)] ${loading ? 'animate-spin' : ''}`} />
           </button>
 
+          {/* Foreground News Alerts Inbox Bell */}
+          <NewsAlerts
+            newsArticles={newsArticles}
+            quotes={quotes}
+            onSelectAsset={onSelectAsset}
+            onOpenNews={() => onNavigate('news')}
+            onOpenBackgroundSetup={onDesktop}
+          />
+
           {/* Theme Switcher Toggle */}
           <button
             type="button"
-            className="icon-button h-8 w-8 sm:h-9 sm:w-9 rounded-lg"
+            className="icon-button min-h-[44px] min-w-[44px] rounded-lg"
             onClick={toggleTheme}
             aria-label={`Switch to ${theme === 'dark' ? 'Light' : 'Dark'} mode`}
             title={`Switch to ${theme === 'dark' ? 'Light' : 'Dark'} mode`}
@@ -224,7 +237,7 @@ export default function Header({
           {/* Desktop App & News Alerts */}
           <button
             type="button"
-            className="icon-button h-8 w-8 sm:h-9 sm:w-9 rounded-lg"
+            className="icon-button min-h-[44px] min-w-[44px] rounded-lg"
             onClick={onDesktop}
             aria-label="Desktop app and news alerts"
             title="Desktop app and news alerts"
@@ -236,7 +249,7 @@ export default function Header({
           {onOpenDisclosures && (
             <button
               type="button"
-              className="icon-button h-8 w-8 sm:h-9 sm:w-9 rounded-lg"
+              className="icon-button min-h-[44px] min-w-[44px] rounded-lg"
               onClick={onOpenDisclosures}
               aria-label="Data sources and legal disclosures"
               title="Data sources and legal disclosures"
@@ -248,7 +261,7 @@ export default function Header({
           {/* Settings / Diagnostics Button */}
           <button
             type="button"
-            className={`icon-button h-8 w-8 sm:h-9 sm:w-9 rounded-lg ${
+            className={`icon-button min-h-[44px] min-w-[44px] rounded-lg ${
               settingsOpen || tab === 'diagnostics'
                 ? 'border-[var(--accent-primary)] text-[var(--accent-primary)]'
                 : ''
@@ -263,7 +276,7 @@ export default function Header({
           {/* Mobile menu toggle */}
           <button
             type="button"
-            className="icon-button h-8 w-8 sm:h-9 sm:w-9 rounded-lg md:hidden"
+            className="icon-button min-h-[44px] min-w-[44px] rounded-lg md:hidden"
             onClick={() => setMobileMenuOpen((v) => !v)}
             aria-label={mobileMenuOpen ? 'Close navigation menu' : 'Open navigation menu'}
           >
