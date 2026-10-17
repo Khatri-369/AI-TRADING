@@ -339,8 +339,15 @@ export default function ResearchDesk({
           key={symbol}
           symbol={symbol}
           theme={theme}
-          onPlan={() => {
-            setPlan(initialPlan);
+          onPlan={(levels) => {
+            const currentQuote = quotes.find((q) => q.symbol === symbol);
+            setPlan({
+              ...initialPlan,
+              direction: levels?.direction ?? 'long',
+              entry: levels?.entry ? String(levels.entry) : currentQuote?.price ? String(currentQuote.price) : '',
+              stop: levels?.stop ? String(levels.stop) : '',
+              target: levels?.target ? String(levels.target) : '',
+            });
             setEditing(null);
             setTab('Plan');
           }}
@@ -877,6 +884,20 @@ export default function ResearchDesk({
                       >
                         Review in journal
                       </button>
+                      {p.stop && (
+                        <button
+                          type="button"
+                          className="button-secondary text-xs"
+                          onClick={() => {
+                            setSymbol(p.symbol);
+                            setLevel(String(p.stop));
+                            setDirection(p.direction === 'long' ? 'below' : 'above');
+                            setTab('Alerts');
+                          }}
+                        >
+                          Alert on Stop ({p.stop})
+                        </button>
+                      )}
                       <select
                         aria-label="Change plan status"
                         className="field text-xs py-1"

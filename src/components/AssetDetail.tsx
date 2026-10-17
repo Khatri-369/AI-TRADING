@@ -11,11 +11,12 @@ import {
 import { Bot, Sparkles, X, Table, LineChart as ChartIcon, CandlestickChart } from 'lucide-react';
 import type { AnalysisEntry, Engine, HistoryRange, Quote, ThemeType } from '../types/market';
 import { errorMessage, getHistory } from '../services/api';
-import { changeClass, formatPercent, formatPrice, formatTime } from '../utils/format';
+import { changeClass, formatPercent, formatPrice, formatTime, isIndexInstrument } from '../utils/format';
 import { Empty, ErrorNotice, Loading } from './Feedback';
 import AnalysisResult from './AnalysisResult';
 import StatusBadge from './StatusBadge';
 import CandleWorkspace from './CandleWorkspace';
+import WatchlistToggle from './WatchlistToggle';
 
 interface Props {
   quote: Quote;
@@ -117,15 +118,18 @@ export default function AssetDetail({
         {/* Header Bar */}
         <div className="flex items-start justify-between gap-4 border-b border-[var(--border-subtle)] pb-4">
           <div>
-            <div className="flex flex-wrap items-center gap-2">
-              <button className="button-secondary mb-2" onClick={onAsk}><Bot size={16} />Ask about {quote.symbol}</button>
-              <button className="button-secondary mb-2" onClick={onWorkspace}><ChartIcon size={16} />Open chart workspace</button>
+            <div className="flex flex-wrap items-center gap-2 mb-2">
+              <button className="button-secondary min-h-[44px]" onClick={onAsk}><Bot size={16} />Ask about {quote.symbol}</button>
+              <button className="button-secondary min-h-[44px]" onClick={onWorkspace}><ChartIcon size={16} />Open chart workspace</button>
+            </div>
+            <div className="flex items-center gap-2.5">
               <h2 id="asset-detail-title" className="text-xl sm:text-2xl font-bold tracking-tight text-[var(--text-primary)]">
                 {quote.symbol}
               </h2>
               <span className="text-sm font-medium text-[var(--text-secondary)]">
                 {quote.name}
               </span>
+              <WatchlistToggle symbol={quote.symbol} compact />
             </div>
             <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-[var(--text-muted)]">
               <span className="capitalize">{quote.category} market</span>
@@ -141,7 +145,7 @@ export default function AssetDetail({
           </div>
           <button
             autoFocus
-            className="icon-button"
+            className="icon-button min-h-[44px] min-w-[44px]"
             aria-label="Close"
             onClick={onClose}
           >
@@ -156,7 +160,7 @@ export default function AssetDetail({
               Current Observation
             </span>
             <p className="mt-1 font-mono text-3xl font-bold tabular-nums text-[var(--text-primary)]">
-              {formatPrice(quote.price, quote.currency)}
+              {formatPrice(quote.price, quote.currency, isIndexInstrument(quote.symbol, quote.sector, quote.currency))}
             </p>
             <p className={`mt-0.5 font-mono text-sm tabular-nums ${changeClass(quote.changePercent)}`}>
               {formatPercent(quote.changePercent)}

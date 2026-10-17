@@ -117,7 +117,7 @@ export default function ResearchChat({
         aria-expanded={open}
         aria-controls="market-chat"
         onClick={() => onOpenChange(true)}
-        className={`fixed bottom-20 md:bottom-6 right-4 sm:right-6 z-40 h-12 w-12 sm:h-13 sm:w-13 items-center justify-center rounded-full bg-gradient-to-tr from-cyan-600 to-blue-600 text-white shadow-xl shadow-cyan-500/25 hover:scale-105 active:scale-95 transition cursor-pointer ${
+        className={`fixed bottom-20 md:bottom-6 right-4 sm:right-6 z-40 h-12 w-12 sm:h-13 sm:w-13 items-center justify-center rounded-full bg-[var(--accent-primary)] hover:bg-[var(--accent-hover)] text-white shadow-lg transition cursor-pointer min-h-[44px] min-w-[44px] ${
           open ? 'hidden' : 'flex'
         }`}
         title="Ask AI Market Assistant"
@@ -434,7 +434,7 @@ export default function ResearchChat({
                   aria-label="Send message"
                   title="Send message"
                   disabled={draft.trim().length < 3}
-                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-tr from-cyan-600 to-blue-600 text-white shadow-md hover:brightness-110 active:scale-95 disabled:opacity-35 disabled:cursor-not-allowed transition cursor-pointer p-0"
+                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[var(--accent-primary)] hover:bg-[var(--accent-hover)] text-white shadow-sm active:scale-95 disabled:opacity-35 disabled:cursor-not-allowed transition cursor-pointer p-0"
                 >
                   <Send className="h-4 w-4" />
                 </button>

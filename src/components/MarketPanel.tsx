@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { BarChart3, LayoutGrid, List, Loader2 } from 'lucide-react';
 import type { Quote } from '../types/market';
-import { changeClass, formatPercent, formatPrice, formatTime } from '../utils/format';
+import { changeClass, formatPercent, formatPrice, formatTime, isIndexInstrument } from '../utils/format';
 import StatusBadge from './StatusBadge';
 import QuoteCard from './QuoteCard';
 import { Empty, Loading } from './Feedback';
@@ -210,7 +210,7 @@ export default function MarketPanel({
                 </div>
                 <div className="text-right shrink-0">
                   <p className="font-mono text-sm font-bold tabular-nums text-[var(--text-primary)]">
-                    {formatPrice(quote.price, quote.currency)}
+                    {formatPrice(quote.price, quote.currency, isIndexInstrument(quote.symbol, quote.sector, quote.currency))}
                   </p>
                   <span
                     className={`mt-1 inline-flex items-center justify-end rounded px-2 py-0.5 font-mono text-xs font-semibold tabular-nums ${
@@ -268,7 +268,7 @@ export default function MarketPanel({
                     )}
                   </th>
                   <td className="whitespace-nowrap px-3.5 py-3 font-mono font-semibold tabular-nums text-[var(--text-primary)]">
-                    {formatPrice(quote.price, quote.currency)}
+                    {formatPrice(quote.price, quote.currency, isIndexInstrument(quote.symbol, quote.sector, quote.currency))}
                   </td>
                   <td className={`whitespace-nowrap px-3.5 py-3 font-mono tabular-nums ${changeClass(quote.changePercent)}`}>
                     <span>

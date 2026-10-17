@@ -1,0 +1,170 @@
+import { useState, useEffect, useCallback } from 'react';
+import type { Quote } from '../types/market';
+import {
+  AlertSettings,
+  getNotificationPermission,
+  getStoredAlertSettings,
+  NotificationPermissionState,
+  requestNotificationPermission,
+  saveStoredAlertSettings,
+  sendSystemNotification,
+  triggerMarketAlertTest,
+} from '../utils/notifications';
+
+export function useNewsAlertSettings() {
+  const [settings, setSettings] = useState<AlertSettings>(getStoredAlertSettings);
+  const [permission, setPermission] = useState<NotificationPermissionState>(getNotificationPermission);
+  const [requesting, setRequesting] = useState(false);
+  const [feedbackMessage, setFeedbackMessage] = useState<string | null>(null);
+
+  // Sync settings when modified elsewhere (cross-component or cross-tab)
+  useEffect(() => {
+    const handleCustomChange = (e: Event) => {
+      const custom = e as CustomEvent<AlertSettings>;
+      if (custom.detail) {
+        setSettings(custom.detail);
+      }
+    };
+    const handleStorage = (e: StorageEvent) => {
+      if (e.key === 'markets.alerts.settings.v1') {
+        setSettings(getStoredAlertSettings());
+      }
+    };
+    window.addEventListener('market-alert-settings-changed', handleCustomChange);
+    window.addEventListener('storage', handleStorage);
+    return () => {
+      window.removeEventListener('market-alert-settings-changed', handleCustomChange);
+      window.removeEventListener('storage', handleStorage);
+    };
+  }, []);
+
+  // Update permission status on mount
+  useEffect(() => {
+    setPermission(getNotificationPermission());
+  }, []);
+
+  // Clear feedback message after 5 seconds
+  useEffect(() => {
+    if (!feedbackMessage) return;
+    const t = setTimeout(() => setFeedbackMessage(null), 5000);
+    return () => clearTimeout(t);
+  }, [feedbackMessage]);
+
+  const updateSettings = useCallback((partial: Partial<AlertSettings>) => {
+    setSettings((prev) => {
+      const next = { ...prev, ...partial };
+      saveStoredAlertSettings(next);
+      return next;
+    });
+  }, []);
+
+  const toggleEnabled = useCallback(() => {
+    setSettings((prev) => {
+      const next = { ...prev, enabled: !prev.enabled };
+      saveStoredAlertSettings(next);
+      setFeedbackMessage(
+        next.enabled
+          ? 'News notifications enabled! Breaking market alerts will appear.'
+          : 'News notifications disabled. Alerts are currently muted.'
+      );
+      return next;
+    });
+  }, []);
+
+  const setEnabled = useCallback(
+    (enabled: boolean) => {
+      updateSettings({ enabled });
+      setFeedbackMessage(
+        enabled
+          ? 'News notifications enabled! Breaking market alerts will appear.'
+          : 'News notifications disabled. Alerts are currently muted.'
+      );
+    },
+    [updateSettings]
+  );
+
+  const toggleDeviceNotifications = useCallback(async () => {
+    if (settings.device) {
+      updateSettings({ device: false });
+      setFeedbackMessage('Device notifications disabled. In-app alerts remain active.');
+      return;
+    }
+
+    setRequesting(true);
+    const granted = await requestNotificationPermission();
+    setPermission(getNotificationPermission());
+    setRequesting(false);
+
+    if (granted) {
+      updateSettings({ enabled: true, device: true });
+      setFeedbackMessage('Device & push notifications enabled successfully!');
+      // Send a confirmation system notification
+      void sendSystemNotification(
+        'Tradexa Notifications Active',
+        'Tradexa Market Intelligence',
+        [],
+        `welcome-${Date.now()}`
+      );
+    } else {
+      updateSettings({ device: false });
+      setFeedbackMessage(
+        'Notification permission was not granted by your browser. Please allow notifications in site settings.'
+      );
+    }
+  }, [settings.device, updateSettings]);
+
+  const setScope = useCallback(
+    (scope: 'all' | 'watchlist') => {
+      updateSettings({ scope });
+    },
+    [updateSettings]
+  );
+
+  const setQuiet = useCallback(
+    (quiet: boolean) => {
+      updateSettings({ quiet });
+    },
+    [updateSettings]
+  );
+
+  const sendTestAlert = useCallback(
+    (quotes: Quote[] = []) => {
+      const testArticle = {
+        id: `test-news-${Date.now()}`,
+        headline: 'Market Update: Sector leaders show volume momentum and price action',
+        source: 'Tradexa News Wire',
+        time: new Date().toISOString(),
+        relatedStocks: quotes.slice(0, 3),
+      };
+
+      triggerMarketAlertTest(testArticle);
+
+      if (settings.device && permission === 'granted') {
+        void sendSystemNotification(
+          testArticle.headline,
+          testArticle.source,
+          testArticle.relatedStocks,
+          testArticle.id
+        );
+      }
+
+      setFeedbackMessage('Test alert dispatched! Check your screen and notification center.');
+    },
+    [settings.device, permission]
+  );
+
+  return {
+    settings,
+    permission,
+    requesting,
+    feedbackMessage,
+    setFeedbackMessage,
+    toggleEnabled,
+    setEnabled,
+    toggleDeviceNotifications,
+    setScope,
+    setQuiet,
+    sendTestAlert,
+    updateSettings,
+  };
+}
