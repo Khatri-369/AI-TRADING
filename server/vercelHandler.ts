@@ -12,7 +12,6 @@ function getApp(): Express {
     try {
       const config = readConfig({
         ...process.env,
-        SESSION_SECRET: process.env.SESSION_SECRET || 'vercel-serverless-fallback-session-secret-key-32chars',
         NODE_ENV: 'production',
         HOST: '0.0.0.0',
         PORT: '3000',
@@ -20,7 +19,6 @@ function getApp(): Express {
       appInstance = createApp(config, true);
     } catch (err) {
       initError = err instanceof Error ? err : new Error(String(err));
-      console.error('Failed to initialize serverless application:', initError);
       throw initError;
     }
   }
@@ -51,15 +49,14 @@ export default function handler(req: IncomingMessage, res: ServerResponse) {
 
     const app = getApp();
     return app(req, res);
-  } catch (err) {
-    console.error('Serverless request handling error:', err);
+  } catch {
     if (!res.headersSent) {
       res.statusCode = 500;
       res.setHeader('Content-Type', 'application/json');
       res.end(
         JSON.stringify({
           error: 'Serverless initialization failed',
-          message: err instanceof Error ? err.message : 'Check the backend environment configuration, including SESSION_SECRET.',
+          message: 'Check the backend environment configuration, including SESSION_SECRET.',
         })
       );
     }

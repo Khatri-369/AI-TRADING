@@ -7,6 +7,7 @@ import { CryptoStreamClient } from './cryptoStream';
 import { marketSession } from './sessions';
 import type { Fetcher } from './http';
 import type { Candle } from '../../shared/research';
+import { acceptQuoteUpdate, mergeQuoteUpdate } from '../../shared/quoteUpdates';
 
 const HOUR = 3_600_000;
 const DAY = 24 * HOUR;
@@ -44,10 +45,12 @@ export class MarketService {
       if (!asset) return;
       const session = this.sessions.get(asset.symbol) ?? marketSession('india');
       const quote: Quote = { ...asset, price: tick.lastPrice, change: tick.change, changePercent: tick.changePercent, volume: null, asOf: tick.timestamp, fetchedAt: new Date().toISOString(), provider: 'upstox', cached: false, status: quoteFreshness(asset, tick.timestamp, session), session };
+      if (!acceptQuoteUpdate(quote, this.streamQuotes.get(quote.symbol))) return;
       this.streamQuotes.set(asset.symbol, quote);
       for (const listener of this.listeners) listener(quote);
     });
     this.cryptoWs = new CryptoStreamClient(quote => {
+      if (!acceptQuoteUpdate(quote, this.streamQuotes.get(quote.symbol))) return;
       this.streamQuotes.set(quote.symbol, quote);
       for (const listener of this.listeners) listener(quote);
     });
@@ -119,8 +122,8 @@ export class MarketService {
     const quotes = assets.map((asset) => {
       const rest = bySymbol.get(asset.symbol)!;
       const tick = this.streamQuotes.get(asset.symbol);
-      if (!tick || Date.now() - Date.parse(tick.fetchedAt!) > 60_000 || Date.parse(tick.asOf!) < Date.parse(rest.asOf ?? '1970-01-01')) return rest;
-      return { ...tick, volume: rest.volume, session: rest.session, status: quoteFreshness(asset, tick.asOf!, rest.session) };
+      const merged = mergeQuoteUpdate(rest, tick);
+      return merged === rest ? rest : { ...merged, status: quoteFreshness(asset, merged.asOf!, merged.session) };
     });
     for (const provider of new Set(quotes.map((quote) => quote.provider))) {
       const subset = quotes.filter((quote) => quote.provider === provider);

@@ -61,6 +61,8 @@ export function usePolling<T>(load: (signal: AbortSignal) => Promise<T>, interva
     };
 
     refreshRef.current = () => void run();
+    const online = () => { void run(); };
+    window.addEventListener('online', online);
     document.addEventListener('visibilitychange', visibility);
     void run();
 
@@ -69,6 +71,7 @@ export function usePolling<T>(load: (signal: AbortSignal) => Promise<T>, interva
       controller?.abort();
       clearTimeout(timer);
       document.removeEventListener('visibilitychange', visibility);
+      window.removeEventListener('online', online);
       refreshRef.current = () => {};
     };
   }, [load, intervalMs, enabled]);
