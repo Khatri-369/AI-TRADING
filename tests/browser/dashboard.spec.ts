@@ -241,8 +241,7 @@ test('responsive layouts at 320px, 390px, 768px, and 1440px have zero horizontal
   }
 
   // Provider Settings on Mobile
-  await page.getByRole('button', { name: 'Open navigation menu' }).click();
-  await page.getByRole('navigation', { name: 'Mobile primary navigation' }).getByRole('button', { name: 'Provider settings' }).click();
+  await page.getByRole('button', { name: 'Provider settings' }).click();
   await expect(page.getByRole('heading', { name: 'Provider connections & diagnostics' })).toBeVisible();
   const settingsNoOverflow = await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth);
   expect(settingsNoOverflow).toBe(true);
