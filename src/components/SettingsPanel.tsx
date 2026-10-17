@@ -82,14 +82,14 @@ export default function SettingsPanel({ onClose, quotes = [] }: SettingsPanelPro
           <div className="flex items-center gap-2">
             <ShieldCheck className="h-4 w-4 text-[var(--accent-primary)]" />
             <h2 id="settings-heading" className="section-heading text-base">
-              Settings & Platform Diagnostics
+              Provider connections & diagnostics
             </h2>
           </div>
           <p className="mt-1 text-xs text-[var(--text-secondary)]">
             Configure live news notifications, AI usage allowances, protected operator telemetry, and real-time market data providers.
           </p>
         </div>
-        <button className="icon-button" onClick={onClose} aria-label="Close settings">
+        <button className="icon-button" onClick={onClose} aria-label="Close provider settings">
           <X className="h-4 w-4" />
         </button>
       </div>

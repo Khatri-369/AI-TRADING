@@ -3,13 +3,11 @@ import { Bell, X, Check, ShieldAlert, Sparkles, TrendingUp, TrendingDown, Play }
 import { z } from 'zod';
 import type { NewsArticle, Quote } from '../types/market';
 import { useWatchlist } from '../hooks/useWatchlist';
-import { formatPercent, formatPrice } from '../utils/format';
+import { formatPercent } from '../utils/format';
 
 import {
-  STORAGE_ALERT_SETTINGS,
   STORAGE_ALERT_INBOX,
   AlertSettings,
-  defaultAlertSettings,
   getStoredAlertSettings,
   saveStoredAlertSettings,
   sendSystemNotification,
@@ -17,7 +15,6 @@ import {
 } from '../utils/notifications';
 
 const STORAGE_INBOX = STORAGE_ALERT_INBOX;
-const STORAGE_SETTINGS = STORAGE_ALERT_SETTINGS;
 
 const noticeSchema = z.object({
   id: z.string(),
