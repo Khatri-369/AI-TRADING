@@ -598,13 +598,16 @@ export default function CandleWorkspace({
       )}
 
       {/* Primary Toolbar: Intervals, Ranges, Actions */}
-      <div className="flex flex-wrap items-center justify-between gap-2">
+      <div className="flex flex-wrap items-center justify-between gap-2.5 rounded-xl bg-[var(--bg-surface-elevated)] p-2.5 border border-[var(--border-subtle)]">
         <div className="flex flex-wrap items-center gap-2">
-          <label className="text-xs">
-            Candle interval
+          <div className="flex items-center gap-1.5">
+            <label htmlFor="candle-interval-select" className="text-xs font-medium text-[var(--text-secondary)]">
+              Interval:
+            </label>
             <select
+              id="candle-interval-select"
               aria-label="Candle interval"
-              className="field block mt-0.5"
+              className="field text-xs font-semibold py-1 px-2 rounded-lg bg-[var(--bg-surface)] border-[var(--border-default)] cursor-pointer"
               value={interval}
               onChange={(e) => {
                 const next = e.target.value as typeof interval;
@@ -612,16 +615,20 @@ export default function CandleWorkspace({
                 if (next !== '1d' && ['3M', '6M', '1Y'].includes(range)) setRange('1M');
               }}
             >
-              <option value="5m">5 minutes</option>
-              <option value="30m">30 minutes</option>
-              <option value="1d">Daily</option>
+              <option value="5m">5m Intraday</option>
+              <option value="30m">30m Intraday</option>
+              <option value="1d">Daily (1D)</option>
             </select>
-          </label>
-          <label className="text-xs">
-            Range
+          </div>
+
+          <div className="flex items-center gap-1.5">
+            <label htmlFor="candle-range-select" className="text-xs font-medium text-[var(--text-secondary)]">
+              Range:
+            </label>
             <select
+              id="candle-range-select"
               aria-label="Candle range"
-              className="field block mt-0.5"
+              className="field text-xs font-semibold py-1 px-2 rounded-lg bg-[var(--bg-surface)] border-[var(--border-default)] cursor-pointer"
               value={range}
               onChange={(e) => setRange(e.target.value as HistoryRange)}
             >
@@ -629,36 +636,36 @@ export default function CandleWorkspace({
                 <option key={r}>{r}</option>
               ))}
             </select>
-          </label>
+          </div>
         </div>
 
         <div className="flex flex-wrap items-center gap-1.5">
           <button
             type="button"
-            className="button-secondary min-h-[44px]"
+            className="button-secondary text-xs py-1.5 px-2.5 min-h-[34px] cursor-pointer"
             onClick={() => chart.current?.timeScale().fitContent()}
           >
             Reset view
           </button>
           <button
             type="button"
-            className="button-secondary min-h-[44px] flex items-center gap-1.5"
+            className="button-secondary text-xs py-1.5 px-2.5 min-h-[34px] flex items-center gap-1.5 cursor-pointer"
             onClick={() => setIsExpanded((v) => !v)}
             aria-label={isExpanded ? 'Exit full screen' : 'Full screen'}
           >
-            {isExpanded ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
+            {isExpanded ? <Minimize2 size={13} /> : <Maximize2 size={13} />}
             <span>{isExpanded ? 'Exit full screen' : 'Full screen'}</span>
           </button>
           <button
             type="button"
-            className="button-secondary min-h-[44px]"
+            className="button-secondary text-xs py-1.5 px-2.5 min-h-[34px] cursor-pointer"
             onClick={() => setTable((v) => !v)}
           >
             {table ? 'Show candles' : 'Candle table'}
           </button>
           <button
             type="button"
-            className="button-secondary"
+            className="button-secondary text-xs py-1.5 px-2.5 min-h-[34px] cursor-pointer"
             disabled={!data?.candles.length || table}
             onClick={() => void exportImage()}
           >
