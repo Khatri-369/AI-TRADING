@@ -113,53 +113,81 @@ export default function WatchlistPage({
       )}
 
       {/* Filter and Search Bar */}
-      <div className="flex flex-wrap gap-3 rounded-xl border border-[var(--border-default)] bg-[var(--bg-surface)] p-4">
-        <label className="text-xs grow">
-          Find instruments
+      <div className="rounded-xl border border-[var(--border-default)] bg-[var(--bg-surface)] p-3.5 space-y-3 shadow-xs">
+        {/* Search input with clean styling */}
+        <div className="relative">
           <input
             aria-label="Find watchlist instruments"
-            className="field mt-1 block w-full"
+            className="field block w-full pl-3 pr-8 py-2 text-xs rounded-lg bg-[var(--bg-surface-elevated)] border-[var(--border-subtle)]"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Symbol or company name"
+            placeholder="Search symbol or name (e.g. RELIANCE, BTC, NIFTY50)..."
           />
-        </label>
-        <label className="text-xs">
-          Market
-          <select
-            className="field mt-1 block"
-            value={category}
-            onChange={(e) => setCategory(e.target.value)}
-          >
-            <option value="all">All markets</option>
-            {['india', 'us', 'crypto', 'commodities', 'forex'].map((c) => (
-              <option key={c} value={c}>
-                {c.toUpperCase()}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="text-xs">
-          Sort by
-          <select
-            className="field mt-1 block"
-            value={sort}
-            onChange={(e) => setSort(e.target.value)}
-          >
-            <option value="name">Name</option>
-            <option value="gainers">Largest change %</option>
-            <option value="decliners">Smallest change %</option>
-          </select>
-        </label>
-        <label className="flex items-center gap-2 text-sm min-h-[44px] cursor-pointer">
-          <input
-            type="checkbox"
-            checked={onlySaved}
-            onChange={(e) => setOnlySaved(e.target.checked)}
-            className="h-4 w-4 rounded accent-[var(--accent-primary)]"
-          />
-          <span>Saved only ({saved.length})</span>
-        </label>
+          {search && (
+            <button
+              type="button"
+              onClick={() => setSearch('')}
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[var(--text-muted)] hover:text-[var(--text-primary)] cursor-pointer"
+              aria-label="Clear search"
+            >
+              <X size={14} />
+            </button>
+          )}
+        </div>
+
+        {/* Category Pills (horizontal scroll on mobile) */}
+        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar text-xs">
+          {[
+            { id: 'all', label: 'All Markets' },
+            { id: 'india', label: 'Indian (NSE/BSE)' },
+            { id: 'us', label: 'US Equities' },
+            { id: 'crypto', label: 'Crypto' },
+            { id: 'commodities', label: 'Commodities' },
+            { id: 'forex', label: 'Forex' },
+          ].map((cat) => {
+            const isCatActive = category === cat.id;
+            return (
+              <button
+                key={cat.id}
+                type="button"
+                onClick={() => setCategory(cat.id)}
+                className={`px-3 py-1.5 rounded-lg font-medium whitespace-nowrap transition cursor-pointer min-h-[32px] ${
+                  isCatActive
+                    ? 'bg-[var(--accent-primary)] text-white shadow-xs'
+                    : 'bg-[var(--bg-subtle)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] border border-[var(--border-subtle)]'
+                }`}
+              >
+                {cat.label}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Secondary controls row: Sort & Saved Only toggle */}
+        <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-[var(--border-subtle)]">
+          <div className="flex items-center gap-2">
+            <span className="text-[11px] text-[var(--text-muted)]">Sort:</span>
+            <select
+              className="field py-1 px-2 text-xs rounded-md bg-[var(--bg-surface-elevated)] border-[var(--border-subtle)] cursor-pointer"
+              value={sort}
+              onChange={(e) => setSort(e.target.value)}
+            >
+              <option value="name">Name (A-Z)</option>
+              <option value="gainers">Top Gainers (%)</option>
+              <option value="decliners">Top Losers (%)</option>
+            </select>
+          </div>
+
+          <label className="flex items-center gap-2 text-xs cursor-pointer text-[var(--text-secondary)] select-none">
+            <input
+              type="checkbox"
+              checked={onlySaved}
+              onChange={(e) => setOnlySaved(e.target.checked)}
+              className="h-4 w-4 rounded accent-[var(--accent-primary)] cursor-pointer"
+            />
+            <span className="font-medium">Star Saved Only ({saved.length})</span>
+          </label>
+        </div>
       </div>
 
       {/* Comparison Drawer / Panel */}

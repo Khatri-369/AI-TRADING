@@ -213,20 +213,27 @@ export default function ResearchDesk({
     </label>
   );
 
-  const tabButton = (name: string) => (
-    <button
-      key={name}
-      className="button-secondary"
-      aria-pressed={tab === name}
-      onClick={() => {
-        setTab(name);
-        setError('');
-        setEditing(null);
-      }}
-    >
-      {name}
-    </button>
-  );
+  const tabButton = (name: string) => {
+    const isActive = tab === name;
+    return (
+      <button
+        key={name}
+        className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition cursor-pointer flex items-center gap-1.5 min-h-[36px] ${
+          isActive
+            ? 'bg-[var(--accent-primary)] text-white shadow-sm'
+            : 'bg-[var(--bg-surface-elevated)] text-[var(--text-secondary)] border border-[var(--border-subtle)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-subtle)]'
+        }`}
+        aria-pressed={isActive}
+        onClick={() => {
+          setTab(name);
+          setError('');
+          setEditing(null);
+        }}
+      >
+        <span>{name}</span>
+      </button>
+    );
+  };
 
   function handleDeriveFromBudget() {
     try {
@@ -291,27 +298,38 @@ export default function ResearchDesk({
 
   return (
     <section id="panel-desk" className="space-y-4">
-      <header className="flex flex-wrap items-start justify-between gap-3">
+      <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2 border-b border-[var(--border-subtle)]">
         <div>
-          <h1 className="text-2xl font-semibold">Research desk</h1>
-          <p className="mt-1 text-sm text-[var(--text-secondary)]">
-            Chart → plan → alert → review. Practice trades are simulated; no real orders are placed.
-          </p>
-          <p className="mt-1 text-xs" role="status">
-            {store.user ? `${store.user.username} · ` : ''}
-            {store.status}
+          <div className="flex flex-wrap items-center gap-2.5">
+            <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-[var(--text-primary)]">
+              Research desk
+            </h1>
+            <span
+              role="status"
+              className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-semibold border border-emerald-500/30 bg-emerald-500/10 text-emerald-400"
+            >
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
+              {store.user ? `@${store.user.username} · Synced` : 'Guest · Saved on device'}
+            </span>
+          </div>
+          <p className="mt-1 text-xs text-[var(--text-secondary)]">
+            Chart, plan, set alerts & review performance. Practice trades are simulated.
           </p>
         </div>
-        <label className="text-xs">
-          Instrument
+
+        <div className="flex items-center gap-2">
+          <label htmlFor="desk-instrument-select" className="text-xs font-medium text-[var(--text-secondary)] shrink-0">
+            Instrument:
+          </label>
           <select
-            className="field block mt-1 max-w-full"
+            id="desk-instrument-select"
+            className="field text-xs font-semibold py-1.5 px-2.5 rounded-lg bg-[var(--bg-surface-elevated)] border-[var(--border-default)] min-w-[200px] max-w-full cursor-pointer"
             value={symbol}
             onChange={(e) => {
               setSymbol(e.target.value);
               setEditing(null);
               setPlan(initialPlan);
-              setJournal(previous => ({ ...previous, planId: '' }));
+              setJournal((previous) => ({ ...previous, planId: '' }));
             }}
           >
             {[...ASSET_BY_SYMBOL.values()].map((a) => (
@@ -320,10 +338,13 @@ export default function ResearchDesk({
               </option>
             ))}
           </select>
-        </label>
+        </div>
       </header>
 
-      <nav aria-label="Research desk tools" className="flex flex-wrap gap-2">
+      <nav
+        aria-label="Research desk tools"
+        className="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar sm:flex-wrap"
+      >
         {['Chart', 'Plan', 'Alerts', 'Journal', 'Practice', 'Account'].map(tabButton)}
       </nav>
 

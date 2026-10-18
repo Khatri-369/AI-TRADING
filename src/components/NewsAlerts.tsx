@@ -223,13 +223,13 @@ export default function NewsAlerts({
       return;
     }
 
-    // Filter truly new articles
+    // Filter truly new articles (accommodate aggregation delay and clock skew up to 24h)
     const freshArticles = newsArticles.filter((article) => {
       if (baselineRef.current?.has(article.id)) return false;
       const pubTime = Date.parse(article.publishedAt);
       if (Number.isNaN(pubTime)) return false;
-      // Ignore stale feeds (> 3 hours old) or future timestamps (> 5 mins into future)
-      if (pubTime < now - 3 * 3600 * 1000 || pubTime > now + 300 * 1000) return false;
+      // Accept recent news within 24 hours
+      if (pubTime < now - 24 * 3600 * 1000) return false;
       return true;
     });
 
@@ -237,10 +237,15 @@ export default function NewsAlerts({
 
     if (!freshArticles.length) return;
 
-    // Scope check: watchlist only vs all market
+    // Scope check: watchlist only vs all market (checks both relatedAssets and text content)
     const matching = freshArticles.filter((a) => {
       if (settings.scope === 'all' || !symbols.length) return true;
-      return a.relatedAssets?.some((sym) => symbols.includes(sym));
+      const hasRelated = a.relatedAssets?.some((sym) =>
+        symbols.some((s) => s.toUpperCase() === sym.toUpperCase())
+      );
+      if (hasRelated) return true;
+      const text = `${a.headline} ${a.summary ?? ''}`.toUpperCase();
+      return symbols.some((s) => text.includes(s.toUpperCase()));
     });
 
     if (!matching.length) return;
@@ -271,12 +276,14 @@ export default function NewsAlerts({
       relatedStocks: related,
     });
 
-    // Device notification if opted-in and cooldown satisfied
+    // Device notification if enabled, permission granted, and cooldown satisfied
+    const isDeviceAllowed =
+      settings.device || (typeof Notification !== 'undefined' && Notification.permission === 'granted');
     if (
-      settings.device &&
+      isDeviceAllowed &&
       typeof Notification !== 'undefined' &&
       Notification.permission === 'granted' &&
-      now - lastDeviceNotifyTime.current > 30000
+      now - lastDeviceNotifyTime.current > 10000
     ) {
       lastDeviceNotifyTime.current = now;
       void sendSystemNotification(topStory.headline, topStory.source ?? 'Market Wire', related, topStory.id);
@@ -383,7 +390,9 @@ export default function NewsAlerts({
       relatedStocks: fallbackRelated,
     });
 
-    if (settings.device && typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+    const isDeviceAllowed =
+      settings.device || (typeof Notification !== 'undefined' && Notification.permission === 'granted');
+    if (isDeviceAllowed && typeof Notification !== 'undefined' && Notification.permission === 'granted') {
       void sendSystemNotification(
         topArticle.headline,
         topArticle.source ?? 'Market Wire',

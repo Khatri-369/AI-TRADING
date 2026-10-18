@@ -253,7 +253,7 @@ export default function NewsSignalFeed({
 
       {/* Scope Segment Tabs: All / Watchlist / Saved */}
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--border-subtle)] pb-2.5">
-        <div className="flex items-center gap-1.5" role="tablist">
+        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar w-full sm:w-auto" role="tablist">
           <button
             type="button"
             role="tab"
