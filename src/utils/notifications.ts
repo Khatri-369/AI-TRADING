@@ -24,15 +24,20 @@ export function getStoredAlertSettings(): AlertSettings {
   if (typeof window === 'undefined') return defaultAlertSettings;
   try {
     const raw = localStorage.getItem(STORAGE_ALERT_SETTINGS);
+    const hasGranted = typeof Notification !== 'undefined' && Notification.permission === 'granted';
     if (raw) {
       const parsed = JSON.parse(raw);
       return {
         enabled: typeof parsed.enabled === 'boolean' ? parsed.enabled : defaultAlertSettings.enabled,
         scope: parsed.scope === 'watchlist' ? 'watchlist' : 'all',
         quiet: typeof parsed.quiet === 'boolean' ? parsed.quiet : defaultAlertSettings.quiet,
-        device: typeof parsed.device === 'boolean' ? parsed.device : defaultAlertSettings.device,
+        device: typeof parsed.device === 'boolean' ? (parsed.device || hasGranted) : hasGranted,
       };
     }
+    return {
+      ...defaultAlertSettings,
+      device: hasGranted,
+    };
   } catch {
     // Ignore JSON parsing errors
   }
@@ -114,10 +119,12 @@ export async function sendSystemNotification(
     data: { url: '/news' },
   };
 
-  // 1. Try ServiceWorkerRegistration.showNotification first (Required for mobile Android Chrome)
+  // 1. Try ServiceWorkerRegistration.showNotification first with 500ms timeout
   try {
     if ('serviceWorker' in navigator) {
-      const reg = await navigator.serviceWorker.ready;
+      const swReady = navigator.serviceWorker.ready;
+      const timeout = new Promise<null>((resolve) => setTimeout(() => resolve(null), 500));
+      const reg = (await Promise.race([swReady, timeout])) as ServiceWorkerRegistration | null;
       if (reg && reg.showNotification) {
         await reg.showNotification(title, options);
         return true;
@@ -129,7 +136,14 @@ export async function sendSystemNotification(
 
   // 2. Fallback to desktop Notification constructor
   try {
-    new Notification(title, options);
+    const notif = new Notification(title, options);
+    notif.onclick = () => {
+      try {
+        window.focus();
+      } catch {
+        // Ignore focus error
+      }
+    };
     return true;
   } catch {
     return false;

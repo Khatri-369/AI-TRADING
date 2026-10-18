@@ -134,7 +134,7 @@ export class MarketService {
 
   async news(): Promise<NewsResponse> {
     try {
-      const response = await this.newsCache.get('news', 5 * 60_000, 6 * HOUR, () => this.providers.news());
+      const response = await this.newsCache.get('news', 2 * 60_000, 6 * HOUR, () => this.providers.news());
       return { articles: response.value, provider: 'finnhub', status: response.stale ? 'stale' : response.cached ? 'cached' : 'live',
         fetchedAt: response.fetchedAt, cached: response.cached, ...(response.error ? { error: response.error } : {}) };
     } catch (error) {

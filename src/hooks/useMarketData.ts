@@ -61,4 +61,4 @@ export function useMarketData() {
   };
 }
 
-export const useNews = () => usePolling(getNews, 300_000);
+export const useNews = () => usePolling(getNews, 60_000, true, true);
