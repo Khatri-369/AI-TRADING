@@ -10,6 +10,7 @@ import {
   Sparkles,
   X,
   Star,
+  ChevronRight,
 } from 'lucide-react';
 import type { NewsArticle, Quote, Tab } from '../types/market';
 import {
@@ -21,6 +22,7 @@ import {
 } from '../utils/format';
 import { Loading } from './Feedback';
 import { useWatchlist } from '../hooks/useWatchlist';
+import WatchlistToggle from './WatchlistToggle';
 
 interface Props {
   quotes: Quote[];

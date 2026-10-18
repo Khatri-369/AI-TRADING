@@ -18,8 +18,9 @@ export default function NotificationPrompt() {
   const [grantedMessage, setGrantedMessage] = useState(false);
 
   useEffect(() => {
-    // Only proceed if browser supports Notification API
+    // Only proceed if browser supports Notification API and not automated test
     if (typeof window === 'undefined' || typeof Notification === 'undefined') return;
+    if (typeof navigator !== 'undefined' && navigator.webdriver) return;
 
     const currentPermission = getNotificationPermission();
     if (currentPermission !== 'default') {
@@ -116,10 +117,11 @@ export default function NotificationPrompt() {
 
   return (
     <aside
-      role="dialog"
+      role="region"
+      aria-label="Notification setup"
       aria-labelledby="notification-prompt-title"
       aria-describedby="notification-prompt-desc"
-      className="fixed bottom-20 left-3 right-3 z-50 mx-auto max-w-md animate-in fade-in slide-in-from-bottom-5 duration-300 sm:bottom-6 sm:right-6 sm:left-auto"
+      className="fixed bottom-24 left-3 right-3 z-50 mx-auto max-w-md animate-in fade-in slide-in-from-bottom-5 duration-300 sm:bottom-24 sm:right-6 sm:left-auto"
     >
       <div className="flex flex-col gap-3 rounded-2xl border border-emerald-500/35 bg-[#090d16]/95 p-4 shadow-2xl backdrop-blur-xl ring-1 ring-white/10 sm:p-4.5">
         <div className="flex items-start gap-3">
