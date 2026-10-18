@@ -7,6 +7,7 @@ import { formatPercent } from '../utils/format';
 
 import {
   STORAGE_ALERT_INBOX,
+  STORAGE_ALERT_SETTINGS,
   AlertSettings,
   getStoredAlertSettings,
   saveStoredAlertSettings,
@@ -85,6 +86,7 @@ export default function NewsAlerts({
 
   const baselineRef = useRef<Set<string> | null>(null);
   const lastDeviceNotifyTime = useRef<number>(0);
+  const [pendingDeviceAlerts, setPendingDeviceAlerts] = useState<NewsArticle[]>([]);
   const panelRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
 
@@ -154,9 +156,14 @@ export default function NewsAlerts({
     };
 
     window.addEventListener('market-alert-settings-changed', handleSettingsChanged);
+    const handleStorage = (event: StorageEvent) => {
+      if (event.key === STORAGE_ALERT_SETTINGS || event.key === null) setSettings(getStoredAlertSettings());
+    };
+    window.addEventListener('storage', handleStorage);
     window.addEventListener('market-alert-trigger-test', handleTriggerTest);
     return () => {
       window.removeEventListener('market-alert-settings-changed', handleSettingsChanged);
+      window.removeEventListener('storage', handleStorage);
       window.removeEventListener('market-alert-trigger-test', handleTriggerTest);
     };
   }, [newsArticles, quotes]);
@@ -212,7 +219,10 @@ export default function NewsAlerts({
       return;
     }
 
-    if (!settings.enabled) return;
+    if (!settings.enabled) {
+      baselineRef.current = new Set([...baselineRef.current, ...newsArticles.map(a => a.id)].slice(-500));
+      return;
+    }
 
     const now = Date.now();
     const currentHour = new Date().getHours();
@@ -239,7 +249,7 @@ export default function NewsAlerts({
 
     // Scope check: watchlist only vs all market
     const matching = freshArticles.filter((a) => {
-      if (settings.scope === 'all' || !symbols.length) return true;
+      if (settings.scope === 'all') return true;
       return a.relatedAssets?.some((sym) => symbols.includes(sym));
     });
 
@@ -271,17 +281,34 @@ export default function NewsAlerts({
       relatedStocks: related,
     });
 
-    // Device notification if opted-in and cooldown satisfied
+    // Queue instead of dropping stories that arrive during the cooldown.
     if (
       settings.device &&
       typeof Notification !== 'undefined' &&
-      Notification.permission === 'granted' &&
-      now - lastDeviceNotifyTime.current > 30000
+      Notification.permission === 'granted'
     ) {
-      lastDeviceNotifyTime.current = now;
-      void sendSystemNotification(topStory.headline, topStory.source ?? 'Market Wire', related, topStory.id);
+      setPendingDeviceAlerts(previous => [...previous, topStory].slice(-20));
     }
   }, [newsArticles, settings, symbols, notices, quotes]);
+
+  useEffect(() => {
+    if (!pendingDeviceAlerts.length) return;
+    const hour = new Date().getHours();
+    if (!settings.enabled || !settings.device || (settings.quiet && (hour >= 22 || hour < 8))) {
+      setPendingDeviceAlerts([]);
+      return;
+    }
+    const timer = setTimeout(() => {
+      const story = pendingDeviceAlerts[0];
+      const currentHour = new Date().getHours();
+      setPendingDeviceAlerts(previous => previous.filter(item => item.id !== story.id));
+      if (settings.quiet && (currentHour >= 22 || currentHour < 8)) return;
+      lastDeviceNotifyTime.current = Date.now();
+      void sendSystemNotification(story.headline, story.source, getRelatedQuotes(story.relatedAssets, quotes), story.id)
+        .then(sent => { if (!sent) setMessage('News arrived in your inbox, but the device notification could not be shown. Check browser notification permissions.'); });
+    }, Math.max(0, 30_000 - (Date.now() - lastDeviceNotifyTime.current)));
+    return () => clearTimeout(timer);
+  }, [pendingDeviceAlerts, settings, quotes]);
 
   // Request browser notification permission & immediately trigger a live verification alert
   const handleAllowNotification = async () => {

@@ -3,6 +3,7 @@ import { getOverview, getNews, quoteSchema } from '../services/api';
 import { usePolling } from './usePolling';
 import type { Quote } from '../types/market';
 import { acceptQuoteUpdate, mergeQuoteUpdate } from '../../shared/quoteUpdates';
+import { getStoredAlertSettings, STORAGE_ALERT_SETTINGS } from '../utils/notifications';
 
 export function useMarketData() {
   const state = usePolling(getOverview, 60_000);
@@ -61,4 +62,18 @@ export function useMarketData() {
   };
 }
 
-export const useNews = () => usePolling(getNews, 300_000);
+export function useNews() {
+  const [settings, setSettings] = useState(getStoredAlertSettings);
+  useEffect(() => {
+    const sync = () => setSettings(getStoredAlertSettings());
+    const storage = (event: StorageEvent) => { if (event.key === STORAGE_ALERT_SETTINGS || event.key === null) sync(); };
+    window.addEventListener('market-alert-settings-changed', sync);
+    window.addEventListener('storage', storage);
+    return () => {
+      window.removeEventListener('market-alert-settings-changed', sync);
+      window.removeEventListener('storage', storage);
+    };
+  }, []);
+  // Browsers can suspend background tabs; visibility/online events catch up on return.
+  return usePolling(getNews, 60_000, true, settings.enabled && settings.device);
+}

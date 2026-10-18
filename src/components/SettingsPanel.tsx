@@ -222,7 +222,7 @@ export default function SettingsPanel({ onClose, quotes = [] }: SettingsPanelPro
                   )}
                 </div>
                 <p className="text-[11px] text-[var(--text-secondary)]">
-                  Receive device alerts on Windows, macOS, Android, and iOS even when viewing another app.
+                  Checks for new headlines every minute while this app is running. Browsers may suspend background tabs; alerts catch up when you return. Closed-app alerts require background push setup.
                 </p>
               </div>
             </div>

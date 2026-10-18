@@ -117,7 +117,8 @@ export async function sendSystemNotification(
   // 1. Try ServiceWorkerRegistration.showNotification first (Required for mobile Android Chrome)
   try {
     if ('serviceWorker' in navigator) {
-      const reg = await navigator.serviceWorker.ready;
+      // ready never resolves if no worker is registered. Do not strand desktop delivery.
+      const reg = await navigator.serviceWorker.getRegistration();
       if (reg && reg.showNotification) {
         await reg.showNotification(title, options);
         return true;

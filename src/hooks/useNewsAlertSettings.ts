@@ -97,7 +97,7 @@ export function useNewsAlertSettings() {
 
     if (granted) {
       updateSettings({ enabled: true, device: true });
-      setFeedbackMessage('Device & push notifications enabled successfully!');
+      setFeedbackMessage('Device notifications enabled while the app is running. Closed-app alerts require background push setup.');
       // Send a confirmation system notification
       void sendSystemNotification(
         'Tradexa Notifications Active',

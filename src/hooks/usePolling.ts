@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { errorMessage } from '../services/api';
 
-/** Recursive timeouts start after completion; hidden pages cancel work and resume on focus. */
-export function usePolling<T>(load: (signal: AbortSignal) => Promise<T>, intervalMs: number, enabled = true) {
+/** Recursive timeouts start after completion; hidden polling is opt-in for news alerts. */
+export function usePolling<T>(load: (signal: AbortSignal) => Promise<T>, intervalMs: number, enabled = true, runWhenHidden = false) {
   const [data, setData] = useState<T | null>(null);
   const [loading, setLoading] = useState(enabled);
   const [error, setError] = useState<string | null>(null);
@@ -21,7 +21,7 @@ export function usePolling<T>(load: (signal: AbortSignal) => Promise<T>, interva
     let timer: ReturnType<typeof setTimeout> | undefined;
 
     const run = async () => {
-      if (!active || document.hidden || (controller && !controller.signal.aborted)) return;
+      if (!active || (document.hidden && !runWhenHidden) || (controller && !controller.signal.aborted)) return;
       clearTimeout(timer);
       const current = new AbortController();
       controller = current;
@@ -42,7 +42,7 @@ export function usePolling<T>(load: (signal: AbortSignal) => Promise<T>, interva
         if (active && controller === current) {
           controller = null;
           setLoading(false);
-          if (!document.hidden && intervalMs > 0) {
+          if ((!document.hidden || runWhenHidden) && intervalMs > 0) {
             timer = setTimeout(() => void run(), intervalMs);
           }
         }
@@ -50,8 +50,8 @@ export function usePolling<T>(load: (signal: AbortSignal) => Promise<T>, interva
     };
 
     const visibility = () => {
-      setPaused(document.hidden);
-      if (document.hidden) {
+      setPaused(document.hidden && !runWhenHidden);
+      if (document.hidden && !runWhenHidden) {
         clearTimeout(timer);
         controller?.abort();
         setLoading(false);
@@ -64,6 +64,7 @@ export function usePolling<T>(load: (signal: AbortSignal) => Promise<T>, interva
     const online = () => { void run(); };
     window.addEventListener('online', online);
     document.addEventListener('visibilitychange', visibility);
+    setPaused(document.hidden && !runWhenHidden);
     void run();
 
     return () => {
@@ -74,7 +75,7 @@ export function usePolling<T>(load: (signal: AbortSignal) => Promise<T>, interva
       window.removeEventListener('online', online);
       refreshRef.current = () => {};
     };
-  }, [load, intervalMs, enabled]);
+  }, [load, intervalMs, enabled, runWhenHidden]);
 
   // Live countdown timer ticking down every second
   useEffect(() => {
