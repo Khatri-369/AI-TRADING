@@ -30,6 +30,7 @@ function loadSDK(appId: string) {
 let queue: Promise<unknown> = Promise.resolve();
 export function syncBackgroundPush(): Promise<string | null> {
   const next = queue.then(async () => {
+    backgroundActive = false;
     const response = await fetch('/api/notifications/config', { signal: AbortSignal.timeout(10_000) });
     if (!response.ok) throw new Error('Could not check background notification setup.');
     const config = schema.parse(await response.json());

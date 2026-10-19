@@ -8,8 +8,9 @@ test('OneSignal registration uses its own worker and follows enable, disable and
   });
   await page.route('**/api/notifications/config', route => route.fulfill({ json: { provider: 'onesignal', configured: true, appId: 'c93d06ef-e58a-43a0-8f00-87a7b632f11a', publicKey: null, intervalMinutes: 5 } }));
   await page.route('https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js', route => route.fulfill({ contentType: 'application/javascript', body: `
+    window.sdkLoads = (window.sdkLoads || 0) + 1;
     window.pushCalls = [];
-    const sdk = { init: async options => { window.workerOptions = options; }, User: {
+    const sdk = { init: async options => { window.initCount = (window.initCount || 0) + 1; window.workerOptions = options; }, User: {
       addTag: async (key, value) => window.pushCalls.push(key + '=' + value),
       PushSubscription: { id: 'test-subscription', optedIn: false,
         optIn: async function() { this.optedIn = true; window.pushCalls.push('opt-in'); },
@@ -38,6 +39,7 @@ test('OneSignal registration uses its own worker and follows enable, disable and
     window.dispatchEvent(new CustomEvent('market-alert-settings-changed', { detail: settings }));
   });
   await expect.poll(async () => (await calls()).at(-1)).toBe('opt-out');
+  expect(await page.evaluate(() => ({ loads: (window as unknown as { sdkLoads: number }).sdkLoads, inits: (window as unknown as { initCount: number }).initCount, appId: (window as unknown as { workerOptions: { appId: string } }).workerOptions.appId }))).toEqual({ loads: 1, inits: 1, appId: 'c93d06ef-e58a-43a0-8f00-87a7b632f11a' });
   expect(errors).toEqual([]);
   expect((await page.request.get('/api/cron/news')).status()).toBe(401);
 });

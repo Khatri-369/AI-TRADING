@@ -40,5 +40,10 @@ test('OneSignal rejects missing setup, stale feeds, and provider failures withou
   assert.deepEqual(await service.deliver({ ...feed(), status: 'stale' }), { accepted: 0, skipped: 'feed-unavailable' });
   await assert.rejects(service.deliver(feed()), /Push provider rejected the news job \(429\)/);
   const empty = new OneSignalNewsPush({ ...options, fetcher: async () => new Response(JSON.stringify({ id: '' })) });
-  assert.deepEqual(await empty.deliver(feed()), { accepted: 0, checked: 1 });
+  assert.deepEqual(await empty.deliver(feed()), { accepted: 0, checked: 1, noRecipients: 1 });
+});
+
+test('news jobs explain when there are no recent headlines without calling the provider', async () => {
+  const service = new OneSignalNewsPush({ ...options, fetcher: async () => { throw new Error('Must not send'); } });
+  assert.deepEqual(await service.deliver(feed([article('old', 3600000)])), { accepted: 0, checked: 0, noRecipients: 0, skipped: 'no-recent-news' });
 });

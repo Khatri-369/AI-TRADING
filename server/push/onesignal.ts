@@ -32,6 +32,7 @@ export class OneSignalNewsPush {
     });
     const articles = [...new Map([...regional, ...candidates].map(article => [article.id, article])).values()].slice(0, 3);
     let accepted = 0;
+    let noRecipients = 0;
     for (const article of articles) {
       const bytes = createHash('sha256').update(`${options.appId}:${article.id}:${article.publishedAt}`).digest().subarray(0, 16);
       bytes[6] = (bytes[6] & 15) | 80; bytes[8] = (bytes[8] & 63) | 128;
@@ -52,8 +53,11 @@ export class OneSignalNewsPush {
       if (!response.ok) throw new Error(`Push provider rejected the news job (${response.status}).`);
       const body = await response.json() as { id?: string };
       if (body.id) accepted++;
+      else noRecipients++;
     }
-    return { accepted, checked: articles.length };
+    return { accepted, checked: articles.length, noRecipients,
+      ...(articles.length === 0 ? { skipped: 'no-recent-news' } : {}),
+    };
   }
 }
 

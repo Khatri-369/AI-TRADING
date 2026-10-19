@@ -53,3 +53,9 @@ Android battery restrictions, iOS Focus modes, denied permission, connectivity a
 - https://documentation.onesignal.com/reference/push-notification
 - https://vercel.com/docs/cron-jobs/usage-and-pricing
 - https://cron-job.org/en/
+
+## Troubleshooting a working test but missing news
+
+A dashboard test confirms the device subscription, not the scheduled news sender. Check that the deployed `/api/notifications/config` reports OneSignal, the external job actually runs every five minutes, and its authenticated response includes `checked` and `accepted`. `skipped: "no-recent-news"` means no article was published in the last 15 minutes; `noRecipients` means OneSignal returned no message ID, so inspect active subscriptions and the `market_news=on` tag. A response containing only `count` comes from the older native push implementation: deploy this integration first.
+
+Do not paste an additional OneSignal initialization into `index.html`: the application initializes it once using the backend App ID. Inline initialization is blocked by the production CSP and a root-scoped OneSignal worker competes with the offline worker. Existing users should reopen the updated app and enable background alerts to register the separate worker and news tag.
