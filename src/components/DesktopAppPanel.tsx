@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 import { Bell, Download, X } from 'lucide-react';
 import { z } from 'zod';
+import { syncBackgroundPush } from '../utils/backgroundPush';
+import { getStoredAlertSettings, saveStoredAlertSettings, requestNotificationPermission } from '../utils/notifications';
 
 interface InstallEvent extends Event { prompt: () => Promise<void>; userChoice: Promise<{ outcome: string }> }
-const configSchema = z.object({ configured: z.boolean(), publicKey: z.string().nullable(), intervalMinutes: z.number() });
+const configSchema = z.object({ configured: z.boolean(), publicKey: z.string().nullable(), intervalMinutes: z.number(), provider: z.string().optional() });
 async function updateSubscription(action: 'subscribe' | 'unsubscribe', subscription: PushSubscription) {
   const response = await fetch(`/api/notifications/${action}`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }, body: JSON.stringify(subscription.toJSON()), signal: AbortSignal.timeout(15000) });
   if (!response.ok) throw new Error('The server could not save your notification preference. Please try again.');
@@ -45,6 +47,16 @@ export default function DesktopAppPanel({ open, onClose }: { open: boolean; onCl
     return () => controller.abort();
   }, [open, supported]);
   async function enable() {
+    if (config?.provider === 'onesignal') {
+      setBusy(true);
+      try {
+        if (!await requestNotificationPermission()) { setMessage('Allow notifications in browser settings first.'); return; }
+        saveStoredAlertSettings({ ...getStoredAlertSettings(), enabled: true, device: true });
+        setMessage(await syncBackgroundPush() ?? 'Background provider is unavailable.');
+      } catch { setMessage('Background registration failed. Check OneSignal setup and retry.'); }
+      finally { setBusy(false); }
+      return;
+    }
     if (!config?.publicKey || busy) return;
     setBusy(true); setMessage('');
     let created: PushSubscription | undefined;
@@ -65,6 +77,11 @@ export default function DesktopAppPanel({ open, onClose }: { open: boolean; onCl
   async function disable() {
     setBusy(true); setMessage('');
     try {
+      if (config?.provider === 'onesignal') {
+        saveStoredAlertSettings({ ...getStoredAlertSettings(), device: false });
+        setMessage(await syncBackgroundPush() ?? 'Background provider is unavailable.');
+        return;
+      }
       const registration = await navigator.serviceWorker.getRegistration();
       const subscription = await registration?.pushManager.getSubscription();
       if (subscription) {
@@ -121,7 +138,8 @@ export default function DesktopAppPanel({ open, onClose }: { open: boolean; onCl
         {config && !config.configured && <p className="text-sm">Background alerts are not configured on this server yet. News remains available in the News section.</p>}
         <div className="flex flex-wrap items-center gap-2">
           <button className="button-primary" disabled={busy || !config?.configured} onClick={() => void enable()}>{busy ? 'Updating…' : subscribed ? 'Renew news alerts' : 'Enable news alerts'}</button>
-          {subscribed && <>
+          {config?.provider === 'onesignal' && <button className="button-secondary" disabled={busy} onClick={() => void disable()}>Disable background alerts</button>}
+          {subscribed && config?.provider !== 'onesignal' && <>
             <button className="button-secondary" disabled={busy} onClick={() => void sendTest()}>Send test alert</button>
             <button className="button-secondary" disabled={busy} onClick={() => void disable()}>Disable alerts</button>
           </>}
@@ -132,7 +150,9 @@ export default function DesktopAppPanel({ open, onClose }: { open: boolean; onCl
           <p>• <strong>iPhone / iOS (16.4+):</strong> In Safari, tap <strong>Share ⎋</strong> → <strong>Add to Home Screen ⊕</strong>, then open the installed app and enable alerts.</p>
         </div>
       </>}
-      <p className="text-xs leading-5 text-[var(--text-muted)]">Delivery depends on browser/OS settings and connectivity; alerts are not instant trading signals. Subscriptions expire after 90 days unless renewed. We store this browser’s push endpoint and encryption keys on the server to deliver alerts. Disable alerts to remove them. No historical headline flood when you subscribe.</p>
+      <p className="text-xs leading-5 text-[var(--text-muted)]">{config?.provider === 'onesignal'
+        ? 'OneSignal stores this device’s push subscription. Background alerts support All market news with Quiet hours off; other settings pause background sends. Checks run on an external schedule. Browser/OS restrictions, battery settings and connectivity can delay delivery. Use OneSignal’s dashboard to send a server test to your device, then lock the phone to verify delivery.'
+        : 'Delivery depends on browser/OS settings and connectivity; alerts are not instant trading signals. Subscriptions expire after 90 days unless renewed. We store this browser’s push endpoint and encryption keys on the server to deliver alerts. Disable alerts to remove them.'}</p>
     </section>
     {message && <p role="status" className="mt-4 text-sm rounded-lg bg-[var(--bg-subtle)] p-3">{message}</p>}
   </dialog>;

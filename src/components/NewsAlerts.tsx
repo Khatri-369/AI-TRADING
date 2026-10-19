@@ -4,6 +4,7 @@ import { z } from 'zod';
 import type { NewsArticle, Quote } from '../types/market';
 import { useWatchlist } from '../hooks/useWatchlist';
 import { formatPercent } from '../utils/format';
+import { hasActiveBackgroundPush } from '../utils/backgroundPush';
 
 import {
   STORAGE_ALERT_INBOX,
@@ -156,6 +157,8 @@ export default function NewsAlerts({
     };
 
     window.addEventListener('market-alert-settings-changed', handleSettingsChanged);
+    const backgroundStatus = (event: Event) => setMessage((event as CustomEvent<string>).detail);
+    window.addEventListener('market-background-push-status', backgroundStatus);
     const handleStorage = (event: StorageEvent) => {
       if (event.key === STORAGE_ALERT_SETTINGS || event.key === null) setSettings(getStoredAlertSettings());
     };
@@ -163,6 +166,7 @@ export default function NewsAlerts({
     window.addEventListener('market-alert-trigger-test', handleTriggerTest);
     return () => {
       window.removeEventListener('market-alert-settings-changed', handleSettingsChanged);
+      window.removeEventListener('market-background-push-status', backgroundStatus);
       window.removeEventListener('storage', handleStorage);
       window.removeEventListener('market-alert-trigger-test', handleTriggerTest);
     };
@@ -289,6 +293,7 @@ export default function NewsAlerts({
     // Queue instead of dropping stories that arrive during the cooldown.
     if (
       settings.device &&
+      !hasActiveBackgroundPush() &&
       typeof Notification !== 'undefined' &&
       Notification.permission === 'granted'
     ) {

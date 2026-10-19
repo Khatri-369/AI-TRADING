@@ -10,6 +10,7 @@ import { analyze, scenario, chat, aiProviderStatuses, AIServiceError } from './a
 import { chatInputSchema } from '../shared/chat';
 import { prepareChatContext, prepareChartEvidence } from './ai/chatContext';
 import { newsPush } from './push';
+import { authorizedNewsJob, oneSignalPush, usesOneSignal } from './push/onesignal';
 import { subscriptionSchema } from './push/service';
 import { intervals } from '../shared/research';
 import { workspaceStore } from './workspace/store';
@@ -108,10 +109,12 @@ export function createApp(config: ServerConfig, production = config.NODE_ENV ===
         ? {
             directives: {
               defaultSrc: ["'self'"],
-              scriptSrc: ["'self'"],
+              scriptSrc: ["'self'", 'https://cdn.onesignal.com'],
               styleSrc: ["'self'", "'unsafe-inline'"],
               imgSrc: ["'self'", 'data:'],
-              connectSrc: ["'self'"],
+              connectSrc: ["'self'", 'https://*.onesignal.com'],
+              frameSrc: ["'self'", 'https://*.onesignal.com'],
+              workerSrc: ["'self'"],
               fontSrc: ["'self'"],
               objectSrc: ["'none'"],
               baseUri: ["'self'"],
@@ -164,7 +167,12 @@ export function createApp(config: ServerConfig, production = config.NODE_ENV ===
   app.use(express.json({ limit: '16kb', strict: true }));
   app.use('/api/workspace', workspaceRouter(production));
 
-  app.get('/api/notifications/config', asyncRoute(async (_req, res) => { res.json(await newsPush.status()); }));
+  app.get('/api/notifications/config', asyncRoute(async (_req, res) => {
+    if (usesOneSignal()) {
+      res.json({ provider: 'onesignal', configured: oneSignalPush.configured && (process.env.CRON_SECRET?.length ?? 0) >= 32,
+        appId: process.env.ONESIGNAL_APP_ID, publicKey: null, intervalMinutes: 5 });
+    } else res.json({ ...await newsPush.status(), provider: 'native' });
+  }));
   const notificationLimit = rateLimit({ windowMs: 60000, limit: 10, message: { error: 'Too many notification changes. Try again shortly.' } });
   for (const action of ['subscribe', 'unsubscribe', 'test'] as const) {
     app.post(`/api/notifications/${action}`, notificationLimit, csrfProtection, asyncRoute(async (req, res) => {
@@ -174,10 +182,15 @@ export function createApp(config: ServerConfig, production = config.NODE_ENV ===
       catch { res.status(503).json({ error: 'Notifications could not be updated. Check server configuration or try later.' }); }
     }));
   }
-  app.get('/api/cron/news', asyncRoute(async (_req, res) => {
+  app.get('/api/cron/news', asyncRoute(async (req, res) => {
+    if (!authorizedNewsJob(req.get('authorization'))) { res.status(401).json({ error: 'Unauthorized news job.' }); return; }
+    if (usesOneSignal() ? !oneSignalPush.configured : !(await newsPush.status()).configured) {
+      res.status(503).json({ error: 'Background news delivery is not configured.' }); return;
+    }
     const news = await marketService.news();
-    await newsPush.deliver(news);
-    res.json({ ok: true, count: news.articles.length, timestamp: new Date().toISOString() });
+    if (news.status === 'unavailable' || news.status === 'stale') { res.status(503).json({ error: 'Fresh news is unavailable; retry the job later.' }); return; }
+    const result = usesOneSignal() ? await oneSignalPush.deliver(news) : await newsPush.deliver(news);
+    res.json({ ok: true, ...result, count: news.articles.length, timestamp: new Date().toISOString() });
   }));
 
   /**

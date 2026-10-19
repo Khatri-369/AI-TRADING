@@ -136,13 +136,22 @@ export class MarketService {
   }
 
   async news(): Promise<NewsResponse> {
-    try {
-      const response = await this.newsCache.get('news', 2 * 60_000, 6 * HOUR, () => this.providers.news());
-      return { articles: response.value, provider: 'finnhub', status: response.stale ? 'stale' : response.cached ? 'cached' : 'live',
-        fetchedAt: response.fetchedAt, cached: response.cached, ...(response.error ? { error: response.error } : {}) };
-    } catch (error) {
-      return { articles: [], provider: 'finnhub', status: 'unavailable', fetchedAt: null, cached: false, error: errorMessage(error) };
-    }
+    const names = ['Finnhub global', 'Business Standard India'];
+    const results = await Promise.allSettled([
+      this.newsCache.get('global-news', 2 * 60_000, 6 * HOUR, () => this.providers.news()),
+      this.newsCache.get('india-news', 2 * 60_000, 6 * HOUR, () => this.providers.indiaNews()),
+    ]);
+    const available = results.flatMap((result, index) => result.status === 'fulfilled' ? [{ ...result.value, name: names[index] }] : []);
+    const fresh = available.filter(source => !source.stale);
+    const selected = fresh.length ? fresh : available;
+    const problems = results.flatMap((result, index) => result.status === 'rejected' || result.value.stale ? [`${names[index]} temporarily unavailable`] : []);
+    const articles = [...new Map(selected.flatMap(source => source.value.slice(0, 40)).map(article => [article.url, article])).values()]
+      .sort((a, b) => b.publishedAt.localeCompare(a.publishedAt));
+    return { articles, provider: selected.map(source => source.name).join(' + ') || names.join(' + '),
+      status: !selected.length ? 'unavailable' : !fresh.length ? 'stale' : fresh.every(source => source.cached) ? 'cached' : 'live',
+      fetchedAt: selected.map(source => source.fetchedAt).sort()[0] ?? null, cached: selected.some(source => source.cached),
+      ...(problems.length ? { error: problems.join('; ') } : {}),
+    };
   }
 
   async history(symbol: string, range: HistoryRange): Promise<HistoryResponse> {

@@ -1,4 +1,5 @@
 import type { ChatFocus } from '../shared/chat';
+import { startBackgroundPushSync } from './utils/backgroundPush';
 import { Component, lazy, Suspense, useEffect, useState, type ReactNode } from 'react';
 import { RefreshCw, X } from 'lucide-react';
 import Header from './components/Header';
@@ -57,6 +58,7 @@ export default function App() {
 }
 
 function MainApp() {
+  useEffect(startBackgroundPushSync, []);
   // Theme state: exactly TWO modes ('light' | 'dark'), persisted in localStorage
   const [theme, setTheme] = useState<ThemeType>(() => {
     const saved = localStorage.getItem('theme');

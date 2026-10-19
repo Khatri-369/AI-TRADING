@@ -36,6 +36,8 @@ export interface Overview {
 }
 
 export interface NewsArticle {
+  region?: 'india' | 'global';
+  stockLinks?: Array<{ symbol: string; basis: 'provider' | 'mention'; evidence: string }>;
   id: string;
   headline: string;
   source: string;

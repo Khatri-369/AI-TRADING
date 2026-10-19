@@ -31,9 +31,12 @@ export function useNewsAlertSettings() {
       }
     };
     window.addEventListener('market-alert-settings-changed', handleCustomChange);
+    const backgroundStatus = (event: Event) => setFeedbackMessage((event as CustomEvent<string>).detail);
+    window.addEventListener('market-background-push-status', backgroundStatus);
     window.addEventListener('storage', handleStorage);
     return () => {
       window.removeEventListener('market-alert-settings-changed', handleCustomChange);
+      window.removeEventListener('market-background-push-status', backgroundStatus);
       window.removeEventListener('storage', handleStorage);
     };
   }, []);

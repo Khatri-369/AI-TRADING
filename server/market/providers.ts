@@ -1,4 +1,5 @@
 import { gunzipSync } from 'node:zlib';
+import { enrichNews, indianMarketNews } from './news';
 import { z } from 'zod';
 import { ASSETS } from '../../shared/assets';
 import type { Asset, HistoryRange, MarketSession, NewsArticle } from '../../shared/types';
@@ -238,8 +239,10 @@ export class MarketProviders {
       } catch { /* Drop malformed dates without discarding other articles. */ }
     }
     if (raw.length && !articles.length) throw new Error('Provider returned no valid news articles');
-    return [...new Map(articles.map((item) => [item.id, item])).values()].sort((a, b) => b.publishedAt.localeCompare(a.publishedAt)).slice(0, 40);
+    return [...new Map(articles.map((item) => [item.id, enrichNews(item, 'global')])).values()].sort((a, b) => b.publishedAt.localeCompare(a.publishedAt)).slice(0, 40);
   }
+
+  indiaNews() { return indianMarketNews(this.fetcher); }
 
   async history(asset: Asset, range: HistoryRange): Promise<PricePoint[]> {
     const days = RANGE_DAYS[range];

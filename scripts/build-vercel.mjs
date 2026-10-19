@@ -80,11 +80,12 @@ await writeFile(
             'X-Frame-Options': 'DENY',
             'Referrer-Policy': 'strict-origin-when-cross-origin',
             'Content-Security-Policy':
-              "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; worker-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'",
+              "default-src 'self'; script-src 'self' https://cdn.onesignal.com; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' https://*.onesignal.com; frame-src 'self' https://*.onesignal.com; worker-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'",
           },
           continue: true,
         },
         { src: '/sw.js', headers: { 'Cache-Control': 'no-cache', 'Service-Worker-Allowed': '/' }, continue: true },
+        { src: '/onesignal/OneSignalSDKWorker.js', headers: { 'Cache-Control': 'no-cache', 'Service-Worker-Allowed': '/onesignal/' }, continue: true },
         { src: '/manifest.webmanifest', headers: { 'Cache-Control': 'no-cache' }, continue: true },
         { src: '/icons/.*', headers: { 'Cache-Control': 'no-cache' }, continue: true },
         apiRoute,

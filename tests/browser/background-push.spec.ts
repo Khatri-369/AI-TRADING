@@ -1,0 +1,43 @@
+import { test, expect } from '@playwright/test';
+
+test('OneSignal registration uses its own worker and follows enable, disable and scope preferences', async ({ page }) => {
+  const errors: string[] = []; page.on('pageerror', error => errors.push(error.message));
+  await page.addInitScript(() => {
+    localStorage.setItem('markets.alerts.settings.v1', JSON.stringify({ enabled: true, device: true, scope: 'all', quiet: false }));
+    Object.defineProperty(window, 'Notification', { value: class { static permission = 'granted'; static requestPermission = async () => 'granted'; } });
+  });
+  await page.route('**/api/notifications/config', route => route.fulfill({ json: { provider: 'onesignal', configured: true, appId: 'c93d06ef-e58a-43a0-8f00-87a7b632f11a', publicKey: null, intervalMinutes: 5 } }));
+  await page.route('https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js', route => route.fulfill({ contentType: 'application/javascript', body: `
+    window.pushCalls = [];
+    const sdk = { init: async options => { window.workerOptions = options; }, User: {
+      addTag: async (key, value) => window.pushCalls.push(key + '=' + value),
+      PushSubscription: { id: 'test-subscription', optedIn: false,
+        optIn: async function() { this.optedIn = true; window.pushCalls.push('opt-in'); },
+        optOut: async function() { this.optedIn = false; window.pushCalls.push('opt-out'); }
+      }
+    }};
+    window.OneSignalDeferred.forEach(callback => callback(sdk));
+  ` }));
+  await page.route('**/api/workspace/session', route => route.fulfill({ json: { user: null } }));
+  await page.route('**/api/markets/overview', route => route.fulfill({ json: { quotes: [], generatedAt: new Date().toISOString() } }));
+  await page.route('**/api/news', route => route.fulfill({ json: { articles: [], provider: 'Fixture', status: 'unavailable', cached: false, fetchedAt: null } }));
+  await page.route('**/api/stream/live-ticks', route => route.abort());
+  await page.goto('/');
+  const calls = () => page.evaluate(() => (window as unknown as { pushCalls: string[] }).pushCalls);
+  await expect.poll(calls).toContain('market_news=on');
+  expect(await page.evaluate(() => (window as unknown as { workerOptions: { serviceWorkerParam: { scope: string } } }).workerOptions.serviceWorkerParam.scope)).toBe('/onesignal/');
+  await page.getByRole('button', { name: 'Desktop app and news alerts' }).click();
+  await page.getByRole('button', { name: 'Disable background alerts' }).click();
+  await expect.poll(async () => (await calls()).at(-1)).toBe('opt-out');
+  await expect(page.getByRole('status').filter({ hasText: 'Background news notifications are off.' })).toBeVisible();
+  await page.getByRole('button', { name: 'Enable news alerts', exact: true }).click();
+  await expect(page.getByRole('status').filter({ hasText: 'Device registered with OneSignal' })).toBeVisible();
+  await page.evaluate(() => {
+    const settings = { enabled: true, device: true, scope: 'watchlist', quiet: false };
+    localStorage.setItem('markets.alerts.settings.v1', JSON.stringify(settings));
+    window.dispatchEvent(new CustomEvent('market-alert-settings-changed', { detail: settings }));
+  });
+  await expect.poll(async () => (await calls()).at(-1)).toBe('opt-out');
+  expect(errors).toEqual([]);
+  expect((await page.request.get('/api/cron/news')).status()).toBe(401);
+});

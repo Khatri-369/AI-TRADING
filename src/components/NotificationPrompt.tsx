@@ -173,8 +173,8 @@ export default function NotificationPrompt() {
               className="mt-1 text-xs text-gray-300 leading-relaxed"
             >
               {grantedMessage
-                ? 'You will now receive instant desktop & mobile alerts for breaking market news.'
-                : 'Get instant alerts on your screen when breaking financial news and market movements occur.'}
+                ? 'Browser permission is enabled. Closed-app news alerts also require background registration and a scheduled news check.'
+                : 'Get alerts for new market headlines. Background delivery uses OneSignal when configured and depends on phone settings.'}
             </p>
           </div>
         </div>

@@ -74,6 +74,7 @@ export default function NewsSignalFeed({
   const [, navigate] = useRouter();
   const { symbols: watchlistSymbols } = useWatchlist();
   const [feedFilter, setFeedFilter] = useState<'all' | 'watchlist' | 'saved'>('all');
+  const [region, setRegion] = useState<'all' | 'india' | 'global'>('all');
   const [expandedWhy, setExpandedWhy] = useState<Record<string, boolean>>({});
   const [shareToast, setShareToast] = useState('');
 
@@ -184,6 +185,7 @@ export default function NewsSignalFeed({
 
   // Apply search and tab filters
   const filteredArticles = clusteredArticles.filter((article) => {
+    if (region !== 'all' && article.region !== region) return false;
     // Search query match
     const query = search.trim().toLowerCase();
     const matchesSearch =
@@ -252,6 +254,13 @@ export default function NewsSignalFeed({
       </div>
 
       {/* Scope Segment Tabs: All / Watchlist / Saved */}
+      {data?.error && <p role="status" className="text-xs text-[var(--text-muted)]">Coverage notice: {data.error}</p>}
+      <label className="flex flex-wrap items-center gap-2 text-xs text-[var(--text-secondary)]">News region
+        <select aria-label="News region" className="field min-h-[44px]" value={region} onChange={event => setRegion(event.target.value as typeof region)}>
+          <option value="all">Global + India</option><option value="india">India</option><option value="global">Global</option>
+        </select>
+        <span>Related stocks are provider links or company mentions—not confirmed price effects.</span>
+      </label>
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--border-subtle)] pb-2.5">
         <div className="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar w-full sm:w-auto" role="tablist">
           <button
@@ -464,7 +473,7 @@ export default function NewsSignalFeed({
                             navigate(`/desk?symbol=${encodeURIComponent(sym)}`);
                           }}
                           className="inline-flex items-center gap-1 rounded-md border border-[var(--border-default)] bg-[var(--bg-subtle)] px-2 py-1 font-mono text-[11px] font-medium text-[var(--text-primary)] hover:border-[var(--accent-primary)] hover:text-[var(--accent-text)] transition min-h-[32px] cursor-pointer"
-                          title={`Open ${sym} chart`}
+                          title={`${article.stockLinks?.find(link => link.symbol === sym)?.evidence ?? 'Linked by news provider'}. Open ${sym} chart.`}
                         >
                           <BarChart2 size={12} className="text-[var(--accent-primary)]" />
                           <span>{sym}</span>
