@@ -12,6 +12,7 @@ import ScenarioSimulator from './components/ScenarioSimulator';
 import OverviewPage from './components/OverviewPage';
 import ProductDisclosuresModal from './components/ProductDisclosuresModal';
 import UpdatePrompt from './components/UpdatePrompt';
+import NotificationPrompt from './components/NotificationPrompt';
 import MobileBottomNav from './components/MobileBottomNav';
 import { ErrorNotice, Loading } from './components/Feedback';
 import { useMarketData, useNews } from './hooks/useMarketData';
@@ -480,6 +481,9 @@ function MainApp() {
 
       {/* PWA In-App Update Prompt */}
       <UpdatePrompt />
+
+      {/* First-time & Post-install Notification Prompt */}
+      <NotificationPrompt />
 
       {/* Native Mobile Bottom Navigation Bar */}
       <MobileBottomNav currentTab={route.page} onNavigate={handleNavigate} />

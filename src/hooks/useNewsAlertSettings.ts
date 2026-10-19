@@ -58,9 +58,27 @@ export function useNewsAlertSettings() {
     });
   }, []);
 
-  const toggleEnabled = useCallback(() => {
+  const toggleEnabled = useCallback(async () => {
+    let deviceAllowed = settings.device;
+    const currentPerm = getNotificationPermission();
+
+    if (!settings.enabled) {
+      if (currentPerm === 'default') {
+        const granted = await requestNotificationPermission();
+        deviceAllowed = granted;
+        setPermission(getNotificationPermission());
+      } else if (currentPerm === 'granted') {
+        deviceAllowed = true;
+      }
+    }
+
     setSettings((prev) => {
-      const next = { ...prev, enabled: !prev.enabled };
+      const willEnable = !prev.enabled;
+      const next = {
+        ...prev,
+        enabled: willEnable,
+        device: willEnable ? (deviceAllowed || prev.device) : prev.device,
+      };
       saveStoredAlertSettings(next);
       setFeedbackMessage(
         next.enabled
@@ -69,18 +87,31 @@ export function useNewsAlertSettings() {
       );
       return next;
     });
-  }, []);
+  }, [settings.enabled, settings.device]);
 
   const setEnabled = useCallback(
-    (enabled: boolean) => {
-      updateSettings({ enabled });
+    async (enabled: boolean) => {
+      let deviceAllowed = settings.device;
+      const currentPerm = getNotificationPermission();
+
+      if (enabled) {
+        if (currentPerm === 'default') {
+          const granted = await requestNotificationPermission();
+          deviceAllowed = granted;
+          setPermission(getNotificationPermission());
+        } else if (currentPerm === 'granted') {
+          deviceAllowed = true;
+        }
+      }
+
+      updateSettings({ enabled, ...(enabled && deviceAllowed ? { device: true } : {}) });
       setFeedbackMessage(
         enabled
           ? 'News notifications enabled! Breaking market alerts will appear.'
           : 'News notifications disabled. Alerts are currently muted.'
       );
     },
-    [updateSettings]
+    [updateSettings, settings.device]
   );
 
   const toggleDeviceNotifications = useCallback(async () => {
@@ -129,6 +160,7 @@ export function useNewsAlertSettings() {
 
   const sendTestAlert = useCallback(
     (quotes: Quote[] = []) => {
+      const currentPerm = getNotificationPermission();
       const testArticle = {
         id: `test-news-${Date.now()}`,
         headline: 'Market Update: Sector leaders show volume momentum and price action',
@@ -139,7 +171,11 @@ export function useNewsAlertSettings() {
 
       triggerMarketAlertTest(testArticle);
 
-      if (settings.device && permission === 'granted') {
+      const shouldSendDevice = (settings.device || currentPerm === 'granted') && currentPerm === 'granted';
+      if (shouldSendDevice) {
+        if (!settings.device) {
+          updateSettings({ device: true });
+        }
         void sendSystemNotification(
           testArticle.headline,
           testArticle.source,
@@ -150,7 +186,7 @@ export function useNewsAlertSettings() {
 
       setFeedbackMessage('Test alert dispatched! Check your screen and notification center.');
     },
-    [settings.device, permission]
+    [settings.device, updateSettings]
   );
 
   return {

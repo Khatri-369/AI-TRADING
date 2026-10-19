@@ -11,9 +11,6 @@ import {
   X,
   Star,
   ChevronRight,
-  BarChart2,
-  Clock,
-  Plus,
 } from 'lucide-react';
 import type { NewsArticle, Quote, Tab } from '../types/market';
 import {
@@ -44,8 +41,6 @@ const CATEGORY_MAP: Record<string, { label: string; icon: string }> = {
   crypto: { label: 'Digital Assets', icon: '🪙' },
   commodities: { label: 'Metals & FX', icon: '🏆' },
 };
-
-const RECOMMENDED_INDIAN_STOCKS = ['RELIANCE', 'TCS', 'HDFCBANK', 'INFY', 'ICICIBANK', 'SBIN'];
 
 function BenchmarkCard({
   quote,
@@ -127,7 +122,7 @@ export default function OverviewPage({
   onSelectAsset,
   onNavigate,
 }: Props) {
-  const { symbols, toggle } = useWatchlist();
+  const { symbols } = useWatchlist();
   const [selectedCategory, setSelectedCategory] = useState<'all' | 'india' | 'us' | 'crypto' | 'commodities'>('india');
   const [defaultLanding, setDefaultLanding] = useState<'overview' | 'watchlist'>(() => {
     return (localStorage.getItem('default_landing_page') as 'overview' | 'watchlist') || 'overview';
@@ -152,15 +147,6 @@ export default function OverviewPage({
   const benchmarks = benchmarkSymbols
     .map((sym) => quotes.find((q) => q.symbol === sym))
     .filter((q): q is Quote => Boolean(q));
-
-  // User's Watchlist Quotes
-  const watchlistQuotes = symbols
-    .map((s) => quotes.find((q) => q.symbol === s))
-    .filter((q): q is Quote => Boolean(q));
-
-  // Last viewed chart symbol
-  const lastChartSymbol = localStorage.getItem('last_chart_symbol') || 'RELIANCE';
-  const lastChartQuote = quotes.find((q) => q.symbol === lastChartSymbol) || quotes.find((q) => q.symbol === 'RELIANCE');
 
   // Gainers & Losers
   const quotesWithChanges = quotes.filter(
@@ -234,145 +220,6 @@ export default function OverviewPage({
         </div>
       </div>
 
-      {/* TOP SECTION: User Watchlist & Continue Last Chart */}
-      <section className="grid gap-3 sm:grid-cols-2">
-        {/* Watchlist Hub Card */}
-        <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-3.5 flex flex-col justify-between">
-          <div>
-            <div className="flex items-center justify-between border-b border-[var(--border-subtle)] pb-2 mb-2.5">
-              <h2 className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-[var(--text-primary)]">
-                <Star className="h-3.5 w-3.5 text-amber-400 fill-amber-400" />
-                <span>My Watchlist</span>
-              </h2>
-              <button
-                type="button"
-                onClick={() => onNavigate('watchlist')}
-                className="text-[11px] font-medium text-[var(--accent-text)] hover:underline flex items-center gap-0.5"
-              >
-                <span>Manage</span>
-                <ChevronRight className="h-3 w-3" />
-              </button>
-            </div>
-
-            {watchlistQuotes.length > 0 ? (
-              <div className="space-y-1.5 max-h-48 overflow-y-auto">
-                {watchlistQuotes.slice(0, 4).map((q) => {
-                  const isGain = (q.changePercent ?? 0) >= 0;
-                  const isIndex = isIndexInstrument(q.symbol, q.sector, q.currency);
-                  return (
-                    <div
-                      key={q.symbol}
-                      className="flex items-center justify-between rounded-lg p-1.5 hover:bg-[var(--bg-surface-hover)] transition text-xs"
-                    >
-                      <button
-                        type="button"
-                        onClick={() => onSelectAsset(q)}
-                        className="flex items-center gap-2 text-left min-w-0 flex-1 cursor-pointer"
-                      >
-                        <span className="font-bold text-[var(--text-primary)]">{q.symbol}</span>
-                        <span className="text-[11px] text-[var(--text-muted)] truncate max-w-[120px]">{q.name}</span>
-                      </button>
-                      <div className="flex items-center gap-2">
-                        <span className="font-mono text-xs tabular-nums text-[var(--text-primary)]">
-                          {formatPrice(q.price, q.currency, isIndex)}
-                        </span>
-                        <span
-                          className={`rounded px-1.5 py-0.5 font-mono text-[10px] font-bold tabular-nums ${
-                            isGain ? 'text-emerald-400 bg-emerald-500/10' : 'text-rose-400 bg-rose-500/10'
-                          }`}
-                        >
-                          {formatPercent(q.changePercent)}
-                        </span>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            ) : (
-              <div className="py-2 space-y-2">
-                <p className="text-xs text-[var(--text-secondary)]">
-                  Save stocks to track quotes, compare setups, and filter news.
-                </p>
-                <div className="flex flex-wrap gap-1.5 pt-1">
-                  {RECOMMENDED_INDIAN_STOCKS.map((sym) => (
-                    <button
-                      key={sym}
-                      type="button"
-                      onClick={() => void toggle(sym)}
-                      className="inline-flex items-center gap-1 rounded-md border border-[var(--border-subtle)] bg-[var(--bg-subtle)] px-2 py-1 text-xs font-medium text-[var(--text-secondary)] hover:border-[var(--accent-primary)] hover:text-[var(--text-primary)] transition cursor-pointer"
-                    >
-                      <Plus className="h-3 w-3" />
-                      <span>{sym}</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-
-          {watchlistQuotes.length > 4 && (
-            <p className="mt-2 text-[11px] text-[var(--text-muted)] text-right">
-              +{watchlistQuotes.length - 4} more stocks saved
-            </p>
-          )}
-        </div>
-
-        {/* Continue Last Chart Card */}
-        <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-3.5 flex flex-col justify-between">
-          <div>
-            <div className="flex items-center justify-between border-b border-[var(--border-subtle)] pb-2 mb-2.5">
-              <h2 className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-[var(--text-primary)]">
-                <Clock className="h-3.5 w-3.5 text-[var(--accent-primary)]" />
-                <span>Continue Last Chart</span>
-              </h2>
-              <span className="text-[10px] text-[var(--text-muted)] font-mono">Workspace</span>
-            </div>
-
-            {lastChartQuote ? (
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <span className="text-sm font-bold text-[var(--text-primary)]">{lastChartQuote.symbol}</span>
-                    <span className="ml-2 text-xs text-[var(--text-muted)]">{lastChartQuote.name}</span>
-                  </div>
-                  <div className="text-right">
-                    <div className="font-mono text-sm font-bold tabular-nums text-[var(--text-primary)]">
-                      {formatPrice(lastChartQuote.price, lastChartQuote.currency, isIndexInstrument(lastChartQuote.symbol, lastChartQuote.sector, lastChartQuote.currency))}
-                    </div>
-                    <span
-                      className={`text-[11px] font-mono tabular-nums ${
-                        (lastChartQuote.changePercent ?? 0) >= 0 ? 'text-emerald-400' : 'text-rose-400'
-                      }`}
-                    >
-                      {formatPercent(lastChartQuote.changePercent)}
-                    </span>
-                  </div>
-                </div>
-                <p className="text-xs text-[var(--text-secondary)] leading-relaxed">
-                  Resume candlestick chart analysis, saved trendlines, and risk planning for {lastChartQuote.name}.
-                </p>
-              </div>
-            ) : (
-              <p className="text-xs text-[var(--text-muted)]">No recent chart viewed yet.</p>
-            )}
-          </div>
-
-          <div className="mt-3 flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => {
-                const sym = lastChartQuote?.symbol ?? 'RELIANCE';
-                localStorage.setItem('last_chart_symbol', sym);
-                onNavigate('desk');
-              }}
-              className="button-primary text-xs min-h-[44px] flex-1 rounded-lg flex items-center justify-center gap-1.5"
-            >
-              <BarChart2 className="h-3.5 w-3.5" />
-              <span>Open {lastChartQuote?.symbol ?? 'RELIANCE'} Chart</span>
-            </button>
-          </div>
-        </div>
-      </section>
 
       {/* Simple First-Use Flow: 3-Step Guided Roadmap */}
       {showTip && (

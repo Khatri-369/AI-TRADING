@@ -6,7 +6,7 @@ export function usePolling<T>(load: (signal: AbortSignal) => Promise<T>, interva
   const [data, setData] = useState<T | null>(null);
   const [loading, setLoading] = useState(enabled);
   const [error, setError] = useState<string | null>(null);
-  const [paused, setPaused] = useState(document.hidden);
+  const [paused, setPaused] = useState(document.hidden && !runWhenHidden);
   const [lastFetched, setLastFetched] = useState<Date | null>(null);
   const [secondsUntilRefresh, setSecondsUntilRefresh] = useState(Math.round(intervalMs / 1000));
   const refreshRef = useRef<() => void>(() => {});

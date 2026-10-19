@@ -38,7 +38,17 @@ export function ResearchProvider({ children }: { children: ReactNode }) {
       const value = await workspaceRequest<{ records: ResearchRecord[] }>('/records');
       if (request !== sequence.current) return;
       setUser(session.user); setRecords(value.records); setStatus('Account workspace synced');
-    } catch (error) { if (request !== sequence.current) return; if ((error as { status?: number }).status === 503 && identity.current === null) initialized.current = true; setStatus(error instanceof Error ? error.message : 'Sync unavailable'); }
+    } catch (error) {
+      if (request !== sequence.current) return;
+      if (identity.current === null) {
+        initialized.current = true;
+        setUser(null);
+        setRecords(loadLocal());
+        setStatus('Guest · saved on this browser');
+        return;
+      }
+      setStatus(error instanceof Error ? error.message : 'Sync unavailable');
+    }
   }
   useEffect(() => { void refresh(); const onFocus = () => { void refresh(); }; window.addEventListener('focus', onFocus); return () => window.removeEventListener('focus', onFocus); }, []);
   async function save(id: string, kind: RecordKind, data: unknown, version: number) {
