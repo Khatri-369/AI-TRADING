@@ -11,6 +11,7 @@ import { chatInputSchema } from '../shared/chat';
 import { prepareChatContext, prepareChartEvidence } from './ai/chatContext';
 import { newsPush } from './push';
 import { authorizedNewsJob, oneSignalPush, usesOneSignal } from './push/onesignal';
+import { deviceCheckSchema, verifyDevice, appDiagnostics } from './push/diagnostics';
 import { subscriptionSchema } from './push/service';
 import { intervals } from '../shared/research';
 import { workspaceStore } from './workspace/store';
@@ -174,6 +175,18 @@ export function createApp(config: ServerConfig, production = config.NODE_ENV ===
     } else res.json({ ...await newsPush.status(), provider: 'native' });
   }));
   const notificationLimit = rateLimit({ windowMs: 60000, limit: 10, message: { error: 'Too many notification changes. Try again shortly.' } });
+  app.post('/api/notifications/verify', notificationLimit, csrfProtection, asyncRoute(async (req, res) => {
+    const parsed = deviceCheckSchema.safeParse(req.body);
+    if (!parsed.success) { res.status(400).json({ error: 'Invalid device verification request.' }); return; }
+    if (!oneSignalPush.configured) { res.status(503).json({ error: 'Background push is not configured.' }); return; }
+    try { res.json(await verifyDevice(process.env.ONESIGNAL_APP_ID!, process.env.ONESIGNAL_REST_API_KEY!, parsed.data.userId, parsed.data.subscriptionId)); }
+    catch { logger.warn('Device registration verification unavailable'); res.status(503).json({ error: 'Device verification unavailable. Retry shortly.' }); }
+  }));
+  app.get('/api/notifications/diagnostics', asyncRoute(async (req, res) => {
+    if (!authorizedNewsJob(req.get('authorization'))) { res.status(401).json({ error: 'Unauthorized diagnostics.' }); return; }
+    if (!oneSignalPush.configured) { res.status(503).json({ error: 'Background push is not configured.' }); return; }
+    res.json(await appDiagnostics(process.env.ONESIGNAL_APP_ID!, process.env.ONESIGNAL_REST_API_KEY!, process.env.PUBLIC_SITE_URL));
+  }));
   for (const action of ['subscribe', 'unsubscribe', 'test'] as const) {
     app.post(`/api/notifications/${action}`, notificationLimit, csrfProtection, asyncRoute(async (req, res) => {
       const parsed = subscriptionSchema.safeParse(req.body);
@@ -183,7 +196,13 @@ export function createApp(config: ServerConfig, production = config.NODE_ENV ===
     }));
   }
   app.get('/api/cron/news', asyncRoute(async (req, res) => {
-    if (!authorizedNewsJob(req.get('authorization'))) { res.status(401).json({ error: 'Unauthorized news job.' }); return; }
+    if (!authorizedNewsJob(req.get('authorization'))) {
+      const header = req.get('authorization');
+      const reason = !process.env.CRON_SECRET || process.env.CRON_SECRET.length < 32 ? 'server-secret-unconfigured'
+        : !header ? 'missing-authorization' : !header.startsWith('Bearer ') ? 'invalid-authorization-scheme' : 'secret-mismatch';
+      logger.warn('News cron authentication rejected', { reason });
+      res.status(401).json({ error: 'Unauthorized news job.', code: 'CRON_UNAUTHORIZED' }); return;
+    }
     if (usesOneSignal() ? !oneSignalPush.configured : !(await newsPush.status()).configured) {
       res.status(503).json({ error: 'Background news delivery is not configured.' }); return;
     }

@@ -5,6 +5,7 @@ export interface QueuedHeadline {
   key: string;
   article: NewsArticle;
   attempts: number;
+  deliveryGeneration?: number;
   firstAttempt?: number;
   messageId?: string;
   error?: string;

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Bell, Download, X } from 'lucide-react';
 import { z } from 'zod';
-import { syncBackgroundPush } from '../utils/backgroundPush';
+import { syncBackgroundPush, hasActiveBackgroundPush } from '../utils/backgroundPush';
 import { getStoredAlertSettings, saveStoredAlertSettings, requestNotificationPermission } from '../utils/notifications';
 
 interface InstallEvent extends Event { prompt: () => Promise<void>; userChoice: Promise<{ outcome: string }> }
@@ -46,13 +46,19 @@ export default function DesktopAppPanel({ open, onClose }: { open: boolean; onCl
     }).catch(() => undefined);
     return () => controller.abort();
   }, [open, supported]);
+  useEffect(() => {
+    const update = (event: Event) => { setMessage((event as CustomEvent<string>).detail); setSubscribed(hasActiveBackgroundPush()); };
+    window.addEventListener('market-background-push-status', update);
+    return () => window.removeEventListener('market-background-push-status', update);
+  }, []);
   async function enable() {
     if (config?.provider === 'onesignal') {
       setBusy(true);
       try {
-        if (!await requestNotificationPermission()) { setMessage('Allow notifications in browser settings first.'); return; }
+        if (!await requestNotificationPermission()) { setMessage('On iPhone, open the Safari-installed Home Screen app (iOS 16.4+). Otherwise allow notifications in browser site settings.'); return; }
         saveStoredAlertSettings({ ...getStoredAlertSettings(), enabled: true, device: true });
         setMessage(await syncBackgroundPush() ?? 'Background provider is unavailable.');
+        setSubscribed(hasActiveBackgroundPush());
       } catch { setMessage('Background registration failed. Check OneSignal setup and retry.'); }
       finally { setBusy(false); }
       return;
@@ -80,6 +86,7 @@ export default function DesktopAppPanel({ open, onClose }: { open: boolean; onCl
       if (config?.provider === 'onesignal') {
         saveStoredAlertSettings({ ...getStoredAlertSettings(), device: false });
         setMessage(await syncBackgroundPush() ?? 'Background provider is unavailable.');
+        setSubscribed(hasActiveBackgroundPush());
         return;
       }
       const registration = await navigator.serviceWorker.getRegistration();

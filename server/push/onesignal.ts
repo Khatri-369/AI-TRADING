@@ -1,6 +1,7 @@
 import { createHash, randomUUID, timingSafeEqual } from 'node:crypto';
 import { z } from 'zod';
 import { logger } from '../logger';
+import { appDiagnostics, classifyPushResponse } from './diagnostics';
 import { RedisNewsQueue, queueHeadline, type NewsQueue, type QueuedHeadline } from './newsQueue';
 import type { NewsResponse } from '../../shared/types';
 
@@ -15,8 +16,8 @@ interface Options {
   appId?: string; apiKey?: string; queue?: NewsQueue; fetcher?: typeof fetch;
   now?: () => number; sleep?: (ms: number) => Promise<void>;
 }
-export function notificationKey(appId: string, key: string) {
-  const bytes = createHash('sha256').update(`${appId}:${key}`).digest().subarray(0, 16);
+export function notificationKey(appId: string, key: string, generation = 0) {
+  const bytes = createHash('sha256').update(`${appId}:${key}${generation ? `:retry-${generation}` : ''}`).digest().subarray(0, 16);
   bytes[6] = (bytes[6] & 15) | 80; bytes[8] = (bytes[8] & 63) | 128;
   const hex = bytes.toString('hex');
   return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
@@ -69,11 +70,18 @@ export class OneSignalNewsPush {
         }
         const result = await this.send(record, options);
         if (result.id) {
+          if (result.warning) logger.warn('Push accepted with recipient warnings', { key: record.key, reason: result.warning });
           record.state = 'accepted'; record.messageId = result.id; delete record.error;
           // A failed commit leaves a retryable record with the SAME idempotency key.
           await queue.save(owner, record, now()); accepted++;
         } else {
           record.error = result.error; failed++;
+          // Only an explicit no-recipients rejection proves no notification was created.
+          // Persist the new generation before retrying; unknown outcomes keep their original key.
+          if (result.definitelyNotCreated) {
+            record.deliveryGeneration = (record.deliveryGeneration ?? 0) + 1;
+            delete record.firstAttempt;
+          }
           const due = now() + retryDelay(record.attempts, result.retryAfter ?? null, now());
           await queue.save(owner, record, due, result.pause ? due : 0);
           logger.error('Headline delivery deferred', { key: record.key, attempt: record.attempts, reason: result.error, retryAt: new Date(due).toISOString() });
@@ -90,8 +98,8 @@ export class OneSignalNewsPush {
       try { await queue.release(owner); } catch { logger.error('News job lease release failed; lease will expire'); }
     }
   }
-  private async send(record: QueuedHeadline, options: { appId: string; apiKey: string }) {
-    const id = notificationKey(options.appId, record.key);
+  private async send(record: QueuedHeadline, options: { appId: string; apiKey: string }): Promise<{ id?: string; warning?: string; error?: string; httpStatus?: number; retryAfter?: string | null; pause?: boolean; definitelyNotCreated?: boolean }> {
+    const id = notificationKey(options.appId, record.key, record.deliveryGeneration);
     try {
       const response = await (this.options.fetcher ?? fetch)('https://api.onesignal.com/notifications', {
         method: 'POST', redirect: 'error', headers: { Authorization: `Key ${options.apiKey}`, 'Content-Type': 'application/json' },
@@ -104,10 +112,19 @@ export class OneSignalNewsPush {
           ttl: 86400, priority: 10, idempotency_key: id,
         }),
       });
-      if (!response.ok) return { error: `provider-http-${response.status}`, retryAfter: response.headers.get('retry-after'), pause: response.status === 429 || response.status === 401 || response.status === 403 || response.status >= 500 };
-      const body = await response.json() as { id?: string };
-      if (typeof body.id === 'string' && body.id) return { id: body.id };
-      return { error: 'no-message-id-or-no-subscribers', pause: true };
+      const body: unknown = await response.json().catch(() => null);
+      const outcome = classifyPushResponse(response.status, body);
+      if (outcome.id) return outcome;
+      if (outcome.error === 'audience-no-subscribed-recipients') {
+        try {
+          const diagnostic = await appDiagnostics(options.appId, options.apiKey, process.env.PUBLIC_SITE_URL, this.options.fetcher ?? fetch);
+          logger.warn('OneSignal audience unavailable', { ...diagnostic,
+            cause: diagnostic.status !== 'ok' ? 'audience-diagnosis-unavailable' : 'messageableSubscriptions' in diagnostic && diagnostic.messageableSubscriptions === 0 ? 'no-messageable-subscribers' : 'no-subscribed-users-matched-market-news-tag',
+          });
+        } catch { logger.warn('OneSignal audience diagnostic unavailable'); }
+      }
+      return { ...outcome, httpStatus: response.status, retryAfter: response.headers.get('retry-after'),
+        pause: response.ok || response.status === 429 || response.status === 401 || response.status === 403 || response.status >= 500 };
     } catch { return { error: 'provider-network-or-invalid-response', pause: true }; }
   }
 }

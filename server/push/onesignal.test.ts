@@ -143,3 +143,15 @@ test('missing persistent store fails closed and Redis errors never leak credenti
   });
   await assert.rejects(q.acquire('test'), error => error instanceof Error && !error.message.includes('private-redis-token'));
 });
+
+test('explicit no-subscribers rejection can recover with a new persisted generation, while retaining the queued headline', async () => {
+  const t = setup();
+  t.setResponse(() => new Response('{"id":"","errors":["All included players are not subscribed"]}'));
+  await t.sender().deliver(feed());
+  const record = [...t.queue.records.values()][0];
+  assert.equal(record.state, 'pending'); assert.equal(record.deliveryGeneration, 1);
+  t.advance(300000);t.setResponse(() => new Response('{"id":"accepted"}'));
+  await t.sender().deliver(feed());
+  assert.notEqual(t.calls[0].idempotency_key, t.calls.at(-1)?.idempotency_key);
+  assert.equal([...t.queue.records.values()][0].state, 'accepted');
+});

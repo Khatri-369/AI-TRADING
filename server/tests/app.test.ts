@@ -231,3 +231,18 @@ test('configuration rejects invalid port and placeholder secrets without echoing
 test('production requires an explicit session secret even on Vercel', () => {
   assert.throws(() => readConfig({ NODE_ENV: 'production', VERCEL: '1' }), /SESSION_SECRET/);
 });
+
+test('cron and read-only push diagnostics reject missing or wrong Bearer credentials before provider calls', async () => {
+  const saved = process.env.CRON_SECRET;process.env.CRON_SECRET='x'.repeat(32);
+  try {await withServer(async url => {
+    for(const endpoint of ['/api/cron/news','/api/notifications/diagnostics']) {
+      for(const headers of [{}, {Authorization:'Basic wrong'}, {Authorization:'Bearer '+ 'y'.repeat(32)}] as Record<string, string>[]) {
+        const response=await fetch(url+endpoint,{headers}); assert.equal(response.status,401);
+      }
+    }
+    const invalid=await post(url+'/api/notifications/verify',{userId:'invalid',subscriptionId:'invalid'});
+    assert.equal(invalid.status,400);
+    const noCsrf=await fetch(url+'/api/notifications/verify',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});
+    assert.equal(noCsrf.status,403);
+  });}finally{if(saved===undefined)delete process.env.CRON_SECRET;else process.env.CRON_SECRET=saved;}
+});

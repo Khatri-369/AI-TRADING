@@ -2,6 +2,7 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
 import type { Express } from 'express';
 import { readConfig } from './config';
 import { createApp } from './app';
+import { normalizeVercelProxyHeaders } from './proxyHeaders';
 
 let appInstance: Express | null = null;
 let initError: Error | null = null;
@@ -13,6 +14,7 @@ function getApp(): Express {
       const config = readConfig({
         ...process.env,
         NODE_ENV: 'production',
+        ...(process.env.VERCEL === '1' ? { TRUST_PROXY_HOPS: '1' } : {}),
         HOST: '0.0.0.0',
         PORT: '3000',
       });
@@ -27,6 +29,7 @@ function getApp(): Express {
 
 export default function handler(req: IncomingMessage, res: ServerResponse) {
   try {
+    if (process.env.VERCEL === '1') normalizeVercelProxyHeaders(req.headers);
     // If Vercel rewrote the URL to /api, restore the original requested path
     const matchedPath = req.headers['x-matched-path'];
     if (typeof matchedPath === 'string' && matchedPath.startsWith('/api')) {

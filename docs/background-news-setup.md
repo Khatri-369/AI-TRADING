@@ -68,3 +68,34 @@ Official references:
 - https://documentation.onesignal.com/reference/idempotent-notification-requests
 - https://documentation.onesignal.com/reference/rate-limits
 - https://documentation.onesignal.com/docs/en/web-sdk-setup
+
+
+## Registration recovery and safe diagnostics
+
+Browser permission alone is not a push subscription. The application now waits for OneSignal user/subscription change events and verifies the SDK's real user and subscription IDs against OneSignal from the backend. `market_news` is a **user tag**, not a property on the subscription object. `addTag()` updates local state synchronously; its return is not confirmation that OneSignal has saved the tag. The backend returns only registration/subscription/tag readiness booleans, never tokens or other user details. Verification is CSRF-protected, input-validated and rate-limited. It does not create users or subscriptions.
+
+Run `npm run verify:push` locally for read-only app-origin, subscriber-count, production-App-ID and queue checks. It prints no secret values and sends no push. After deployment, `GET /api/notifications/diagnostics` with the same private Bearer cron credential provides read-only aggregate OneSignal diagnostics. Do not use `/api/cron/news` as a connection test: that endpoint processes the real queue.
+
+If diagnostics show zero messageable subscriptions, there is no eligible device to send to. If they show messageable subscriptions but a create request reports no matching recipients, inspect each user's `market_news=on` tag and push status. This distinction is diagnostic, not a reason to broadcast to all users or invent subscriptions. Provider auth, invalid-filter, quota, missing-ID and partial-recipient errors have distinct sanitized codes. A successful message ID with recipient warnings is retained as accepted to avoid resending to users already targeted.
+
+OneSignal dashboard checklist (same existing app; do not change App ID or queue namespace):
+1. Settings → Push & In-App → Web: use Custom Code integration and the exact stable production HTTPS origin, `https://ai-trading-ochre.vercel.app` for this deployment. Both Chrome/Web and Safari site origins must match the site being used; preview deployment URLs are different origins.
+2. Worker path `/onesignal/OneSignalSDKWorker.js`, scope `/onesignal/`. The root `/sw.js` remains the offline application worker. Do not add another inline SDK initializer or unregister all workers as a workaround.
+3. Reload the production app after saving dashboard settings. On Android use a normal supported browser tab (not private mode). On iPhone/iPad use iOS 16.4+ and Safari → Add to Home Screen, then open the installed app.
+4. In TRADEXA choose All market news, Quiet hours off, and Enable news alerts. Wait for **All market news confirmed**. In OneSignal Audience → Subscriptions confirm a real Subscribed device and the user's `market_news=on` tag. If a plan tag limit blocks saving the tag, free capacity or adjust the plan; do not remove the filter from the sender.
+5. Mark your own subscription as a test subscription in OneSignal and use Send test to that subscription only. Lock the phone and verify receipt. The local app demo only proves browser notification permission.
+
+If the wrong origin cannot be edited in your existing OneSignal app, contact OneSignal support before creating another app: changing App ID would select another Redis namespace and requires a planned migration of pending records.
+
+The deployed checks during the registration investigation found 135 pending records and no subscribers. These records were inspected read-only, not reset or marked accepted. The new optional `deliveryGeneration` field defaults to zero for existing records, preserving their previous idempotency keys. Only an explicit HTTP 200 no-subscribed-recipients rejection proves no notification was created; this persists a new retry generation so a previously rejected request can be retried after audience repair without replaying the cached rejection. Unknown outcomes, empty IDs without an explicit rejection, timeouts and storage failures retain the original key. No queue migration, deletion or re-enqueue operation is required.
+
+A cron HTTP 401 is independent of subscriber state. New logs distinguish missing authorization, invalid Bearer scheme, secret mismatch and unconfigured server secret without recording the header. Copy the same private secret into Vercel and the scheduler's Authorization header; preserve the `Bearer ` prefix. An unauthenticated verification request correctly gets 401. Old logs without these reason codes cannot establish which authentication mistake occurred.
+
+The Vercel handler now trusts exactly one platform edge hop, validates the platform IP header, and removes the unsupported/conflicting RFC Forwarded chain before Express rate limiting. This follows Vercel's overwrite guarantees; arbitrary Forwarded input is never used as an identity. Authentication and rate limiting remain enabled. Other hosting paths keep their configured trust policy.
+
+References:
+- https://documentation.onesignal.com/docs/en/web-sdk-reference
+- https://documentation.onesignal.com/reference/view-user
+- https://documentation.onesignal.com/reference/push-notification
+- https://vercel.com/docs/headers/request-headers
+- https://express-rate-limit.mintlify.app/reference/error-codes

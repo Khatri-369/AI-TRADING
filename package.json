@@ -12,7 +12,8 @@
     "lint": "eslint . && tsc --noEmit",
     "test": "tsx --test server/**/*.test.ts",
     "test:browser": "playwright test",
-    "verify:live": "tsx scripts/verify-live.ts --ai"
+    "verify:live": "tsx scripts/verify-live.ts --ai",
+    "verify:push": "tsx scripts/verify-push.ts"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.1.14",
