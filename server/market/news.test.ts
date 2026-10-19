@@ -39,3 +39,12 @@ test('combined feed retains both regions and linked stocks', async () => {
   assert.deepEqual(new Set(news.articles.map(item => item.region)), new Set(['india', 'global']));
   assert.ok(news.articles.some(item => item.relatedAssets.includes('NVDA')));
 });
+
+test('combined feed does not truncate available headlines at forty per source', async () => {
+  const items = Array.from({ length: 85 }, (_, i) => `<item><title>Market headline ${i}</title><link>https://www.business-standard.com/markets/news/${i}</link><pubDate>${new Date().toUTCString()}</pubDate></item>`).join('');
+  const global = Array.from({ length: 55 }, (_, i) => ({ id: i, headline: `Global headline ${i}`, source: 'Fixture', url: `https://example.com/${i}`, datetime: Math.floor(Date.now() / 1000) }));
+  const service = new MarketService({ FINNHUB_API_KEY: 'fixture' }, async url => String(url).includes('business-standard.com')
+    ? new Response(`<rss><channel>${items}</channel></rss>`) : new Response(JSON.stringify(global)));
+  const news = await service.news(true);
+  assert.equal(news.articles.length, 140);
+});

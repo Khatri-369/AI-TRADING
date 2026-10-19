@@ -135,7 +135,7 @@ export class MarketService {
     return { quotes, generatedAt: new Date().toISOString() };
   }
 
-  async news(): Promise<NewsResponse> {
+  async news(forDelivery = false): Promise<NewsResponse> {
     const names = ['Finnhub global', 'Business Standard India'];
     const results = await Promise.allSettled([
       this.newsCache.get('global-news', 2 * 60_000, 6 * HOUR, () => this.providers.news()),
@@ -143,9 +143,9 @@ export class MarketService {
     ]);
     const available = results.flatMap((result, index) => result.status === 'fulfilled' ? [{ ...result.value, name: names[index] }] : []);
     const fresh = available.filter(source => !source.stale);
-    const selected = fresh.length ? fresh : available;
+    const selected = forDelivery ? available : fresh.length ? fresh : available;
     const problems = results.flatMap((result, index) => result.status === 'rejected' || result.value.stale ? [`${names[index]} temporarily unavailable`] : []);
-    const articles = [...new Map(selected.flatMap(source => source.value.slice(0, 40)).map(article => [article.url, article])).values()]
+    const articles = [...new Map(selected.flatMap(source => source.value).map(article => [article.url, article])).values()]
       .sort((a, b) => b.publishedAt.localeCompare(a.publishedAt));
     return { articles, provider: selected.map(source => source.name).join(' + ') || names.join(' + '),
       status: !selected.length ? 'unavailable' : !fresh.length ? 'stale' : fresh.every(source => source.cached) ? 'cached' : 'live',

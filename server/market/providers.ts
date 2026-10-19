@@ -239,7 +239,7 @@ export class MarketProviders {
       } catch { /* Drop malformed dates without discarding other articles. */ }
     }
     if (raw.length && !articles.length) throw new Error('Provider returned no valid news articles');
-    return [...new Map(articles.map((item) => [item.id, enrichNews(item, 'global')])).values()].sort((a, b) => b.publishedAt.localeCompare(a.publishedAt)).slice(0, 40);
+    return [...new Map(articles.map((item) => [item.id, enrichNews(item, 'global')])).values()].sort((a, b) => b.publishedAt.localeCompare(a.publishedAt));
   }
 
   indiaNews() { return indianMarketNews(this.fetcher); }

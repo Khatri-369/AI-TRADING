@@ -1,61 +1,70 @@
-# Closed-app news notifications on Vercel Hobby
+# Persistent market news notifications on Vercel
 
-This integration uses OneSignal Web Push for subscription storage and delivery, and an external scheduler to check news. No always-on Express host or Redis is required. The browser's local test alert does **not** test this delivery path.
+The existing `GET /api/cron/news` accepts only `Authorization: Bearer <CRON_SECRET>` (minimum 32 characters, exact constant-time comparison). It polls the configured Finnhub global news API and Business Standard Indian markets RSS. No Gemini calls, sentiment filters, importance filters, fifteen-minute cutoff, or three-story cap apply to OneSignal delivery.
 
-## 1. Create the OneSignal app
+## Required setup
 
-Create a Web Push app in OneSignal. Choose **Custom Code** and set the exact HTTPS production domain (one origin per app). Copy its App ID and **App API key** from Settings → Keys & IDs. Do not use an organization API key.
+Create a persistent Upstash Redis database (Vercel Marketplace or Upstash console). Enable durable storage, keep eviction disabled, and monitor storage/command quotas. Do not use an expiring development database. Use its read/write REST token, not the read-only token.
 
-The project provides `/onesignal/OneSignalSDKWorker.js` and uses `/onesignal/` as its scope. Match these in any custom service-worker dashboard settings. Keep the existing `/sw.js` registration: it handles offline caching and has a different scope. Disable OneSignal automatic prompts/welcome messages; the app owns permission controls.
+Set these **backend-only** environment variables in Vercel Production, then deploy:
 
-## 2. Set server environment variables and deploy
+- `UPSTASH_REDIS_REST_URL`: database HTTPS REST URL.
+- `UPSTASH_REDIS_REST_TOKEN`: private read/write REST token.
+- `ONESIGNAL_APP_ID`: the public app UUID from your own OneSignal dashboard.
+- `ONESIGNAL_REST_API_KEY`: private App API key for that same app.
+- `CRON_SECRET`: at least 32 random characters, identical to the scheduler header.
+- `FINNHUB_API_KEY`: existing global news credential. Indian RSS requires no key.
+- Keep existing `SESSION_SECRET` and other application settings. `PUBLIC_SITE_URL` may remain but is no longer used for headline notification links: they open the publisher's article directly.
 
-- `ONESIGNAL_APP_ID`: public App ID.
-- `ONESIGNAL_REST_API_KEY`: private App API key, backend only.
-- `PUBLIC_SITE_URL`: exact production origin, such as `https://your-project.vercel.app`.
-- `CRON_SECRET`: at least 32 random characters. Generate locally with `node -e "console.log(require('node:crypto').randomBytes(32).toString('hex'))"` and store securely.
-- Keep existing news-provider credentials and `SESSION_SECRET` configured.
+Never prefix private keys with `VITE_`, commit `.env`, or put a secret in a URL. `/api/notifications/config` reports configured only when OneSignal and Redis settings are present; this is not a live credential check.
 
-Never prefix these secrets with `VITE_`. Never commit `.env`. Deployment is a separate action; local edits do not update the public website.
+## Scheduler
 
-`GET /api/notifications/config` should report `provider: "onesignal"` and `configured: true`. This confirms required settings exist, **not** that the credentials, schedule, or phone delivery have been verified.
+In cron-job.org create a GET job for `https://YOUR-DOMAIN/api/cron/news`, every five minutes. Add custom header `Authorization: Bearer YOUR_CRON_SECRET`. Enable response history and failure alerts. Deploy and configure the database before enabling the job. No browser tab needs to stay open. Vercel function maximum duration is set to 60 seconds; the worker starts no new sends after its 20-second work budget and uses bounded request timeouts. If the scheduler times out, do not assume failure or clear records: the next invocation resumes safely.
 
-## 3. Schedule the news check
+## Database migration and first run
 
-For example, create a cron-job.org job (free tier) with:
+No SQL migration or new npm runtime package is needed. Redis keys are created lazily by atomic Lua scripts in `server/push/newsQueue.ts`. All keys use `tradexa:news:v1:{ONESIGNAL_APP_ID}:`:
 
-- URL: `https://YOUR-DOMAIN/api/cron/news`
-- Method: GET
-- Frequency: every five minutes
-- Custom header: `Authorization: Bearer YOUR_CRON_SECRET`
-- Failure notifications: enabled
+- `records`: hash of canonical URL digest -> immutable first-observed article, attempts, first attempt timestamp, state, error and accepted message ID. The article field is a JSON string to preserve arrays through Lua.
+- `pending`: sorted set ordered by next attempt time.
+- `review`: set of records needing operator reconciliation.
+- `lock`: short-lived owner lease, only its owner can mutate delivery state.
+- `poll`: persistent last feed check timestamp; redundant cron retries do not repoll providers within four minutes.
+- `cooldown`: shared provider retry time, respected across cold starts.
 
-Enter the secret in the scheduler's private header field, never in the URL. Vercel Hobby's built-in cron runs only daily, so no frequent Vercel cron is added to this project. The endpoint returns 401 for an invalid secret, 503 for unavailable configuration/news, and a non-2xx response for provider rejection. Check job history for errors.
+Records and deduplication markers have **no TTL**. Never clear/evict them or change the namespace to fix a notification problem. Use the same database and App ID for every production instance; keep previews on a separate OneSignal app/database and do not schedule them against production.
 
-The job sends at most three newest articles published in the previous 15 minutes. Repeated jobs use the same OneSignal idempotency keys, including across cold starts; retries do not intentionally re-send the same article. An outage longer than the freshness window can miss news. `accepted` counts successful OneSignal responses, not handset delivery or uniquely new sends; an idempotent retry can return the original message ID.
+This is a new durable delivery ledger. It cannot infer which articles an older nonpersistent sender already sent. On first run, every article currently returned by the feeds is newly detected and queued, including older articles. Expect an initial backlog. If you must avoid overlap with an existing sender, stop that sender and reconcile its accepted message history into this ledger before enabling the new job. There is no silent baseline or age-based discard.
 
-News combines Finnhub's general global feed with Business Standard's published Indian markets RSS. Sources are cached independently and partial failures are disclosed. The job prioritizes one fresh story from each region when both are present, within the three-story cap. Push bodies include up to four related instrument symbols. These links are provider metadata or explicit company/ticker mentions, not claims of positive/negative impact or trading recommendations. RSS entries retain attribution and link to the original publisher; full article bodies are not copied.
+## Delivery and failure behavior
 
-## 4. Register and verify a phone
+Each notification includes the full headline, publisher, and direct article URL, targeting only `market_news=on` subscriptions. Phones may visually truncate long notification text. Source links are canonicalized by removing fragments and known tracking parameters while retaining meaningful query parameters. Syndicated stories at distinct publisher URLs remain distinct articles.
 
-Open the deployed app. On iPhone/iPad (iOS 16.4+), add it to the Home Screen through Safari and open the installed app. Enable notifications, use **All market news**, and leave **Quiet hours off**. Open **Desktop app & news alerts → Enable news alerts** to register or retry. The existing settings sync the OneSignal `market_news` tag and subscription.
+Every valid observed article is persisted before any sends. The job attempts up to 40 items, at most two requests per second, within the work budget. Excess items remain pending. At a five-minute schedule the theoretical ceiling is 480 requests/hour, and network latency reduces it; monitor growing backlogs. This implementation does not promise immediate delivery during a burst.
 
-This initial free integration delivers all-market news only. Watchlist scope or quiet hours pauses OneSignal delivery rather than silently ignoring that preference; those filters still work for in-app alerts. Changes must successfully sync online before closing the app. Browser/OS notification controls can immediately block all delivery if connectivity prevents syncing an opt-out.
+Only a successful OneSignal response with a nonempty message ID marks an item accepted. Acceptance is not proof of handset receipt. A database failure after provider acceptance, a timeout, process termination or cold start retries the **same deterministic OneSignal idempotency key and stored payload**. A two-minute lease/visibility delay recovers crashed jobs. Overlapping invocations cannot drain the queue simultaneously.
 
-Confirm the device appears as subscribed in OneSignal and has tag `market_news=on`. Send a **test to that subscription only** from OneSignal's dashboard, lock the screen, and verify receipt. Then check a scheduled job and OneSignal message report for a real fresh headline. No frontend tab should be needed. The app's original test notification only verifies local notification permission.
+429 responses persist a global cooldown honoring numeric or HTTP-date Retry-After. 401/403, 5xx, network failures and empty IDs also pause requests and retain the backlog. Other per-article failures are retained with exponential backoff (five minutes up to one day), while remaining articles proceed. No failed item is permanently marked delivered. Feed outages still allow queued articles to drain; partial coverage is logged and returned as degraded. Feeds are checked once per scheduled interval; no Gemini analysis runs. Provider feeds expose finite windows, so articles never returned between polls cannot be recovered by this system.
 
-Android battery restrictions, iOS Focus modes, denied permission, connectivity and force-stopped browsers can delay or prevent delivery. No implementation can guarantee immediate delivery on every locked phone.
+OneSignal retains idempotency keys for 30 days. Requests unresolved for 28 days move to `review` and generate an error rather than risk an automatic duplicate outside that window. Operators must reconcile against OneSignal message history: mark accepted if confirmed, or deliberately requeue only after confirming no delivery. The application retains these records indefinitely. Exactly-once handset delivery cannot be guaranteed by a third-party push service or an indefinitely ambiguous network result.
 
-## Official references
+Cron responses include `detected`, `accepted`, `failed`, `pending`, `review`, and `feedUnavailable`. Concurrent jobs return `skipped: job-already-running`. Failure/review/provider degradation returns HTTP 503; missing auth 401; missing configuration 503. Stored retries survive these responses. Structured logs include article digest, attempt, sanitized reason and next retry time, never API keys or raw provider response bodies. Review failed scheduler runs, pending growth, Redis quotas and OneSignal delivery reports.
 
+## Phone registration
+
+Use OneSignal Web Push Custom Code with the exact production HTTPS origin. Configure worker `/onesignal/OneSignalSDKWorker.js`, scope `/onesignal/`; keep `/sw.js` for offline caching. Do not add another SDK initialization to `index.html`.
+
+Open the deployed app and enable background alerts, select **All market news**, and leave **Quiet hours off**. Confirm a subscribed device with `market_news=on` in OneSignal. Watchlist/quiet settings pause background sends. On iOS 16.4+, install through Safari Add to Home Screen and grant notifications from that installed app. Test only your own subscription from OneSignal, then lock the phone. Browser/OS restrictions, Focus, battery saving, offline devices, and force-stopped browsers can delay or prevent delivery; notification TTL is 24 hours.
+
+## Verification
+
+`npm run lint`, `npm test`, `npm run build`, and `npm run build:vercel`. Unit tests cover tracking URL deduplication, cross-instance retries, long-lived accepted markers, all headlines without age/sentiment filters, backlog draining, partial failures, provider cooldown, acceptance followed by failed storage, lease contention, feed failures and manual-review retention. Browser regression: `npx playwright test tests/browser/background-push.spec.ts tests/browser/news-notifications.spec.ts` after building.
+
+Live Redis credentials, scheduled execution, and locked-phone receipt must be verified after deployment. Automated provider tests do not send real notifications.
+
+Official references:
+- https://upstash.com/docs/redis/features/restapi
+- https://documentation.onesignal.com/reference/idempotent-notification-requests
+- https://documentation.onesignal.com/reference/rate-limits
 - https://documentation.onesignal.com/docs/en/web-sdk-setup
-- https://documentation.onesignal.com/docs/en/web-sdk-reference
-- https://documentation.onesignal.com/reference/push-notification
-- https://vercel.com/docs/cron-jobs/usage-and-pricing
-- https://cron-job.org/en/
-
-## Troubleshooting a working test but missing news
-
-A dashboard test confirms the device subscription, not the scheduled news sender. Check that the deployed `/api/notifications/config` reports OneSignal, the external job actually runs every five minutes, and its authenticated response includes `checked` and `accepted`. `skipped: "no-recent-news"` means no article was published in the last 15 minutes; `noRecipients` means OneSignal returned no message ID, so inspect active subscriptions and the `market_news=on` tag. A response containing only `count` comes from the older native push implementation: deploy this integration first.
-
-Do not paste an additional OneSignal initialization into `index.html`: the application initializes it once using the backend App ID. Inline initialization is blocked by the production CSP and a root-scoped OneSignal worker competes with the offline worker. Existing users should reopen the updated app and enable background alerts to register the separate worker and news tag.

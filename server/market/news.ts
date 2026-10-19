@@ -45,7 +45,7 @@ export function parseIndianNews(xml: string): NewsArticle[] {
   if (!items) throw new Error('Provider returned no Indian market headlines');
   const rows: unknown[] = Array.isArray(items) ? items : [items];
   const articles: NewsArticle[] = [];
-  for (const row of rows.slice(0, 80)) {
+  for (const row of rows) {
     if (!row || typeof row !== 'object') continue;
     const item = row as Record<string, unknown>;
     if (typeof item.title !== 'string' || typeof item.link !== 'string' || typeof item.pubDate !== 'string') continue;

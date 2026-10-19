@@ -40,6 +40,7 @@ if (backend) {
     JSON.stringify(
       {
         runtime: 'nodejs22.x',
+        maxDuration: 60,
         handler: 'index.mjs',
         launcherType: 'Nodejs',
         shouldAddHelpers: false,

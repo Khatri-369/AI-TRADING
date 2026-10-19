@@ -187,10 +187,16 @@ export function createApp(config: ServerConfig, production = config.NODE_ENV ===
     if (usesOneSignal() ? !oneSignalPush.configured : !(await newsPush.status()).configured) {
       res.status(503).json({ error: 'Background news delivery is not configured.' }); return;
     }
+    if (usesOneSignal()) {
+      const result = await oneSignalPush.deliver(() => marketService.news(true));
+      const degraded = result.failed > 0 || ('feedUnavailable' in result && result.feedUnavailable) || ('review' in result && result.review > 0);
+      res.status(degraded ? 503 : 200).json({ ok: !degraded, ...result, timestamp: new Date().toISOString() });
+      return;
+    }
     const news = await marketService.news();
     if (news.status === 'unavailable' || news.status === 'stale') { res.status(503).json({ error: 'Fresh news is unavailable; retry the job later.' }); return; }
-    const result = usesOneSignal() ? await oneSignalPush.deliver(news) : await newsPush.deliver(news);
-    res.json({ ok: true, ...result, count: news.articles.length, timestamp: new Date().toISOString() });
+    await newsPush.deliver(news);
+    res.json({ ok: true, count: news.articles.length, timestamp: new Date().toISOString() });
   }));
 
   /**
