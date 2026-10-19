@@ -71,6 +71,16 @@ export async function requestNotificationPermission(): Promise<boolean> {
   }
   try {
     const result = await Notification.requestPermission();
+    if (result === 'granted' && typeof window !== 'undefined' && 'OneSignalDeferred' in window) {
+      try {
+        const deferred = (window as unknown as { OneSignalDeferred?: Array<(os: { User?: { PushSubscription?: { optIn: () => Promise<void> } } }) => void> }).OneSignalDeferred;
+        deferred?.push(async (OneSignal) => {
+          await OneSignal.User?.PushSubscription?.optIn?.();
+        });
+      } catch {
+        // Safe fallback if OneSignal SDK is still loading or offline
+      }
+    }
     return result === 'granted';
   } catch {
     return false;

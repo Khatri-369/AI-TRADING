@@ -18,6 +18,17 @@
     <link rel="icon" type="image/png" sizes="512x512" href="/icons/tradexa-512.png" />
     <link rel="apple-touch-icon" href="/icons/tradexa-192.png" />
     <title>Tradexa — Global Markets Research & Intelligence</title>
+    <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
+    <script>
+      window.OneSignalDeferred = window.OneSignalDeferred || [];
+      OneSignalDeferred.push(async function(OneSignal) {
+        await OneSignal.init({
+          appId: "a758ec15-c81c-45f9-a82f-4a3b917c96bd",
+          serviceWorkerPath: "OneSignalSDKWorker.js",
+          serviceWorkerParam: { scope: "/" }
+        });
+      });
+    </script>
   </head>
   <body>
     <div id="root"></div>
