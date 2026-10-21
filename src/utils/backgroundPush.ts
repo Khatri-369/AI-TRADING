@@ -33,7 +33,10 @@ export const hasActiveBackgroundPush = () => backgroundActive;
 function loadSDK(appId: string) {
   if (sdkPromise) return sdkPromise;
   sdkPromise = new Promise<SDK>((resolve, reject) => {
-    const timer = setTimeout(() => reject(new Error('Push setup timed out. Reload and try again.')), 15_000);
+    const timer = setTimeout(() => {
+      sdkPromise = undefined;
+      reject(new Error('Push setup timed out. Reload and try again.'));
+    }, 15_000);
     const host = window as unknown as { OneSignalDeferred?: Array<(sdk: SDK) => void> };
     host.OneSignalDeferred = host.OneSignalDeferred ?? [];
     host.OneSignalDeferred.push(sdk => {
@@ -47,10 +50,18 @@ function loadSDK(appId: string) {
         sdk.User.addEventListener('change', onSubscriptionChange);
         sdk.Notifications.addEventListener('permissionChange', onSubscriptionChange);
         clearTimeout(timer); resolve(sdk);
-      }, () => { clearTimeout(timer); reject(new Error('Push setup failed. Check the OneSignal site domain and worker configuration.')); });
+      }, () => {
+        sdkPromise = undefined;
+        clearTimeout(timer);
+        reject(new Error('Push setup failed. Check the OneSignal site domain and worker configuration.'));
+      });
     });
     const script = document.createElement('script'); script.src = 'https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js'; script.defer = true;
-    script.onerror = () => { clearTimeout(timer); reject(new Error('Push service could not load. Check your connection or content blocker.')); };
+    script.onerror = () => {
+      sdkPromise = undefined;
+      clearTimeout(timer);
+      reject(new Error('Push service could not load. Check your connection or content blocker.'));
+    };
     document.head.appendChild(script);
   });
   return sdkPromise;
@@ -73,12 +84,32 @@ export function syncBackgroundPush(): Promise<string | null> {
       verifiedDevice = undefined;
       backgroundActive = false;
       if (sdk.User.getTags().market_news !== 'off') sdk.User.addTag('market_news', 'off');
-      if (sdk.User.PushSubscription.optedIn) await sdk.User.PushSubscription.optOut();
+      if (sdk.User.PushSubscription.optedIn) {
+        try {
+          await Promise.race([
+            Promise.resolve(sdk.User.PushSubscription.optOut()).catch(() => undefined),
+            new Promise(resolve => setTimeout(resolve, 2000)),
+          ]);
+        } catch { /* safe timeout */ }
+      }
       return settings.scope !== 'all' || settings.quiet
         ? 'Background news is paused: this free integration supports All market news with Quiet hours off. Your in-app filters still apply.'
         : 'Background news notifications are off.';
     }
-    if (!sdk.User.PushSubscription.optedIn || !sdk.User.PushSubscription.id) await sdk.User.PushSubscription.optIn();
+    if (!sdk.User.PushSubscription.optedIn || !sdk.User.PushSubscription.id) {
+      try {
+        await Promise.race([
+          Promise.resolve(sdk.User.PushSubscription.optIn()).catch(() => undefined),
+          new Promise(resolve => setTimeout(resolve, 2500)),
+        ]);
+      } catch { /* safe timeout */ }
+    }
+    if (!sdk.User.PushSubscription.id || !sdk.User.onesignalId) {
+      for (let attempt = 0; attempt < 6; attempt++) {
+        if (sdk.User.PushSubscription.id && sdk.User.onesignalId) break;
+        await new Promise(resolve => setTimeout(resolve, 500));
+      }
+    }
     if (!sdk.User.onesignalId || !sdk.User.PushSubscription.id || !sdk.User.PushSubscription.optedIn) {
       return 'Device registration is pending. Keep this page open; registration will be checked when OneSignal assigns the subscription.';
     }

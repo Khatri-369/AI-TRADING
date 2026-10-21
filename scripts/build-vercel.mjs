@@ -86,6 +86,7 @@ await writeFile(
           continue: true,
         },
         { src: '/sw.js', headers: { 'Cache-Control': 'no-cache', 'Service-Worker-Allowed': '/' }, continue: true },
+        { src: '/OneSignalSDKWorker.js', headers: { 'Cache-Control': 'no-cache', 'Service-Worker-Allowed': '/' }, continue: true },
         { src: '/onesignal/OneSignalSDKWorker.js', headers: { 'Cache-Control': 'no-cache', 'Service-Worker-Allowed': '/onesignal/' }, continue: true },
         { src: '/manifest.webmanifest', headers: { 'Cache-Control': 'no-cache' }, continue: true },
         { src: '/icons/.*', headers: { 'Cache-Control': 'no-cache' }, continue: true },

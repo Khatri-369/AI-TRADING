@@ -57,7 +57,11 @@ export default function DesktopAppPanel({ open, onClose }: { open: boolean; onCl
       try {
         if (!await requestNotificationPermission()) { setMessage('On iPhone, open the Safari-installed Home Screen app (iOS 16.4+). Otherwise allow notifications in browser site settings.'); return; }
         saveStoredAlertSettings({ ...getStoredAlertSettings(), enabled: true, device: true });
-        setMessage(await syncBackgroundPush() ?? 'Background provider is unavailable.');
+        const result = await Promise.race([
+          syncBackgroundPush(),
+          new Promise<string>(resolve => setTimeout(() => resolve('Device registration is in progress. Keep page open to finish.'), 7000)),
+        ]);
+        setMessage(result ?? 'Background provider is unavailable.');
         setSubscribed(hasActiveBackgroundPush());
       } catch { setMessage('Background registration failed. Check OneSignal setup and retry.'); }
       finally { setBusy(false); }
