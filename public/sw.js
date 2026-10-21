@@ -1,5 +1,10 @@
-/* global self, caches, fetch, URL, Response */
-const CACHE_NAME = 'tradexa-static-v3';
+/* global self, caches, fetch, URL, Response, importScripts */
+try {
+  importScripts('https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.sw.js');
+} catch {
+  /* Offline or script unavailable */
+}
+const CACHE_NAME = 'tradexa-static-v4';
 const STATIC_ASSETS = [
   '/',
   '/offline.html',
@@ -12,12 +17,7 @@ const STATIC_ASSETS = [
 
 self.addEventListener('install', event => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then(cache => cache.addAll(STATIC_ASSETS)).then(() => {
-      // If there is no active service worker yet (first install), activate immediately
-      if (!self.registration.active) {
-        return self.skipWaiting();
-      }
-    })
+    caches.open(CACHE_NAME).then(cache => cache.addAll(STATIC_ASSETS)).then(() => self.skipWaiting())
   );
 });
 
@@ -96,6 +96,10 @@ self.addEventListener('push', event => {
   } catch {
     /* Fallback generic payload */
   }
+  // Ignore OneSignal push payloads so OneSignalSDK.sw.js handles them without duplicate notifications
+  if (message.custom || message.onesignal || !message.title) {
+    return;
+  }
   const title = typeof message.title === 'string' && message.title ? message.title : 'Tradexa · Breaking News';
   event.waitUntil(
     self.registration.showNotification(title, {
@@ -111,6 +115,10 @@ self.addEventListener('push', event => {
 
 // Notification click navigation handler
 self.addEventListener('notificationclick', event => {
+  // If notification was created by OneSignal, OneSignal's SDK handler manages it
+  if (event.notification.data?.custom || event.notification.data?.onesignal) {
+    return;
+  }
   event.notification.close();
   const targetUrl = event.notification.data?.url === '/desk' ? '/desk' : '/news';
   const destination = new URL(targetUrl, self.location.origin).href;
