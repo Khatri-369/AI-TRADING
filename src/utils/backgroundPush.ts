@@ -4,7 +4,11 @@ import { getStoredAlertSettings } from './notifications';
 const schema = z.object({ provider: z.string().optional(), configured: z.boolean(), appId: z.string().uuid().optional() });
 interface SDK {
   init(options: object): Promise<void>;
-  Notifications: { isPushSupported(): boolean; addEventListener(event: 'permissionChange', callback: () => void): void };
+  Notifications: {
+    isPushSupported(): boolean;
+    requestPermission?(): Promise<boolean>;
+    addEventListener(event: 'permissionChange', callback: () => void): void;
+  };
   User: {
     onesignalId?: string;
     addTag(key: string, value: string): void;
@@ -23,7 +27,10 @@ function onSubscriptionChange() {
   eventTimer = setTimeout(() => {
     void syncBackgroundPush().then(message => {
       if (message) window.dispatchEvent(new CustomEvent('market-background-push-status', { detail: message }));
-    }).catch(() => window.dispatchEvent(new CustomEvent('market-background-push-status', { detail: 'Background registration verification failed. Retry Enable news alerts.' })));
+    }).catch(err => {
+      const detail = err instanceof Error ? err.message : 'Background registration verification failed. Retry Enable news alerts.';
+      window.dispatchEvent(new CustomEvent('market-background-push-status', { detail }));
+    });
   }, 800);
 }
 let sdkPromise: Promise<SDK> | undefined;
@@ -32,6 +39,11 @@ let verifiedDevice: { key: string; at: number } | undefined;
 export const hasActiveBackgroundPush = () => backgroundActive;
 function loadSDK(appId: string) {
   if (sdkPromise) return sdkPromise;
+  const win = window as unknown as { OneSignal?: SDK };
+  if (win.OneSignal) {
+    sdkPromise = Promise.resolve(win.OneSignal);
+    return sdkPromise;
+  }
   sdkPromise = new Promise<SDK>((resolve, reject) => {
     const timer = setTimeout(() => {
       sdkPromise = undefined;
@@ -39,28 +51,38 @@ function loadSDK(appId: string) {
     }, 15_000);
     const host = window as unknown as { OneSignalDeferred?: Array<(sdk: SDK) => void> };
     host.OneSignalDeferred = host.OneSignalDeferred ?? [];
-    host.OneSignalDeferred.push(sdk => {
+    host.OneSignalDeferred.push(async sdk => {
       const settings = getStoredAlertSettings();
-      void sdk.init({ appId, serviceWorkerPath: 'onesignal/OneSignalSDKWorker.js', serviceWorkerParam: { scope: '/onesignal/' },
-        notifyButton: { enable: false }, welcomeNotification: { disable: true },
-        autoResubscribe: settings.enabled && settings.device && settings.scope === 'all' && !settings.quiet,
-        promptOptions: { slidedown: { prompts: [{ type: 'push', autoPrompt: false }] } },
-      }).then(() => {
-        sdk.User.PushSubscription.addEventListener('change', onSubscriptionChange);
-        sdk.User.addEventListener('change', onSubscriptionChange);
-        sdk.Notifications.addEventListener('permissionChange', onSubscriptionChange);
-        clearTimeout(timer); resolve(sdk);
-      }, () => {
-        sdkPromise = undefined;
-        clearTimeout(timer);
-        reject(new Error('Push setup failed. Check the OneSignal site domain and worker configuration.'));
-      });
+      try {
+        await sdk.init({
+          appId,
+          serviceWorkerPath: 'onesignal/OneSignalSDKWorker.js',
+          serviceWorkerParam: { scope: '/onesignal/' },
+          notifyButton: { enable: false },
+          welcomeNotification: { disable: true },
+          autoResubscribe: settings.enabled && settings.device && settings.scope === 'all' && !settings.quiet,
+          promptOptions: { slidedown: { prompts: [{ type: 'push', autoPrompt: false }] } },
+        });
+      } catch (err) {
+        const msg = String(err);
+        if (!msg.toLowerCase().includes('already initialized')) {
+          sdkPromise = undefined;
+          clearTimeout(timer);
+          reject(new Error(`OneSignal init failed: ${msg}`));
+          return;
+        }
+      }
+      sdk.User.PushSubscription.addEventListener('change', onSubscriptionChange);
+      sdk.User.addEventListener('change', onSubscriptionChange);
+      sdk.Notifications.addEventListener('permissionChange', onSubscriptionChange);
+      clearTimeout(timer);
+      resolve(sdk);
     });
     const script = document.createElement('script'); script.src = 'https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js'; script.defer = true;
     script.onerror = () => {
       sdkPromise = undefined;
       clearTimeout(timer);
-      reject(new Error('Push service could not load. Check your connection or content blocker.'));
+      reject(new Error('Push service could not load (check network/content blocker).'));
     };
     document.head.appendChild(script);
   });
@@ -96,6 +118,11 @@ export function syncBackgroundPush(): Promise<string | null> {
         ? 'Background news is paused: this free integration supports All market news with Quiet hours off. Your in-app filters still apply.'
         : 'Background news notifications are off.';
     }
+    if (typeof sdk.Notifications.requestPermission === 'function') {
+      try {
+        await sdk.Notifications.requestPermission();
+      } catch { /* ignore */ }
+    }
     if (!sdk.User.PushSubscription.optedIn || !sdk.User.PushSubscription.id) {
       try {
         await Promise.race([
@@ -105,7 +132,7 @@ export function syncBackgroundPush(): Promise<string | null> {
       } catch { /* safe timeout */ }
     }
     if (!sdk.User.PushSubscription.id || !sdk.User.onesignalId) {
-      for (let attempt = 0; attempt < 6; attempt++) {
+      for (let attempt = 0; attempt < 8; attempt++) {
         if (sdk.User.PushSubscription.id && sdk.User.onesignalId) break;
         await new Promise(resolve => setTimeout(resolve, 500));
       }
@@ -153,8 +180,9 @@ export function startBackgroundPushSync() {
     if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
     void syncBackgroundPush().then(message => {
       if (active && message) window.dispatchEvent(new CustomEvent('market-background-push-status', { detail: message }));
-    }).catch(() => {
-      if (active) window.dispatchEvent(new CustomEvent('market-background-push-status', { detail: 'Background push setup failed. Open Desktop app & news alerts to retry.' }));
+    }).catch(err => {
+      const detail = err instanceof Error ? err.message : 'Background registration verification failed. Retry Enable news alerts.';
+      if (active) window.dispatchEvent(new CustomEvent('market-background-push-status', { detail }));
     });
   };
   const storage = (event: StorageEvent) => { if (event.key === 'markets.alerts.settings.v1' || event.key === null) sync(); };
