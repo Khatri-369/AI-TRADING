@@ -72,7 +72,7 @@ test('every observed headline including old and neutral is sent; cold starts and
   const result = await t.sender().deliver(data); assert.equal(result.accepted, 5);
   assert.equal(t.calls.length, 5);
   assert.deepEqual(t.calls[0].headings, { en: 'TRADEXA · Publisher' });
-  assert.deepEqual(t.calls[0].contents, { en: 'Neutral headline a' });
+  assert.deepEqual(t.calls[0].contents, { en: 'Neutral headline a\nNo specific stock identified' });
   assert.equal(t.calls[0].url, article('a').url);
   assert.deepEqual(t.calls[0].filters, [{ field: 'tag', key: 'market_news', relation: '=', value: 'on' }]);
   assert.doesNotMatch(JSON.stringify(t.calls), /private-test-only/);

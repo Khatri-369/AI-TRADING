@@ -1,5 +1,5 @@
 import type { Quote } from '../types/market';
-import { formatPrice } from './format';
+import { newsNotificationBody } from '../../shared/newsNotification';
 
 export const STORAGE_ALERT_SETTINGS = 'markets.alerts.settings.v1';
 export const STORAGE_ALERT_INBOX = 'markets.alerts.inbox.v1';
@@ -84,42 +84,22 @@ export async function sendSystemNotification(
   headline: string,
   source: string,
   relatedStocks: Quote[] = [],
-  id: string = String(Date.now())
+  id: string = String(Date.now()),
+  relatedSymbols: string[] = relatedStocks.map(stock => stock.symbol),
+  articleUrl: string = '/news'
 ): Promise<boolean> {
   if (typeof window === 'undefined' || typeof Notification === 'undefined') return false;
   if (Notification.permission !== 'granted') return false;
 
-  const stockSummary =
-    relatedStocks.length > 0
-      ? relatedStocks
-          .map(
-            (s) =>
-              `${s.symbol} ${(s.changePercent ?? 0) >= 0 ? '+' : ''}${
-                s.changePercent !== null ? s.changePercent.toFixed(2) : '0.00'
-              }%`
-          )
-          .join(', ')
-      : '';
-
-  const title = stockSummary ? `Tradexa · ${stockSummary}` : `Tradexa · ${source || 'Market News'}`;
-
-  const stockDetails = relatedStocks
-    .map(
-      (s) =>
-        `${(s.changePercent ?? 0) >= 0 ? '🟢' : '🔴'} ${s.symbol}: ${formatPrice(s.price, s.currency)} (${
-          (s.changePercent ?? 0) >= 0 ? '+' : ''
-        }${s.changePercent !== null ? s.changePercent.toFixed(2) : '0.00'}%)`
-    )
-    .join('\n');
-
-  const body = stockDetails ? `${headline}\n\n${stockDetails}` : headline;
+  const title = `Tradexa · ${source || 'Market News'}`;
+  const body = newsNotificationBody(headline, relatedSymbols);
 
   const options: NotificationOptions = {
     body,
     icon: '/icons/tradexa-192.png',
     badge: '/icons/tradexa-192.png',
     tag: `tradexa-news-${id}`,
-    data: { url: '/news' },
+    data: { url: articleUrl },
   };
 
   // 1. Try the registered service worker first without waiting indefinitely for registration.

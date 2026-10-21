@@ -99,3 +99,9 @@ References:
 - https://documentation.onesignal.com/reference/push-notification
 - https://vercel.com/docs/headers/request-headers
 - https://express-rate-limit.mintlify.app/reference/error-codes
+# Article-specific notification labels
+
+New notifications show the publisher, headline and article-linked stock symbols. Missing quotes do not substitute unrelated market leaders. If the feed provides no supported company link, the notification says “No specific stock identified”; these labels indicate relevance, not a prediction or proof of price impact. Test notifications are explicitly labeled as tests.
+
+New Redis queue records persist `notificationBody` so retries use an identical payload. Existing records without that optional field retain their original headline payload. No migration or queue reset is needed. Browser subscription recovery is enabled only for users whose saved preferences enable device alerts for all news with quiet mode off; browser permission remains required.
+

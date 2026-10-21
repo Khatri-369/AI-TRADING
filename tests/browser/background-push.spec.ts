@@ -30,6 +30,7 @@ test('OneSignal registration uses its own worker and follows enable, disable and
   const calls = () => page.evaluate(() => (window as unknown as { pushCalls: string[] }).pushCalls);
   await expect.poll(calls).toContain('market_news=on');
   expect(await page.evaluate(() => (window as unknown as { workerOptions: { serviceWorkerParam: { scope: string } } }).workerOptions.serviceWorkerParam.scope)).toBe('/onesignal/');
+  expect(await page.evaluate(() => (window as unknown as { workerOptions: { autoResubscribe: boolean } }).workerOptions.autoResubscribe)).toBe(true);
   await page.getByRole('button', { name: 'Desktop app and news alerts' }).click();
   await page.getByRole('button', { name: 'Disable background alerts' }).click();
   await expect.poll(async () => (await calls()).at(-1)).toBe('opt-out');

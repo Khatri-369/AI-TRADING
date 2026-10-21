@@ -31,7 +31,7 @@ interface SettingsPanelProps {
   newsArticles?: NewsArticle[];
 }
 
-export default function SettingsPanel({ onClose, quotes = [] }: SettingsPanelProps) {
+export default function SettingsPanel({ onClose }: SettingsPanelProps) {
   const health = usePolling(getHealth, 60_000);
   const quota = usePolling(getQuota, 30_000);
   const { symbols } = useWatchlist();
@@ -315,7 +315,7 @@ export default function SettingsPanel({ onClose, quotes = [] }: SettingsPanelPro
                 <span className="text-[10px] text-[var(--text-muted)]">Test how alerts appear:</span>
                 <button
                   type="button"
-                  onClick={() => sendTestAlert(quotes)}
+                  onClick={() => sendTestAlert()}
                   className="button-secondary text-[11px] py-1 px-2.5 flex items-center gap-1 shrink-0 cursor-pointer"
                   title="Trigger a test news notification banner and system notification"
                 >

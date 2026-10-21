@@ -37,8 +37,10 @@ function loadSDK(appId: string) {
     const host = window as unknown as { OneSignalDeferred?: Array<(sdk: SDK) => void> };
     host.OneSignalDeferred = host.OneSignalDeferred ?? [];
     host.OneSignalDeferred.push(sdk => {
+      const settings = getStoredAlertSettings();
       void sdk.init({ appId, serviceWorkerPath: 'onesignal/OneSignalSDKWorker.js', serviceWorkerParam: { scope: '/onesignal/' },
-        notifyButton: { enable: false }, welcomeNotification: { disable: true }, autoResubscribe: false,
+        notifyButton: { enable: false }, welcomeNotification: { disable: true },
+        autoResubscribe: settings.enabled && settings.device && settings.scope === 'all' && !settings.quiet,
         promptOptions: { slidedown: { prompts: [{ type: 'push', autoPrompt: false }] } },
       }).then(() => {
         sdk.User.PushSubscription.addEventListener('change', onSubscriptionChange);

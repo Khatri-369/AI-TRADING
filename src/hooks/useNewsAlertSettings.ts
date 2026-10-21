@@ -1,5 +1,4 @@
 import { useState, useEffect, useCallback } from 'react';
-import type { Quote } from '../types/market';
 import {
   AlertSettings,
   getNotificationPermission,
@@ -162,14 +161,14 @@ export function useNewsAlertSettings() {
   );
 
   const sendTestAlert = useCallback(
-    (quotes: Quote[] = []) => {
+    () => {
       const currentPerm = getNotificationPermission();
       const testArticle = {
         id: `test-news-${Date.now()}`,
-        headline: 'Market Update: Sector leaders show volume momentum and price action',
+        headline: 'Test notification — TRADEXA alerts are working',
         source: 'Tradexa News Wire',
         time: new Date().toISOString(),
-        relatedStocks: quotes.slice(0, 3),
+        relatedStocks: [],
       };
 
       triggerMarketAlertTest(testArticle);

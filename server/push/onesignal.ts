@@ -107,7 +107,7 @@ export class OneSignalNewsPush {
         body: JSON.stringify({ app_id: options.appId, target_channel: 'push',
           filters: [{ field: 'tag', key: 'market_news', relation: '=', value: 'on' }],
           headings: { en: `TRADEXA · ${record.article.source}` },
-          contents: { en: record.article.headline }, url: record.article.url,
+          contents: { en: record.notificationBody ?? record.article.headline }, url: record.article.url,
           data: { articleId: record.article.id, publisher: record.article.source, articleUrl: record.article.url, relatedAssets: record.article.relatedAssets },
           ttl: 86400, priority: 10, idempotency_key: id,
         }),

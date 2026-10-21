@@ -13,6 +13,7 @@ import {
   getStoredAlertSettings,
   saveStoredAlertSettings,
   sendSystemNotification,
+  requestNotificationPermission,
   MarketAlertTriggerPayload,
 } from '../utils/notifications';
 
@@ -36,6 +37,7 @@ interface ActiveAlert {
   source: string;
   time: string;
   relatedStocks: Quote[];
+  relatedSymbols: string[];
 }
 
 interface Props {
@@ -110,23 +112,23 @@ export default function NewsAlerts({
       const payload = custom.detail || {};
       const fallbackArticle = newsArticles[0] ?? {
         id: `test-news-${Date.now()}`,
-        headline: 'Market Update: Sector leaders show volume momentum and price action',
+        headline: 'Test notification — TRADEXA alerts are working',
         summary: 'Intraday updates on leading equities.',
         source: 'Tradexa News Wire',
         url: '/news',
         publishedAt: new Date().toISOString(),
-        relatedAssets: ['RELIANCE', 'TCS', 'HDFCBANK'],
+        relatedAssets: [],
       };
 
       const headline = payload.headline || fallbackArticle.headline;
       const source = payload.source || fallbackArticle.source || 'Tradexa Wire';
       const time = payload.time || fallbackArticle.publishedAt || new Date().toISOString();
       const id = payload.id || fallbackArticle.id || `test-${Date.now()}`;
-      const relatedStocks = payload.relatedStocks?.length
+      const relatedStocks = payload.relatedStocks !== undefined
         ? payload.relatedStocks
         : getRelatedQuotes(fallbackArticle.relatedAssets, quotes);
 
-      const resolvedStocks = relatedStocks.length ? relatedStocks : quotes.slice(0, 3);
+      const resolvedStocks = relatedStocks;
 
       setActiveAlert({
         id,
@@ -134,6 +136,7 @@ export default function NewsAlerts({
         source,
         time,
         relatedStocks: resolvedStocks,
+        relatedSymbols: payload.relatedStocks !== undefined ? payload.relatedStocks.map(stock => stock.symbol) : fallbackArticle.relatedAssets,
       });
 
       // Add to inbox
@@ -288,6 +291,7 @@ export default function NewsAlerts({
       source: topStory.source ?? 'Market Wire',
       time: topStory.publishedAt,
       relatedStocks: related,
+      relatedSymbols: topStory.relatedAssets,
     });
 
     // Queue instead of dropping stories that arrive during the cooldown.
@@ -314,7 +318,7 @@ export default function NewsAlerts({
       setPendingDeviceAlerts(previous => previous.filter(item => item.id !== story.id));
       if (settings.quiet && (currentHour >= 22 || currentHour < 8)) return;
       lastDeviceNotifyTime.current = Date.now();
-      void sendSystemNotification(story.headline, story.source, getRelatedQuotes(story.relatedAssets, quotes), story.id)
+      void sendSystemNotification(story.headline, story.source, getRelatedQuotes(story.relatedAssets, quotes), story.id, story.relatedAssets, story.url)
         .then(sent => { if (!sent) setMessage('News arrived in your inbox, but the device notification could not be shown. Check browser notification permissions.'); });
     }, Math.max(0, 30_000 - (Date.now() - lastDeviceNotifyTime.current)));
     return () => clearTimeout(timer);
@@ -324,16 +328,7 @@ export default function NewsAlerts({
   const handleAllowNotification = async () => {
     setBusy(true);
     setMessage('');
-    let granted = false;
-
-    if (typeof Notification !== 'undefined') {
-      try {
-        const result = await Notification.requestPermission();
-        granted = result === 'granted';
-      } catch {
-        // Permissions blocked by browser
-      }
-    }
+    const granted = await requestNotificationPermission();
 
     const nextSettings: AlertSettings = {
       ...settings,
@@ -346,16 +341,16 @@ export default function NewsAlerts({
     // Pick top news story to immediately show the active alert with related stock changes
     const topArticle = newsArticles[0] ?? {
       id: `live-alert-${Date.now()}`,
-      headline: 'Indian benchmarks open active with strong volumes across key sectors',
+      headline: 'Test notification — TRADEXA alerts are working',
       summary: 'Market participants track domestic flows and global momentum.',
       source: 'Tradexa News Wire',
       url: '/news',
       publishedAt: new Date().toISOString(),
-      relatedAssets: ['RELIANCE', 'TCS'],
+      relatedAssets: [],
     };
 
     const related = getRelatedQuotes(topArticle.relatedAssets, quotes);
-    const fallbackRelated = related.length > 0 ? related : quotes.slice(0, 2);
+    const fallbackRelated = related;
 
     // Trigger on-screen banner on mobile screen
     setActiveAlert({
@@ -364,6 +359,7 @@ export default function NewsAlerts({
       source: topArticle.source ?? 'Market Wire',
       time: topArticle.publishedAt,
       relatedStocks: fallbackRelated,
+      relatedSymbols: topArticle.relatedAssets,
     });
 
     // Add to inbox
@@ -387,7 +383,9 @@ export default function NewsAlerts({
         topArticle.headline,
         topArticle.source ?? 'Market Wire',
         fallbackRelated,
-        topArticle.id
+        topArticle.id,
+        topArticle.relatedAssets,
+        topArticle.url
       );
       setMessage('Mobile system & on-screen news alerts enabled!');
     } else {
@@ -401,16 +399,16 @@ export default function NewsAlerts({
   const handleTestAlert = () => {
     const topArticle = newsArticles[0] ?? {
       id: `test-news-${Date.now()}`,
-      headline: 'Market Update: Sector leaders show volume momentum and price action',
+      headline: 'Test notification — TRADEXA alerts are working',
       summary: 'Intraday updates on leading equities.',
       source: 'Tradexa Wire',
       url: '/news',
       publishedAt: new Date().toISOString(),
-      relatedAssets: ['RELIANCE', 'TCS', 'HDFCBANK'],
+      relatedAssets: [],
     };
 
     const related = getRelatedQuotes(topArticle.relatedAssets, quotes);
-    const fallbackRelated = related.length > 0 ? related : quotes.slice(0, 3);
+    const fallbackRelated = related;
 
     setActiveAlert({
       id: topArticle.id,
@@ -418,6 +416,7 @@ export default function NewsAlerts({
       source: topArticle.source ?? 'Market Wire',
       time: topArticle.publishedAt,
       relatedStocks: fallbackRelated,
+      relatedSymbols: topArticle.relatedAssets,
     });
 
     const isDeviceAllowed =
@@ -427,7 +426,9 @@ export default function NewsAlerts({
         topArticle.headline,
         topArticle.source ?? 'Market Wire',
         fallbackRelated,
-        topArticle.id
+        topArticle.id,
+        topArticle.relatedAssets,
+        topArticle.url
       );
     }
   };
@@ -483,7 +484,7 @@ export default function NewsAlerts({
                 <span>Allow Live Mobile Notifications</span>
               </div>
               <p className="text-[11px] text-[var(--text-secondary)] leading-relaxed">
-                Receive breaking news alerts and instant positive / negative stock movements on your screen.
+                Receive market headlines with article-linked stocks and available price changes.
               </p>
               <button
                 type="button"
@@ -739,10 +740,13 @@ export default function NewsAlerts({
             {activeAlert.headline}
           </button>
 
-          {/* Related Stock Changes Badges (Positive / Negative) */}
+          <p className="mt-2 text-[11px] text-[var(--text-secondary)]">
+            {activeAlert.relatedSymbols.length ? `Related stocks: ${activeAlert.relatedSymbols.join(', ')}` : 'No specific stock identified'}
+          </p>
+          {/* Quotes are context, not evidence the headline caused the price change. */}
           {activeAlert.relatedStocks.length > 0 && (
             <div className="mt-2.5 flex flex-wrap items-center gap-1.5 pt-2 border-t border-[var(--border-subtle)]">
-              <span className="text-[10px] text-[var(--text-muted)] font-medium">Market Impact:</span>
+              <span className="text-[10px] text-[var(--text-muted)] font-medium">Current quote change:</span>
               {activeAlert.relatedStocks.map((stock) => {
                 const isGain = (stock.changePercent ?? 0) >= 0;
                 return (

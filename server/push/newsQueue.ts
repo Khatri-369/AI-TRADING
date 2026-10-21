@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import { newsNotificationBody } from '../../shared/newsNotification';
 import type { NewsArticle } from '../../shared/types';
 
 export interface QueuedHeadline {
@@ -6,6 +7,7 @@ export interface QueuedHeadline {
   article: NewsArticle;
   attempts: number;
   deliveryGeneration?: number;
+  notificationBody?: string;
   firstAttempt?: number;
   messageId?: string;
   error?: string;
@@ -23,7 +25,7 @@ export function canonicalArticleUrl(value: string) {
 }
 export function queueHeadline(article: NewsArticle): QueuedHeadline {
   const url = canonicalArticleUrl(article.url);
-  return { key: createHash('sha256').update(url).digest('hex'), article: { ...article, url }, attempts: 0, state: 'pending' };
+  return { key: createHash('sha256').update(url).digest('hex'), article: { ...article, url }, notificationBody: newsNotificationBody(article.headline, article.relatedAssets), attempts: 0, state: 'pending' };
 }
 export interface NewsQueue {
   configured: boolean;
