@@ -39,11 +39,14 @@ export default function DesktopAppPanel({ open, onClose }: { open: boolean; onCl
       if (!response.ok) throw new Error();
       const value = configSchema.parse(await response.json());
       if (!controller.signal.aborted) setConfig(value);
+      if (value.provider === 'onesignal') {
+        if (!controller.signal.aborted) setSubscribed(hasActiveBackgroundPush());
+      } else if (supported) {
+        const registration = await navigator.serviceWorker.getRegistration();
+        const subscription = await registration?.pushManager.getSubscription();
+        if (!controller.signal.aborted) setSubscribed(Boolean(subscription));
+      }
     }).catch(() => { if (!controller.signal.aborted) setMessage('Notification settings are unavailable. Close this panel and try again.'); });
-    if (supported) void navigator.serviceWorker.getRegistration().then(async registration => {
-      const subscription = await registration?.pushManager.getSubscription();
-      if (!controller.signal.aborted) setSubscribed(Boolean(subscription));
-    }).catch(() => undefined);
     return () => controller.abort();
   }, [open, supported]);
   useEffect(() => {
@@ -60,7 +63,7 @@ export default function DesktopAppPanel({ open, onClose }: { open: boolean; onCl
         if ('serviceWorker' in navigator) {
           try {
             const reg = await navigator.serviceWorker.getRegistration();
-            if (reg) await reg.update();
+            if (reg) void reg.update().catch(() => undefined);
           } catch { /* safe worker update */ }
         }
         saveStoredAlertSettings({ ...getStoredAlertSettings(), enabled: true, device: true });

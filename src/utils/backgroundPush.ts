@@ -39,14 +39,8 @@ let verifiedDevice: { key: string; at: number } | undefined;
 export const hasActiveBackgroundPush = () => backgroundActive;
 function loadSDK(appId: string) {
   if (sdkPromise) return sdkPromise;
-  const win = window as unknown as { OneSignal?: SDK };
-  if (win.OneSignal) {
-    sdkPromise = Promise.resolve(win.OneSignal);
-    return sdkPromise;
-  }
   sdkPromise = new Promise<SDK>((resolve, reject) => {
     const timer = setTimeout(() => {
-      sdkPromise = undefined;
       reject(new Error('Push setup timed out. Reload and try again.'));
     }, 15_000);
     const host = window as unknown as { OneSignalDeferred?: Array<(sdk: SDK) => void> };
@@ -66,9 +60,8 @@ function loadSDK(appId: string) {
       } catch (err) {
         const msg = String(err);
         if (!msg.toLowerCase().includes('already initialized')) {
-          sdkPromise = undefined;
           clearTimeout(timer);
-          reject(new Error(`OneSignal init failed: ${msg}`));
+          reject(new Error('OneSignal initialization failed. Check the site origin and worker, then reload to retry.'));
           return;
         }
       }
@@ -80,7 +73,6 @@ function loadSDK(appId: string) {
     });
     const script = document.createElement('script'); script.src = 'https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js'; script.defer = true;
     script.onerror = () => {
-      sdkPromise = undefined;
       clearTimeout(timer);
       reject(new Error('Push service could not load (check network/content blocker).'));
     };
@@ -120,18 +112,17 @@ export function syncBackgroundPush(): Promise<string | null> {
       window.dispatchEvent(new CustomEvent('market-background-push-status', { detail: statusMsg }));
       return statusMsg;
     }
-    if (typeof sdk.Notifications.requestPermission === 'function') {
-      try {
-        await sdk.Notifications.requestPermission();
-      } catch { /* ignore */ }
-    }
+    // Native permission was already checked above. Re-requesting through the SDK
+    // can wait for its prompt lifecycle and block the serialized registration queue.
     if (!sdk.User.PushSubscription.optedIn || !sdk.User.PushSubscription.id) {
       try {
         await Promise.race([
-          Promise.resolve(sdk.User.PushSubscription.optIn()).catch(() => undefined),
+          Promise.resolve(sdk.User.PushSubscription.optIn()),
           new Promise(resolve => setTimeout(resolve, 5000)),
         ]);
-      } catch { /* safe timeout */ }
+      } catch {
+        throw new Error('Push subscription failed. Check Chrome notification access and your network, then retry Enable news alerts.');
+      }
     }
     if (!sdk.User.PushSubscription.id || !sdk.User.onesignalId) {
       for (let attempt = 0; attempt < 10; attempt++) {

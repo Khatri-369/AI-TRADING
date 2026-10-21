@@ -1,10 +1,8 @@
 /* global self, caches, fetch, URL, Response, importScripts */
-try {
-  importScripts('https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.sw.js');
-} catch {
-  /* Offline or script unavailable */
-}
-const CACHE_NAME = 'tradexa-static-v4';
+// Fail installation if the push handler cannot load; keep the previous working
+// worker instead of silently activating a worker that cannot deliver news.
+importScripts('https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.sw.js');
+const CACHE_NAME = 'tradexa-static-v5';
 const STATIC_ASSETS = [
   '/',
   '/offline.html',
@@ -116,7 +114,7 @@ self.addEventListener('push', event => {
 // Notification click navigation handler
 self.addEventListener('notificationclick', event => {
   // If notification was created by OneSignal, OneSignal's SDK handler manages it
-  if (event.notification.data?.custom || event.notification.data?.onesignal) {
+  if (event.notification.data?.notificationId || event.notification.data?.custom || event.notification.data?.onesignal) {
     return;
   }
   event.notification.close();

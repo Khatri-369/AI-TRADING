@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 
-test('OneSignal registration uses its own worker and follows enable, disable and scope preferences', async ({ page }) => {
+test('OneSignal registration uses the shared root worker and follows enable, disable and scope preferences', async ({ page }) => {
   const errors: string[] = []; page.on('pageerror', error => errors.push(error.message));
   await page.addInitScript(() => {
     localStorage.setItem('markets.alerts.settings.v1', JSON.stringify({ enabled: true, device: true, scope: 'all', quiet: false }));
@@ -11,7 +11,7 @@ test('OneSignal registration uses its own worker and follows enable, disable and
     window.sdkLoads = (window.sdkLoads || 0) + 1;
     window.pushCalls = [];
     const tags = {};
-    const sdk = { Notifications: { isPushSupported: () => true, addEventListener: () => {} }, init: async options => { window.initCount = (window.initCount || 0) + 1; window.workerOptions = options; }, User: {
+    const sdk = { Notifications: { isPushSupported: () => true, requestPermission: () => new Promise(() => {}), addEventListener: () => {} }, init: async options => { window.initCount = (window.initCount || 0) + 1; window.workerOptions = options; }, User: {
       onesignalId: 'c93d06ef-e58a-43a0-8f00-87a7b632f11a', getTags: () => tags, addEventListener: () => {},
       addTag: (key, value) => { tags[key] = value; window.pushCalls.push(key + '=' + value); },
       PushSubscription: { addEventListener: () => {}, id: 'c93d06ef-e58a-43a0-8f00-87a7b632f11ab', optedIn: false,

@@ -72,6 +72,7 @@ export async function requestNotificationPermission(): Promise<boolean> {
   // iOS requires an installed Home Screen web app and a direct user gesture.
   const ios = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
   if (ios && !window.matchMedia('(display-mode: standalone)').matches && !(navigator as Navigator & { standalone?: boolean }).standalone) return false;
+  if (Notification.permission === 'granted') return true;
   try {
     const result = await Notification.requestPermission();
     return result === 'granted';
