@@ -60,20 +60,20 @@ test('deep linking, page refresh, browser back/forward history, and unknown rout
   await expect(page.getByRole('heading', { name: 'Markets Directory' })).toBeVisible();
   expect(page.url()).toContain('/markets');
 
-  // 3. Navigate to /scenarios
-  await page.getByRole('tab', { name: 'Scenarios' }).click();
-  await expect(page).toHaveURL(/\/scenarios/);
-  await expect(page.getByRole('heading', { name: 'Macro Scenario Laboratory' })).toBeVisible();
+  // 3. Navigate to /news
+  await page.getByRole('tab', { name: /News/ }).click();
+  await expect(page).toHaveURL(/\/news/);
+  await expect(page.getByRole('heading', { name: 'Financial News & Sentiment' })).toBeVisible();
 
   // 4. Browser Back button -> returns to /markets
   await page.goBack();
   await expect(page).toHaveURL(/\/markets/);
   await expect(page.getByRole('heading', { name: 'Markets Directory' })).toBeVisible();
 
-  // 5. Browser Forward button -> returns to /scenarios
+  // 5. Browser Forward button -> returns to /news
   await page.goForward();
-  await expect(page).toHaveURL(/\/scenarios/);
-  await expect(page.getByRole('heading', { name: 'Macro Scenario Laboratory' })).toBeVisible();
+  await expect(page).toHaveURL(/\/news/);
+  await expect(page.getByRole('heading', { name: 'Financial News & Sentiment' })).toBeVisible();
 
   // 6. Direct navigation to asset deep link: /asset/RELIANCE
   await page.goto('/asset/RELIANCE');

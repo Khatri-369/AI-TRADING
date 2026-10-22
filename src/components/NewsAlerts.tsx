@@ -65,7 +65,7 @@ export default function NewsAlerts({
   quotes = [],
   onSelectAsset,
   onOpenNews,
-  onOpenBackgroundSetup,
+  onOpenBackgroundSetup: _onOpenBackgroundSetup,
 }: Props) {
   const { symbols } = useWatchlist();
   const [open, setOpen] = useState(false);

@@ -139,10 +139,6 @@ test('desktop navigation, search, asset detail, chart table alternative, themes 
   await expect(page).toHaveURL(/\/news/);
   await expect(page.getByRole('heading', { name: 'Financial News & Sentiment' })).toBeVisible();
 
-  await page.getByRole('tab', { name: 'Scenarios' }).click();
-  await expect(page).toHaveURL(/\/scenarios/);
-  await expect(page.getByRole('heading', { name: 'Macro Scenario Laboratory' })).toBeVisible();
-
   await page.getByRole('tab', { name: 'Diagnostics' }).click();
   await expect(page).toHaveURL(/\/diagnostics/);
   await expect(page.getByRole('heading', { name: 'Provider connections & diagnostics' })).toBeVisible();

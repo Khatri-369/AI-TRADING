@@ -6,7 +6,7 @@ import { z } from 'zod';
 import type { ServerConfig } from './config';
 import { marketService } from './market/index';
 import { liveStreamManager } from './market/liveStream';
-import { analyze, scenario, chat, aiProviderStatuses, AIServiceError } from './ai/index';
+import { analyze, chat, aiProviderStatuses, AIServiceError } from './ai/index';
 import { chatInputSchema } from '../shared/chat';
 import { prepareChatContext, prepareChartEvidence } from './ai/chatContext';
 import { newsPush } from './push';
@@ -33,7 +33,7 @@ const headlineInput = z
   })
   .strict();
 
-const scenarioInput = z.object({ scenario: z.string().trim().min(10).max(2000) }).strict();
+
 const historyRange = z.enum(HISTORY_RANGES);
 
 const asyncRoute =
@@ -454,45 +454,7 @@ export function createApp(config: ServerConfig, production = config.NODE_ENV ===
     })
   );
 
-  /**
-   * AI Macro Scenario Modeling.
-   */
-  app.post(
-    '/api/ai/scenario',
-    csrfProtection,
-    asyncRoute(async (req, res) => {
-      const isAdmin = isAdminRequest(req, config.ADMIN_DIAGNOSTICS_TOKEN);
-      const clientId = getClientId(req, res);
 
-      let releaseSlot: (() => void) | undefined;
-      try {
-        releaseSlot = aiSpendingGuard.acquire(clientId, isAdmin);
-      } catch (cause) {
-        const quotaErr = cause as { code: string; status: number; message: string; resetInSeconds?: number };
-        if (quotaErr.resetInSeconds) {
-          res.set('Retry-After', String(quotaErr.resetInSeconds));
-        }
-        res.status(quotaErr.status || 429).json({
-          error: quotaErr.message,
-          code: quotaErr.code,
-          engineStatus: 'unavailable',
-        });
-        return;
-      }
-
-      try {
-        const input = scenarioInput.safeParse(req.body);
-        if (!input.success) {
-          res.status(400).json({ error: 'Provide a scenario of 10–2000 characters.', code: 'INVALID_INPUT' });
-          return;
-        }
-
-        res.json(await scenario(input.data, process.env.GEMINI_API_KEY ? await buildContext() : undefined));
-      } finally {
-        releaseSlot?.();
-      }
-    })
-  );
 
   app.post('/api/ai/chat', csrfProtection, asyncRoute(async (req, res) => {
     const input = chatInputSchema.safeParse(req.body);

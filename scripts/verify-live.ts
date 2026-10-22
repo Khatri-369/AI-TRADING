@@ -2,7 +2,7 @@ import 'dotenv/config';
 import { MarketProviders } from '../server/market/providers';
 import { ASSET_BY_SYMBOL } from '../shared/assets';
 import { UpstoxWebSocketClient } from '../server/market/websocket';
-import { analyze, scenario, AIServiceError } from '../server/ai/index';
+import { analyze, AIServiceError } from '../server/ai/index';
 
 // Explicit live smoke test: uses configured read-only credentials; never prints secrets.
 const providers = new MarketProviders();
@@ -34,6 +34,5 @@ if (process.argv.includes('--ai')) {
     try { const result = await analyze({ headline: 'Quarterly company revenue increased while operating margins improved.', engine }); console.log(JSON.stringify({ feature: 'AI', engine, status: result.engineStatus, sentiment: result.sentiment })); }
     catch (error) { console.log(JSON.stringify({ feature: 'AI', engine, error: error instanceof AIServiceError ? error.message : 'Unexpected failure' })); }
   }
-  try { const result = await scenario({ scenario: 'Hypothetically, the Federal Reserve cuts interest rates by 100 basis points.' }); console.log(JSON.stringify({ feature: 'Scenario', hypothetical: result.hypothetical, impacts: result.impacts.length })); }
-  catch (error) { console.log(JSON.stringify({ feature: 'Scenario', error: error instanceof AIServiceError ? error.message : 'Unexpected failure' })); }
 }
+

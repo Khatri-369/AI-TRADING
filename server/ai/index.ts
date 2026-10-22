@@ -1,15 +1,14 @@
 import {
   analysisInputSchema, analysisOutputSchema, analysisJsonSchema,
-  scenarioInputSchema, scenarioOutputSchema, scenarioJsonSchema,
   finbertOutputSchema, geminiEnvelopeSchema,
-  type AnalysisInput, type AnalysisResult, type ScenarioInput, type ScenarioResult,
+  type AnalysisInput, type AnalysisResult,
 } from './schemas.js';
 import { AIResultCache, hashRequest } from './cache.js';
 import { z } from 'zod';
 import { chatInputSchema, chatAnswerSchema, type ChatInput, type ChatResult, type ChatSource } from '../../shared/chat.js';
 
-export type { AnalysisInput, AnalysisResult, ScenarioInput, ScenarioResult } from './schemas.js';
-export { analysisInputSchema, scenarioInputSchema } from './schemas.js';
+export type { AnalysisInput, AnalysisResult } from './schemas.js';
+export { analysisInputSchema } from './schemas.js';
 
 type Engine = 'gemini' | 'finbert';
 export type AIProviderStatus = {
@@ -65,7 +64,7 @@ export function createAIService(options: ServiceOptions = {}) {
   const env = options.env ?? process.env;
   const fetcher = options.fetch ?? globalThis.fetch;
   const now = options.now ?? Date.now;
-  const cache = new AIResultCache<AnalysisResult | ScenarioResult | ChatResult>(now, options.cacheCapacity ?? 200, options.maxConcurrent ?? 12);
+  const cache = new AIResultCache<AnalysisResult | ChatResult>(now, options.cacheCapacity ?? 200, options.maxConcurrent ?? 12);
   const observations = new Map<Engine, Pick<AIProviderStatus, 'status' | 'message'>>();
 
   function credentials(engine: Engine) {
@@ -235,22 +234,7 @@ export function createAIService(options: ServiceOptions = {}) {
     }, () => new AIServiceError(429, 'AI_BUSY', 'Too many analyses are running. Try again shortly.', engine))) as AnalysisResult;
   }
 
-  async function scenario(input: ScenarioInput, context?: unknown): Promise<ScenarioResult> {
-    const parsed = scenarioInputSchema.safeParse(input);
-    if (!parsed.success) throw new AIServiceError(400, 'AI_INPUT_INVALID', 'Provide a hypothetical scenario of 10–2000 characters.', 'gemini');
-    credentials('gemini');
-    const serverContext = contextJson(context);
-    const cacheKey = hashRequest({ task: 'scenario', input: parsed.data, serverContext, model: model() });
-    return await observe('gemini', () => cache.get(cacheKey, 5 * 60_000, async () => {
-      const output = await gemini(
-        'Explore the hypothetical scenario; do not treat it as an observed event. Describe plausible conditional asset impacts and uncertainty. Do not present price targets or precise predictions. Use null for estimatedChangePercent unless supplied evidence supports a defensible illustrative magnitude, and explicitly explain any such estimate and time horizon. Consider relevant assets such as SPY, NVDA, XAU, USD/INR, BTC, and NIFTY50. Never invent current asset prices.',
-        parsed.data, serverContext, scenarioJsonSchema,
-      );
-      const result = scenarioOutputSchema.safeParse(output);
-      if (!result.success) throw new AIServiceError(502, 'AI_INVALID_RESPONSE', 'Gemini returned a scenario that failed validation.', 'gemini');
-      return { ...result.data, scenario: parsed.data.scenario, engine: 'gemini', engineStatus: 'available', hypothetical: true, generatedAt: new Date(now()).toISOString(), cached: false } satisfies ScenarioResult;
-    }, () => new AIServiceError(429, 'AI_BUSY', 'Too many analyses are running. Try again shortly.', 'gemini'))) as ScenarioResult;
-  }
+
 
   async function chat(input: ChatInput, context: { evidence: unknown; sources: ChatSource[] }): Promise<ChatResult> {
     const parsed = chatInputSchema.safeParse(input);
@@ -272,11 +256,10 @@ export function createAIService(options: ServiceOptions = {}) {
     }, () => new AIServiceError(429, 'AI_BUSY', 'Research is busy. Try again shortly.', 'gemini'))) as ChatResult;
   }
 
-  return { analyze, scenario, chat, aiProviderStatuses: providerStatuses };
+  return { analyze, chat, aiProviderStatuses: providerStatuses };
 }
 
 const service = createAIService();
 export const analyze = service.analyze;
-export const scenario = service.scenario;
 export const chat = service.chat;
 export const aiProviderStatuses = service.aiProviderStatuses;

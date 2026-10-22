@@ -36,7 +36,7 @@ The production bundle is `dist/server.js`; the frontend is `dist/client`. `npm s
 - **CoinGecko:** public API for BTC, ETH, BNB, SOL and XRP; optional `COINGECKO_DEMO_API_KEY`. Prices are USD, changes and notional USD volume cover 24 hours. Historical range availability/rate limits depend on the plan. [Documentation](https://docs.coingecko.com/).
 - **Metals:** public [Gold-API](https://gold-api.com/) by default, USD/troy ounce for gold and silver. Optional `GOLD_API_KEY` chooses GoldAPI.io. No metals history is implemented. Missing daily changes stay blank. Selecting GoldAPI does not silently fall back to another source after failure.
 - **Forex:** public [Frankfurter](https://frankfurter.dev/) USD/INR daily reference rates and daily history. These are delayed reference observations, not live tradable FX quotes. No API key.
-- **Gemini:** `GEMINI_API_KEY`, optional `GEMINI_MODEL` (default `gemini-3.5-flash-lite`, verified with the configured account). On-demand structured sentiment and separate hypothetical scenarios. Model availability, quota and free-tier eligibility vary by account. Unavailable/timeout responses are explicit.
+- **Gemini:** `GEMINI_API_KEY`, optional `GEMINI_MODEL` (default `gemini-3.5-flash-lite`, verified with the configured account). On-demand structured sentiment analysis and interactive research chat. Model availability, quota and free-tier eligibility vary by account. Unavailable/timeout responses are explicit.
 - **FinBERT:** `HUGGINGFACE_API_KEY` with Inference Providers access. Calls genuine `ProsusAI/finbert`; never falls back to Gemini or keywords. Requires available account credits/model service. Engine status is unavailable on failure.
 
 ## Architecture
@@ -47,7 +47,7 @@ The production bundle is `dist/server.js`; the frontend is `dist/client`. `npm s
 - `server/market/feedSchema.ts`: generated TypeScript schema from the checked-in official `MarketDataFeed.proto`. Bundled into production; no runtime schema download/path dependency.
 - `server/ai/`: validated Gemini/FinBERT clients, prompts, bounded request/result caching.
 - `shared/`: typed API contracts and instrument directory (names/symbols, never prices).
-- `src/services/`, `src/hooks/`, `src/components/`: same-origin API client, polling/stream lifecycle, accessible dashboard, charts, provider settings, news and scenario UI.
+- `src/services/`, `src/hooks/`, `src/components/`: same-origin API client, polling/stream lifecycle, accessible dashboard, charts, provider settings, news and research desk UI.
 
 ## API
 
@@ -58,7 +58,7 @@ The production bundle is `dist/server.js`; the frontend is `dist/client`. `npm s
 - `GET /api/stream/live-ticks` (SSE; normalized Upstox observations)
 - `GET /api/news`
 - `POST /api/ai/analyze` with `{ "headline": "...", "engine": "gemini" }` and optional known `symbol`
-- `POST /api/ai/scenario` with `{ "scenario": "..." }`
+- `POST /api/ai/chat` with `{ "question": "...", "conversation": [...] }`
 
 Production AI requires `Authorization: Bearer <AI_ACCESS_TOKEN>`. This application access token is not an API provider secret; the Settings input holds it in memory only. AI is disabled in production when the token is empty. Development AI remains usable locally. No provider keys are accepted in request bodies or UI inputs.
 
@@ -66,7 +66,7 @@ Production AI requires `Authorization: Bearer <AI_ACCESS_TOKEN>`. This applicati
 
 Browser overview polling runs every 60 seconds after the preceding request completes; news every five minutes. Hidden tabs cancel polling and close SSE. One Upstox connection is shared across active SSE clients, with bounded exponential reconnect and heartbeats. Slow clients are disconnected. No stream is created merely by importing a module or running tests.
 
-Backend cache TTLs: crypto 60 seconds; equities 60 seconds during sessions, 30 minutes closed; public metals 60 seconds; GoldAPI 24 hours by default; forex six hours; news five minutes; intraday history five minutes, other history one hour. Source timestamps never advance when a refresh fails. Concurrent identical requests share work. Failures cool down for 60 seconds; retained data is explicitly stale and has a bounded retention window. AI caches identical evidence for ten minutes (analysis) or five minutes (scenarios).
+Backend cache TTLs: crypto 60 seconds; equities 60 seconds during sessions, 30 minutes closed; public metals 60 seconds; GoldAPI 24 hours by default; forex six hours; news five minutes; intraday history five minutes, other history one hour. Source timestamps never advance when a refresh fails. Concurrent identical requests share work. Failures cool down for 60 seconds; retained data is explicitly stale and has a bounded retention window. AI caches identical evidence for ten minutes (analysis) or one minute (chat).
 
 Quotes expose provider, source time, fetched time, cache flag and data status. Closed-session observations are delayed, never live. US schedule uses New York DST and published NYSE 2026–2028 holidays/early closes; unexpected halts are not tracked. Indian sessions use Upstox, with a clearly described weekday estimate if unavailable. Crypto is 24/7. Metals session is unknown; forex is daily reference data.
 

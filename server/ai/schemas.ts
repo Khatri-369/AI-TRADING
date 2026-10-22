@@ -6,10 +6,6 @@ export const analysisInputSchema = z.object({
   symbol: z.string().trim().min(1).max(32).regex(/^[A-Za-z0-9^&./:_-]+$/).transform(value => value.toUpperCase()).optional(),
 }).strict();
 
-export const scenarioInputSchema = z.object({
-  scenario: z.string().trim().min(10).max(2000),
-}).strict();
-
 const explanation = z.string().trim().min(1).max(2000);
 const symbols = z.array(z.string().trim().min(1).max(32)).max(20);
 const risks = z.array(z.string().trim().min(1).max(500)).min(1).max(8);
@@ -23,22 +19,6 @@ export const analysisOutputSchema = z.object({
   affectedAssets: symbols,
 }).strict().refine(value => ({ Positive: 'Buy', Negative: 'Sell', Neutral: 'Hold' }[value.sentiment] === value.signal), {
   message: 'Signal must represent the sentiment classification.',
-});
-
-export const scenarioOutputSchema = z.object({
-  summary: explanation,
-  impacts: z.array(z.object({
-    symbol: z.string().trim().min(1).max(32),
-    direction: z.enum(['up', 'down', 'mixed']),
-    estimatedChangePercent: z.number().finite().min(-100).max(1000).nullable(),
-    rationale: explanation,
-  }).strict().refine(impact => impact.estimatedChangePercent === null
-    || (impact.direction === 'up' && impact.estimatedChangePercent >= 0)
-    || (impact.direction === 'down' && impact.estimatedChangePercent <= 0)
-    || impact.direction === 'mixed', { message: 'Impact direction contradicts its percentage.' })).min(1).max(12),
-  risks,
-}).strict().refine(value => new Set(value.impacts.map(impact => impact.symbol.toUpperCase())).size === value.impacts.length, {
-  message: 'Duplicate affected asset.',
 });
 
 export const finbertOutputSchema = z.array(z.object({
@@ -57,19 +37,10 @@ export const geminiEnvelopeSchema = z.object({
 });
 
 export type AnalysisInput = z.input<typeof analysisInputSchema>;
-export type ScenarioInput = z.input<typeof scenarioInputSchema>;
 export type AnalysisResult = z.infer<typeof analysisOutputSchema> & {
   engine: 'gemini' | 'finbert';
   engineStatus: 'available';
   generatedAt: string;
-  cached: boolean;
-};
-export type ScenarioResult = z.infer<typeof scenarioOutputSchema> & {
-  scenario: string;
-  engine: 'gemini';
-  engineStatus: 'available';
-  generatedAt: string;
-  hypothetical: true;
   cached: boolean;
 };
 
@@ -86,29 +57,5 @@ export const analysisJsonSchema = {
     affectedAssets: { type: 'array', items: { type: 'string' }, maxItems: 20 },
   },
   required: ['sentiment', 'signal', 'confidence', 'rationale', 'risks', 'affectedAssets'],
-  additionalProperties: false,
-};
-
-export const scenarioJsonSchema = {
-  type: 'object',
-  properties: {
-    summary: { type: 'string' },
-    impacts: {
-      type: 'array', minItems: 1, maxItems: 12,
-      items: {
-        type: 'object',
-        properties: {
-          symbol: { type: 'string' },
-          direction: { type: 'string', enum: ['up', 'down', 'mixed'] },
-          estimatedChangePercent: { type: ['number', 'null'], minimum: -100, maximum: 1000 },
-          rationale: { type: 'string' },
-        },
-        required: ['symbol', 'direction', 'estimatedChangePercent', 'rationale'],
-        additionalProperties: false,
-      },
-    },
-    risks: { type: 'array', items: { type: 'string' }, minItems: 1, maxItems: 8 },
-  },
-  required: ['summary', 'impacts', 'risks'],
   additionalProperties: false,
 };

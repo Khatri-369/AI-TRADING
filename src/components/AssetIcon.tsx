@@ -45,8 +45,8 @@ export default function AssetIcon({
         xmlns="http://www.w3.org/2000/svg"
         className={`inline-block shrink-0 ${sizeCls} ${className}`}
         aria-label="Gold (XAU)"
-        title="Gold (XAU) Bullion"
       >
+        <title>Gold (XAU) Bullion</title>
         <defs>
           <linearGradient id="goldGradient" x1="0%" y1="0%" x2="100%" y2="100%">
             <stop offset="0%" stopColor="#FDE68A" />
@@ -100,8 +100,8 @@ export default function AssetIcon({
         xmlns="http://www.w3.org/2000/svg"
         className={`inline-block shrink-0 ${sizeCls} ${className}`}
         aria-label="Silver (XAG)"
-        title="Silver (XAG) Bullion"
       >
+        <title>Silver (XAG) Bullion</title>
         <defs>
           <linearGradient id="silverGradient" x1="0%" y1="0%" x2="100%" y2="100%">
             <stop offset="0%" stopColor="#F8FAFC" />
@@ -142,8 +142,8 @@ export default function AssetIcon({
         xmlns="http://www.w3.org/2000/svg"
         className={`inline-block shrink-0 ${sizeCls} ${className}`}
         aria-label="Bitcoin (BTC)"
-        title="Bitcoin (BTC)"
       >
+        <title>Bitcoin (BTC)</title>
         <circle cx="12" cy="12" r="11" fill="#F7931A" stroke="#E27D07" strokeWidth="0.75" />
         <path
           d="M14.6 11.2C15.2 10.8 15.6 10.1 15.4 9.2C15.1 7.8 13.7 7.5 12.1 7.5V5.5H10.8V7.5H9.8V5.5H8.5V7.5H6.5V9H8V15H6.5V16.5H8.5V18.5H9.8V16.5H10.8V18.5H12.1V16.5C14.3 16.5 15.9 15.7 16.2 13.9C16.4 12.5 15.8 11.7 14.6 11.2ZM10.2 9.2H12C12.8 9.2 13.6 9.5 13.6 10.4C13.6 11.3 12.8 11.6 12 11.6H10.2V9.2ZM12.3 14.8H10.2V12.4H12.3C13.2 12.4 14.1 12.8 14.1 13.6C14.1 14.4 13.2 14.8 12.3 14.8Z"
@@ -162,8 +162,8 @@ export default function AssetIcon({
         xmlns="http://www.w3.org/2000/svg"
         className={`inline-block shrink-0 ${sizeCls} ${className}`}
         aria-label="Ethereum (ETH)"
-        title="Ethereum (ETH)"
       >
+        <title>Ethereum (ETH)</title>
         <circle cx="12" cy="12" r="11" fill="#627EEA" stroke="#4C66D6" strokeWidth="0.75" />
         <path d="M12 3.5L6.5 12.5L12 15.8L17.5 12.5L12 3.5Z" fill="#C0CBF8" />
         <path d="M12 3.5L12 15.8L17.5 12.5L12 3.5Z" fill="white" />
@@ -200,8 +200,8 @@ export default function AssetIcon({
         xmlns="http://www.w3.org/2000/svg"
         className={`inline-block shrink-0 rounded-xs overflow-hidden border border-[var(--border-subtle)] ${sizeCls} ${className}`}
         aria-label="Indian Market Instrument"
-        title="India · NSE / BSE"
       >
+        <title>India · NSE / BSE</title>
         {/* Tricolor */}
         <rect width="24" height="5.33" fill="#FF9933" />
         <rect y="5.33" width="24" height="5.34" fill="#FFFFFF" />
@@ -225,8 +225,8 @@ export default function AssetIcon({
         xmlns="http://www.w3.org/2000/svg"
         className={`inline-block shrink-0 rounded-xs overflow-hidden border border-[var(--border-subtle)] ${sizeCls} ${className}`}
         aria-label="US Market Instrument"
-        title="United States · NYSE / NASDAQ"
       >
+        <title>United States · NYSE / NASDAQ</title>
         {/* Stripes */}
         <rect width="24" height="16" fill="#B22234" />
         <rect y="2.46" width="24" height="2.46" fill="#FFFFFF" />

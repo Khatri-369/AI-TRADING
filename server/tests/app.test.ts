@@ -106,14 +106,6 @@ test('analysis validates input and explicitly reports missing engine keys', asyn
   });
 });
 
-test('scenario rejects short inputs and never synthesizes an impact without AI', async () => {
-  await withServer(async (url) => {
-    assert.equal((await post(`${url}/api/ai/scenario`, { scenario: 'hi' })).status, 400);
-    const response = await post(`${url}/api/ai/scenario`, { scenario: 'Federal Reserve cuts rates by 100 bps' });
-    assert.equal(response.status, 503);
-    assert.equal((await response.json()).engineStatus, 'unavailable');
-  });
-});
 
 test('production AI is disabled until protected with an application token', async () => {
   await withServer(

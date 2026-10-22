@@ -8,11 +8,7 @@ const analysisFixture = {
   rationale: 'Improved earnings can support sentiment; price reaction is uncertain.',
   risks: ['The headline alone does not establish investment value.'], affectedAssets: ['AAPL'],
 };
-const scenarioFixture = {
-  summary: 'A hypothetical rate cut could affect risk appetite.',
-  impacts: [{ symbol: 'SPY', direction: 'up', estimatedChangePercent: null, rationale: 'Lower discount rates may support valuations, depending on growth.' }],
-  risks: ['A cut prompted by a recession could have the opposite effect.'],
-};
+
 const inferenceResponse = (value: unknown) => Response.json({
   candidates: [{ finishReason: 'STOP', content: { parts: [{ text: JSON.stringify(value) }] } }],
 });
@@ -111,7 +107,6 @@ test('invalid client input and forged context fields are rejected before inferen
   await assert.rejects(service.analyze({ ...headline, headline: '' }), { code: 'AI_INPUT_INVALID', status: 400 });
   await assert.rejects(service.analyze({ ...headline, symbol: '<script>' }), { code: 'AI_INPUT_INVALID' });
   await assert.rejects(service.analyze({ ...headline, priceContext: { price: 999 } } as unknown as typeof headline), { code: 'AI_INPUT_INVALID' });
-  await assert.rejects(service.scenario({ scenario: 'short' }), { code: 'AI_INPUT_INVALID' });
   assert.equal(calls, 0);
 });
 
@@ -202,26 +197,4 @@ test('unique concurrent requests have a hard cap while identical requests share 
   release(inferenceResponse(analysisFixture));
   assert.equal((await first).cached, false);
   assert.equal((await duplicate).cached, true);
-});
-
-test('scenario results are always hypothetical and cannot mutate supplied quotes', async () => {
-  const context = { quotes: [{ symbol: 'SPY', price: 500 }] };
-  const service = createAIService({ env: keys, fetch: async () => inferenceResponse(scenarioFixture) });
-  const input = { scenario: 'Federal Reserve cuts interest rates by 100 basis points' };
-  const result = await service.scenario(input, context);
-  assert.equal(result.hypothetical, true);
-  assert.equal(result.scenario, input.scenario);
-  assert.equal(result.impacts[0].estimatedChangePercent, null);
-  assert.deepEqual(context, { quotes: [{ symbol: 'SPY', price: 500 }] });
-  assert.equal((await service.scenario(input, context)).cached, true);
-});
-
-test('scenario contradictory directions and duplicate assets fail validation', async () => {
-  for (const impacts of [
-    [{ ...scenarioFixture.impacts[0], estimatedChangePercent: -5 }],
-    [...scenarioFixture.impacts, ...scenarioFixture.impacts],
-  ]) {
-    const service = createAIService({ env: keys, fetch: async () => inferenceResponse({ ...scenarioFixture, impacts }) });
-    await assert.rejects(service.scenario({ scenario: 'Hypothetical change to interest rates' }), { code: 'AI_INVALID_RESPONSE' });
-  }
 });

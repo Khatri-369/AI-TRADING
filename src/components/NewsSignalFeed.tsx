@@ -8,7 +8,6 @@ import {
   Check,
   ChevronDown,
   ChevronUp,
-  BarChart2,
   HelpCircle,
   TrendingUp,
   TrendingDown,

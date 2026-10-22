@@ -5,7 +5,6 @@ import {
   TrendingDown,
   TrendingUp,
   Newspaper,
-  FlaskConical,
   Layers,
   Sparkles,
   X,
@@ -483,20 +482,20 @@ export default function OverviewPage({
         <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-4 flex flex-col justify-between">
           <div>
             <div className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-[var(--text-primary)] mb-2">
-              <FlaskConical className="h-4 w-4 text-[var(--accent-primary)]" />
-              <span>Scenario Simulation</span>
+              <Activity className="h-4 w-4 text-[var(--accent-primary)]" />
+              <span>Research Desk & Charts</span>
             </div>
             <p className="text-xs leading-relaxed text-[var(--text-secondary)]">
-              Explore hypothetical interest rate decisions, commodity shocks, and macro events with structured reasoning.
+              Analyze multi-timeframe candlestick charts, track technical levels, and model disciplined trade plans with real-time market data.
             </p>
           </div>
 
           <button
             type="button"
-            onClick={() => onNavigate('scenarios')}
+            onClick={() => onNavigate('desk')}
             className="button-primary mt-4 w-full text-xs min-h-[44px] py-2 rounded-xl flex items-center justify-center gap-2"
           >
-            <span>Run Scenarios</span>
+            <span>Open Research Desk</span>
             <ArrowRight className="h-3.5 w-3.5" />
           </button>
         </div>

@@ -450,9 +450,9 @@ export default function ResearchDesk({
                 </span>
               </div>
 
-              {/* Scenario Direction */}
+              {/* Trade Direction */}
               <div>
-                <label className="text-xs font-medium text-[var(--text-secondary)]">Scenario Direction</label>
+                <label className="text-xs font-medium text-[var(--text-secondary)]">Trade Direction</label>
                 <div className="mt-1 flex gap-2">
                   <button
                     type="button"
@@ -463,7 +463,7 @@ export default function ResearchDesk({
                     }`}
                     onClick={() => setPlan({ ...plan, direction: 'long' })}
                   >
-                    📈 Long Scenario
+                    📈 Long Position
                   </button>
                   <button
                     type="button"
@@ -474,7 +474,7 @@ export default function ResearchDesk({
                     }`}
                     onClick={() => setPlan({ ...plan, direction: 'short' })}
                   >
-                    📉 Short Scenario
+                    📉 Short Position
                   </button>
                 </div>
               </div>

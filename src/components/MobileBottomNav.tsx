@@ -47,7 +47,7 @@ export default function MobileBottomNav({ currentTab, onNavigate, onOpenDisclosu
     { id: 'news', label: 'News', icon: Newspaper },
   ];
 
-  const isMoreActive = ['markets', 'scenarios', 'diagnostics'].includes(currentTab);
+  const isMoreActive = ['markets', 'diagnostics'].includes(currentTab);
 
   return (
     <>
@@ -87,22 +87,6 @@ export default function MobileBottomNav({ currentTab, onNavigate, onOpenDisclosu
               >
                 <Layers className="h-4 w-4 text-[var(--accent-primary)]" />
                 <span>Markets Directory</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  setMoreOpen(false);
-                  onNavigate('scenarios');
-                }}
-                className={`flex items-center gap-2.5 p-3 rounded-xl border text-left text-xs font-semibold transition min-h-[44px] ${
-                  currentTab === 'scenarios'
-                    ? 'border-[var(--accent-primary)] bg-[var(--accent-subtle)] text-[var(--accent-text)]'
-                    : 'border-[var(--border-subtle)] bg-[var(--bg-subtle)] text-[var(--text-primary)] hover:bg-[var(--bg-surface-hover)]'
-                }`}
-              >
-                <FlaskConical className="h-4 w-4 text-[var(--accent-primary)]" />
-                <span>AI Scenarios</span>
               </button>
 
               <button
