@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Bell, X, Check, ShieldAlert, Sparkles, TrendingUp, TrendingDown, Play } from 'lucide-react';
+import { Bell, X, Check, Sparkles, TrendingUp, TrendingDown, Play } from 'lucide-react';
 import { z } from 'zod';
 import type { NewsArticle, Quote } from '../types/market';
 import { useWatchlist } from '../hooks/useWatchlist';
@@ -562,28 +562,6 @@ export default function NewsAlerts({
             </div>
           </div>
 
-          {/* Hosting & Architecture Transparency Note */}
-          <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-canvas)] p-2.5 text-[10px] leading-relaxed text-[var(--text-muted)] space-y-1">
-            <p className="font-semibold text-[var(--text-secondary)] flex items-center gap-1">
-              <ShieldAlert size={12} className="text-amber-500" />
-              <span>Hosting transparency</span>
-            </p>
-            <p>
-              Foreground news alerts trigger while you have the app open. Closed-app background push notifications require a dedicated 24/7 background worker & push server.
-            </p>
-            {onOpenBackgroundSetup && (
-              <button
-                type="button"
-                onClick={() => {
-                  setOpen(false);
-                  onOpenBackgroundSetup();
-                }}
-                className="text-[var(--accent-text)] underline block pt-0.5 cursor-pointer"
-              >
-                View background push requirements
-              </button>
-            )}
-          </div>
 
           {message && (
             <p role="status" className="text-xs text-amber-500 font-medium">
