@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 
-test('OneSignal registration uses the shared root worker and follows enable, disable and scope preferences', async ({ page }) => {
+for (const slowInit of [false, true]) test(`OneSignal shared worker registers and recovers from slow initialization (${slowInit})`, async ({ page }) => {
   const errors: string[] = []; page.on('pageerror', error => errors.push(error.message));
   await page.addInitScript(() => {
     localStorage.setItem('markets.alerts.settings.v1', JSON.stringify({ enabled: true, device: true, scope: 'all', quiet: false }));
@@ -11,7 +11,7 @@ test('OneSignal registration uses the shared root worker and follows enable, dis
     window.sdkLoads = (window.sdkLoads || 0) + 1;
     window.pushCalls = [];
     const tags = {};
-    const sdk = { Notifications: { isPushSupported: () => true, requestPermission: () => new Promise(() => {}), addEventListener: () => {} }, init: async options => { window.initCount = (window.initCount || 0) + 1; window.workerOptions = options; }, User: {
+    const sdk = { Notifications: { isPushSupported: () => true, requestPermission: () => new Promise(() => {}), addEventListener: () => {} }, init: async options => { window.initCount = (window.initCount || 0) + 1; window.workerOptions = options; await new Promise(resolve => setTimeout(resolve, ${slowInit ? 17000 : 0})); if (options.autoResubscribe) await new Promise(() => {}); }, User: {
       onesignalId: 'c93d06ef-e58a-43a0-8f00-87a7b632f11a', getTags: () => tags, addEventListener: () => {},
       addTag: (key, value) => { tags[key] = value; window.pushCalls.push(key + '=' + value); },
       PushSubscription: { addEventListener: () => {}, id: 'c93d06ef-e58a-43a0-8f00-87a7b632f11ab', optedIn: false,
@@ -27,10 +27,15 @@ test('OneSignal registration uses the shared root worker and follows enable, dis
   await page.route('**/api/news', route => route.fulfill({ json: { articles: [], provider: 'Fixture', status: 'unavailable', cached: false, fetchedAt: null } }));
   await page.route('**/api/stream/live-ticks', route => route.abort());
   await page.goto('/');
+  if (slowInit) {
+    await page.getByRole('button', { name: 'Desktop app and news alerts' }).click();
+    await expect(page.getByRole('status').filter({ hasText: 'Push setup delayed while initializing OneSignal configuration' })).toBeVisible({ timeout: 20000 });
+    await page.getByRole('button', { name: 'Close desktop settings' }).click();
+  }
   const calls = () => page.evaluate(() => (window as unknown as { pushCalls: string[] }).pushCalls);
   await expect.poll(calls).toContain('market_news=on');
   expect(await page.evaluate(() => (window as unknown as { workerOptions: { serviceWorkerParam: { scope: string } } }).workerOptions.serviceWorkerParam.scope)).toBe('/');
-  expect(await page.evaluate(() => (window as unknown as { workerOptions: { autoResubscribe: boolean } }).workerOptions.autoResubscribe)).toBe(true);
+  expect(await page.evaluate(() => (window as unknown as { workerOptions: { autoResubscribe: boolean } }).workerOptions.autoResubscribe)).toBe(false);
   await page.getByRole('button', { name: 'Desktop app and news alerts' }).click();
   await page.getByRole('button', { name: 'Disable background alerts' }).click();
   await expect.poll(async () => (await calls()).at(-1)).toBe('opt-out');

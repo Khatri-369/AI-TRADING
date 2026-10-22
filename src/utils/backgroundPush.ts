@@ -37,16 +37,13 @@ let sdkPromise: Promise<SDK> | undefined;
 let backgroundActive = false;
 let verifiedDevice: { key: string; at: number } | undefined;
 export const hasActiveBackgroundPush = () => backgroundActive;
-function loadSDK(appId: string) {
-  if (sdkPromise) return sdkPromise;
-  sdkPromise = new Promise<SDK>((resolve, reject) => {
-    const timer = setTimeout(() => {
-      reject(new Error('Push setup timed out. Reload and try again.'));
-    }, 15_000);
+let sdkStage = 'loading OneSignal scripts';
+async function loadSDK(appId: string) {
+  if (!sdkPromise) sdkPromise = new Promise<SDK>((resolve, reject) => {
     const host = window as unknown as { OneSignalDeferred?: Array<(sdk: SDK) => void> };
     host.OneSignalDeferred = host.OneSignalDeferred ?? [];
     host.OneSignalDeferred.push(async sdk => {
-      const settings = getStoredAlertSettings();
+      sdkStage = 'initializing OneSignal configuration';
       try {
         await sdk.init({
           appId,
@@ -54,13 +51,14 @@ function loadSDK(appId: string) {
           serviceWorkerParam: { scope: '/' },
           notifyButton: { enable: false },
           welcomeNotification: { disable: true },
-          autoResubscribe: settings.enabled && settings.device && settings.scope === 'all' && !settings.quiet,
+          // Subscribe explicitly after initialization so browser push registration
+          // cannot hold the initialization promise open.
+          autoResubscribe: false,
           promptOptions: { slidedown: { prompts: [{ type: 'push', autoPrompt: false }] } },
         });
       } catch (err) {
         const msg = String(err);
         if (!msg.toLowerCase().includes('already initialized')) {
-          clearTimeout(timer);
           reject(new Error('OneSignal initialization failed. Check the site origin and worker, then reload to retry.'));
           return;
         }
@@ -68,17 +66,24 @@ function loadSDK(appId: string) {
       sdk.User.PushSubscription.addEventListener('change', onSubscriptionChange);
       sdk.User.addEventListener('change', onSubscriptionChange);
       sdk.Notifications.addEventListener('permissionChange', onSubscriptionChange);
-      clearTimeout(timer);
+      sdkStage = 'ready';
       resolve(sdk);
+      onSubscriptionChange();
     });
     const script = document.createElement('script'); script.src = 'https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js'; script.defer = true;
     script.onerror = () => {
-      clearTimeout(timer);
       reject(new Error('Push service could not load (check network/content blocker).'));
     };
     document.head.appendChild(script);
   });
-  return sdkPromise;
+  // Keep the real initialization promise alive: a slow successful init must
+  // recover without loading a second SDK or permanently caching a timeout.
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([sdkPromise, new Promise<SDK>((_, reject) => {
+      timer = setTimeout(() => reject(new Error(`Push setup delayed while ${sdkStage}. Retry Enable news alerts; if it persists, send this message.`)), 15_000);
+    })]);
+  } finally { clearTimeout(timer); }
 }
 let queue: Promise<unknown> = Promise.resolve();
 export function syncBackgroundPush(): Promise<string | null> {
