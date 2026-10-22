@@ -3,21 +3,7 @@ import { TrendingUp, TrendingDown, X, Play, Pause } from 'lucide-react';
 import type { Quote } from '../types/market';
 import { formatPercent, formatPrice, formatTime } from '../utils/format';
 
-const ASSET_ICONS: Record<string, string> = {
-  NIFTY50: '🇮🇳',
-  SENSEX: '🇮🇳',
-  BANKNIFTY: '🇮🇳',
-  SPY: '🇺🇸',
-  QQQ: '🇺🇸',
-  BTC: '🪙',
-  ETH: '⟠',
-  SOL: '🟣',
-  BNB: '🟡',
-  XRP: '⚪',
-  XAU: '🏆',
-  XAG: '🥈',
-  'USD/INR': '💱',
-};
+import AssetIcon from './AssetIcon';
 
 export default function TickerTape({
   quotes,
@@ -87,8 +73,6 @@ export default function TickerTape({
             tickerItems.map((quote, idx) => {
               const isGain = (quote.changePercent ?? 0) >= 0;
               const hasChange = quote.changePercent !== null;
-              const icon = ASSET_ICONS[quote.symbol] ?? '📈';
-
               return (
                 <button
                   key={`${quote.symbol}-${idx}`}
@@ -97,7 +81,7 @@ export default function TickerTape({
                   className="group flex shrink-0 items-center gap-1.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-2.5 py-1 text-xs transition hover:border-[var(--accent-primary)] hover:bg-[var(--bg-surface-hover)] cursor-pointer"
                   title={`${quote.name} · ${quote.category.toUpperCase()} · As of ${formatTime(quote.asOf)}`}
                 >
-                  <span className="text-xs shrink-0">{icon}</span>
+                  <AssetIcon symbol={quote.symbol} category={quote.category} size="xs" />
                   <span className="font-bold text-[var(--text-primary)] group-hover:text-[var(--accent-text)] transition-colors">
                     {quote.symbol}
                   </span>

@@ -5,11 +5,55 @@ import type { NewsArticle } from '../../shared/types';
 import { fetchBytes, validTime, type Fetcher } from './http';
 
 const aliases: Record<string, string[]> = {
-  RELIANCE: ['Reliance Industries'], TCS: ['Tata Consultancy Services'], HDFCBANK: ['HDFC Bank'],
-  ICICIBANK: ['ICICI Bank'], SBIN: ['State Bank of India'], BHARTIARTL: ['Bharti Airtel', 'Airtel'],
-  LT: ['Larsen & Toubro', 'Larsen and Toubro', 'L&T'], 'M&M': ['Mahindra & Mahindra', 'Mahindra and Mahindra'],
-  HCLTECH: ['HCL Technologies', 'HCLTech'], SUNPHARMA: ['Sun Pharma', 'Sun Pharmaceutical'],
-  BANKNIFTY: ['Bank Nifty', 'Nifty Bank'], NIFTY50: ['Nifty 50'], GOOGL: ['Alphabet', 'Google'],
+  // Indian Equities & Benchmarks
+  RELIANCE: ['Reliance Industries', 'Reliance Jio', 'Reliance Retail'],
+  TCS: ['Tata Consultancy Services', 'TCS'],
+  HDFCBANK: ['HDFC Bank'],
+  INFY: ['Infosys'],
+  ICICIBANK: ['ICICI Bank'],
+  SBIN: ['State Bank of India', 'SBI'],
+  BHARTIARTL: ['Bharti Airtel', 'Airtel'],
+  LT: ['Larsen & Toubro', 'Larsen and Toubro', 'L&T'],
+  'M&M': ['Mahindra & Mahindra', 'Mahindra and Mahindra', 'Mahindra Motors'],
+  HCLTECH: ['HCL Technologies', 'HCLTech'],
+  SUNPHARMA: ['Sun Pharma', 'Sun Pharmaceutical'],
+  BANKNIFTY: ['Bank Nifty', 'Nifty Bank'],
+  NIFTY50: ['Nifty 50', 'Nifty'],
+  SENSEX: ['Sensex', 'BSE Sensex', 'BSE 30'],
+  TATAMOTORS: ['Tata Motors'],
+  HINDUNILVR: ['Hindustan Unilever', 'HUL'],
+  ITC: ['ITC Ltd'],
+  BAJFINANCE: ['Bajaj Finance', 'Bajaj Finserv'],
+  LICI: ['Life Insurance Corporation', 'LIC of India'],
+  TITAN: ['Titan Company', 'Titan'],
+  ULTRACEMCO: ['UltraTech Cement', 'UltraTech'],
+  POWERGRID: ['Power Grid Corporation', 'Power Grid', 'PowerGrid'],
+  NTPC: ['NTPC Ltd'],
+
+  // US Equities & Benchmarks
+  SPY: ['S&P 500', 'S&P500', 'SP500', 'Wall Street', 'S&P index'],
+  QQQ: ['Nasdaq', 'Nasdaq 100', 'Invesco QQQ'],
+  AAPL: ['Apple', 'Apple Inc', 'iPhone', 'iPad'],
+  MSFT: ['Microsoft', 'Windows', 'Azure'],
+  NVDA: ['Nvidia', 'NVIDIA', 'GeForce', 'Blackwell'],
+  TSLA: ['Tesla', 'Elon Musk', 'Tesla Motors'],
+  AMZN: ['Amazon', 'Amazon.com', 'AWS'],
+  GOOGL: ['Alphabet', 'Google'],
+  META: ['Meta Platforms', 'Facebook', 'Instagram'],
+
+  // Digital Assets & Crypto
+  BTC: ['Bitcoin', 'BTC'],
+  ETH: ['Ethereum', 'Ether'],
+  SOL: ['Solana'],
+  BNB: ['Binance Coin', 'Binance'],
+  XRP: ['Ripple', 'XRP'],
+
+  // Commodities & Precious Metals
+  XAU: ['Gold', 'Spot Gold', 'Gold prices', 'Gold price', 'Bullion'],
+  XAG: ['Silver', 'Spot Silver', 'Silver prices', 'Silver price'],
+
+  // Forex & Currency
+  'USD/INR': ['USD/INR', 'USD-INR', 'USDINR', 'Indian Rupee', 'Rupee', 'Dollar-Rupee'],
 };
 const escaped = (value: string) => [...value].map(character => '\\^$.*+?()[]{}|'.includes(character) ? `\\${character}` : character).join('');
 function mentions(text: string, value: string, insensitive = true) {

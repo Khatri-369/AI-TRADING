@@ -5,6 +5,7 @@ import { ASSET_BY_SYMBOL } from '../../shared/assets';
 import { useResearchStore } from '../hooks/useResearchStore';
 import { recordSchemas } from '../../shared/research';
 import { formatPrice, formatPercent, isIndexInstrument } from '../utils/format';
+import AssetIcon from './AssetIcon';
 
 const storageKey = 'markets.watchlist.v1';
 const RECOMMENDED_INDIAN_STOCKS = ['RELIANCE', 'TCS', 'HDFCBANK', 'INFY', 'ICICIBANK', 'SBIN'];
@@ -305,6 +306,7 @@ export default function WatchlistPage({
                     onClick={() => onSelect(q)}
                   >
                     <div className="flex items-center gap-1.5">
+                      <AssetIcon symbol={q.symbol} category={q.category} size="xs" />
                       <h2 className="font-semibold text-sm text-[var(--text-primary)] hover:text-[var(--accent-text)] transition">
                         {q.symbol}
                       </h2>

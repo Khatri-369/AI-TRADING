@@ -20,6 +20,7 @@ import AnalysisResult from './AnalysisResult';
 import StatusBadge from './StatusBadge';
 import { useWatchlist } from '../hooks/useWatchlist';
 import { useRouter } from '../utils/router';
+import AssetIcon from './AssetIcon';
 
 interface Props {
   data: NewsResponse | null;
@@ -472,10 +473,10 @@ export default function NewsSignalFeed({
                             localStorage.setItem('last_chart_symbol', sym);
                             navigate(`/desk?symbol=${encodeURIComponent(sym)}`);
                           }}
-                          className="inline-flex items-center gap-1 rounded-md border border-[var(--border-default)] bg-[var(--bg-subtle)] px-2 py-1 font-mono text-[11px] font-medium text-[var(--text-primary)] hover:border-[var(--accent-primary)] hover:text-[var(--accent-text)] transition min-h-[32px] cursor-pointer"
+                          className="inline-flex items-center gap-1.5 rounded-md border border-[var(--border-default)] bg-[var(--bg-subtle)] px-2 py-1 font-mono text-[11px] font-medium text-[var(--text-primary)] hover:border-[var(--accent-primary)] hover:text-[var(--accent-text)] transition min-h-[32px] cursor-pointer"
                           title={`${article.stockLinks?.find(link => link.symbol === sym)?.evidence ?? 'Linked by news provider'}. Open ${sym} chart.`}
                         >
-                          <BarChart2 size={12} className="text-[var(--accent-primary)]" />
+                          <AssetIcon symbol={sym} size="xs" />
                           <span>{sym}</span>
                         </button>
                       ))

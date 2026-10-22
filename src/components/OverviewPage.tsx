@@ -34,12 +34,14 @@ interface Props {
   onRefresh: () => void;
 }
 
+import AssetIcon from './AssetIcon';
+
 const CATEGORY_MAP: Record<string, { label: string; icon: string }> = {
   all: { label: 'All Instruments', icon: '🌐' },
   india: { label: 'Indian Equities', icon: '🇮🇳' },
   us: { label: 'US Equities', icon: '🇺🇸' },
-  crypto: { label: 'Digital Assets', icon: '🪙' },
-  commodities: { label: 'Metals & FX', icon: '🏆' },
+  crypto: { label: 'Digital Assets', icon: '₿' },
+  commodities: { label: 'Metals & FX', icon: '🪙' },
 };
 
 function BenchmarkCard({
@@ -52,15 +54,6 @@ function BenchmarkCard({
   const hasChange = quote.changePercent !== null && Number.isFinite(quote.changePercent);
   const isGain = (quote.changePercent ?? 0) >= 0;
   const isIndex = isIndexInstrument(quote.symbol, quote.sector, quote.currency);
-
-  const flag =
-    quote.category === 'india'
-      ? '🇮🇳'
-      : quote.category === 'us'
-      ? '🇺🇸'
-      : quote.category === 'crypto'
-      ? '🪙'
-      : '🏆';
 
   return (
     <button
@@ -79,7 +72,7 @@ function BenchmarkCard({
             </span>
           )}
         </div>
-        <span className="text-xs shrink-0">{flag}</span>
+        <AssetIcon symbol={quote.symbol} category={quote.category} size="sm" />
       </div>
 
       <span className="truncate text-[11px] text-[var(--text-muted)] mt-0.5 block w-full">

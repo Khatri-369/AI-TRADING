@@ -5,6 +5,7 @@ import type { NewsArticle, Quote } from '../types/market';
 import { useWatchlist } from '../hooks/useWatchlist';
 import { formatPercent } from '../utils/format';
 import { hasActiveBackgroundPush } from '../utils/backgroundPush';
+import AssetIcon from './AssetIcon';
 
 import {
   STORAGE_ALERT_INBOX,
@@ -656,6 +657,7 @@ export default function NewsAlerts({
                                     : 'bg-rose-500/10 text-rose-400 hover:bg-rose-500/20 border border-rose-500/20'
                                 }`}
                               >
+                                <AssetIcon symbol={stock.symbol} category={stock.category} size="xs" />
                                 <span>{stock.symbol}</span>
                                 <span className="flex items-center">
                                   {isGain ? (
@@ -745,6 +747,7 @@ export default function NewsAlerts({
                         : 'bg-rose-500/15 text-rose-400 hover:bg-rose-500/25 border border-rose-500/30'
                     }`}
                   >
+                    <AssetIcon symbol={stock.symbol} category={stock.category} size="xs" />
                     <span>{stock.symbol}</span>
                     <span className="flex items-center gap-0.5">
                       {isGain ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}

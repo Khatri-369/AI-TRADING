@@ -17,6 +17,7 @@ import AnalysisResult from './AnalysisResult';
 import StatusBadge from './StatusBadge';
 import CandleWorkspace from './CandleWorkspace';
 import WatchlistToggle from './WatchlistToggle';
+import AssetIcon from './AssetIcon';
 
 interface Props {
   quote: Quote;
@@ -123,6 +124,7 @@ export default function AssetDetail({
               <button className="button-secondary min-h-[44px]" onClick={onWorkspace}><ChartIcon size={16} />Open chart workspace</button>
             </div>
             <div className="flex items-center gap-2.5">
+              <AssetIcon symbol={quote.symbol} category={quote.category} size="md" />
               <h2 id="asset-detail-title" className="text-xl sm:text-2xl font-bold tracking-tight text-[var(--text-primary)]">
                 {quote.symbol}
               </h2>
