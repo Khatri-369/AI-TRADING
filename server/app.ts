@@ -110,7 +110,7 @@ export function createApp(config: ServerConfig, production = config.NODE_ENV ===
         ? {
             directives: {
               defaultSrc: ["'self'"],
-              scriptSrc: ["'self'", 'https://cdn.onesignal.com'],
+              scriptSrc: ["'self'", 'https://cdn.onesignal.com', 'https://api.onesignal.com'],
               styleSrc: ["'self'", "'unsafe-inline'"],
               imgSrc: ["'self'", 'data:'],
               connectSrc: ["'self'", 'https://*.onesignal.com'],
