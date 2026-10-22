@@ -59,7 +59,6 @@ export default function App() {
 
 function MainApp() {
   useEffect(startBackgroundPushSync, []);
-  // Theme state: exactly TWO modes ('light' | 'dark'), persisted in localStorage
   const [theme, setTheme] = useState<ThemeType>(() => {
     const saved = localStorage.getItem('theme');
     if (saved === 'light' || saved === 'dark') return saved;
@@ -82,7 +81,6 @@ function MainApp() {
     }
   }, [theme]);
 
-  // Client-side router managing clean URLs with browser history
   const [route, navigate] = useRouter();
   const [search, setSearch] = useState('');
   const [showTicker, setShowTicker] = useState(() => {
@@ -96,14 +94,12 @@ function MainApp() {
   const [disclosuresOpen, setDisclosuresOpen] = useState(false);
   const [engine, setEngine] = useState<Engine>('gemini');
 
-  // Market subcategory selection for Markets page
   const [marketCategory, setMarketCategory] = useState<'all' | 'us' | 'india' | 'crypto' | 'commodities'>('all');
 
   const market = useMarketData();
   const news = useNews();
   const ai = useAIAnalysis();
 
-  // Redirect to Watchlist if chosen as default landing page
   useEffect(() => {
     if (window.location.pathname === '/' && localStorage.getItem('default_landing_page') === 'watchlist') {
       navigate('/watchlist');
@@ -152,7 +148,6 @@ function MainApp() {
     news.refresh();
   };
 
-  // Resolve current active asset for /asset/:symbol
   const fallbackAsset = route.symbol ? ASSET_BY_SYMBOL.get(route.symbol) : undefined;
   const currentQuote: Quote | null =
     (route.symbol ? market.quotes.find((q) => q.symbol === route.symbol) : null) ??
@@ -176,7 +171,6 @@ function MainApp() {
         }
       : null);
 
-  // Filtered quotes based on honest search across 42 instruments
   const filteredQuotes = market.quotes.filter((quote) =>
     `${quote.symbol} ${quote.name} ${quote.sector ?? ''} ${quote.category}`
       .toLowerCase()
@@ -212,7 +206,6 @@ function MainApp() {
       className="min-h-screen bg-[var(--bg-canvas)] text-[var(--text-primary)] flex flex-col justify-between"
     >
       <div>
-        {/* Application Header Shell */}
         <Header
           theme={theme}
           onDesktop={() => setDesktopOpen(true)}
@@ -239,7 +232,6 @@ function MainApp() {
           onSelectAsset={handleSelectAsset}
         />
 
-        {/* Global Movable Benchmark Ticker Tape */}
         {showTicker && (
           <TickerTape
             quotes={market.quotes.filter((q) =>
@@ -254,12 +246,10 @@ function MainApp() {
           />
         )}
 
-        {/* Main Content Area */}
         <main
           id="main-content"
           className="mx-auto max-w-[1440px] w-full px-3 py-4 sm:px-6 lg:px-8 pb-24 md:pb-8 space-y-6"
         >
-          {/* Active Search Banner */}
           {search.trim() && (
             <div className="flex items-center justify-between gap-3 rounded-lg border border-[var(--border-default)] bg-[var(--bg-surface-elevated)] px-4 py-2 text-xs">
               <div>
