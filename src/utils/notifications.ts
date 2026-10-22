@@ -93,7 +93,7 @@ export async function sendSystemNotification(
   if (Notification.permission !== 'granted') return false;
 
   const title = `Tradexa · ${source || 'Market News'}`;
-  const body = newsNotificationBody(headline, relatedSymbols);
+  const body = newsNotificationBody(headline, relatedSymbols, relatedStocks);
 
   const options: NotificationOptions = {
     body,

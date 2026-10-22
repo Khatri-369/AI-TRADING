@@ -23,9 +23,9 @@ export function canonicalArticleUrl(value: string) {
   url.searchParams.sort();
   return url.href;
 }
-export function queueHeadline(article: NewsArticle): QueuedHeadline {
+export function queueHeadline(article: NewsArticle, quotes?: Array<{ symbol: string; changePercent?: number | null; price?: number | null; currency?: string }>): QueuedHeadline {
   const url = canonicalArticleUrl(article.url);
-  return { key: createHash('sha256').update(url).digest('hex'), article: { ...article, url }, notificationBody: newsNotificationBody(article.headline, article.relatedAssets), attempts: 0, state: 'pending' };
+  return { key: createHash('sha256').update(url).digest('hex'), article: { ...article, url }, notificationBody: newsNotificationBody(article.headline, article.relatedAssets, quotes), attempts: 0, state: 'pending' };
 }
 export interface NewsQueue {
   configured: boolean;

@@ -51,8 +51,12 @@ interface Props {
 
 function getRelatedQuotes(assetSymbols: string[] | undefined, quotes: Quote[] = []): Quote[] {
   if (!assetSymbols || !assetSymbols.length || !quotes.length) return [];
+  const lookup = new Map<string, Quote>();
+  for (const q of quotes) {
+    if (q?.symbol) lookup.set(q.symbol.toUpperCase(), q);
+  }
   return assetSymbols
-    .map((sym) => quotes.find((q) => q.symbol === sym))
+    .map((sym) => lookup.get(sym.trim().toUpperCase()))
     .filter((q): q is Quote => Boolean(q));
 }
 

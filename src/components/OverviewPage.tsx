@@ -59,7 +59,7 @@ function BenchmarkCard({
     <button
       type="button"
       onClick={() => onSelect(quote)}
-      className="group flex flex-col justify-between rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-3 text-left transition duration-150 hover:border-[var(--accent-primary)] hover:bg-[var(--bg-surface-hover)] cursor-pointer"
+      className="group flex flex-col justify-between rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-3 text-left transition-all duration-200 hover:border-[var(--accent-border)] hover:bg-[var(--bg-surface-hover)] hover:shadow-sm cursor-pointer"
     >
       <div className="flex items-center justify-between gap-1 w-full">
         <div className="flex items-center gap-1.5 min-w-0">
@@ -135,13 +135,11 @@ export default function OverviewPage({
     localStorage.setItem('default_landing_page', val);
   };
 
-  // Indian benchmarks together, followed by Global benchmarks
   const benchmarkSymbols = ['NIFTY50', 'BANKNIFTY', 'SENSEX', 'SPY', 'BTC', 'XAU', 'USD/INR'];
   const benchmarks = benchmarkSymbols
     .map((sym) => quotes.find((q) => q.symbol === sym))
     .filter((q): q is Quote => Boolean(q));
 
-  // Gainers & Losers
   const quotesWithChanges = quotes.filter(
     (q) => q.changePercent !== null && q.price !== null && !['unavailable', 'stale'].includes(q.status)
   );
@@ -154,7 +152,6 @@ export default function OverviewPage({
     .sort((a, b) => (a.changePercent ?? 0) - (b.changePercent ?? 0))
     .slice(0, 5);
 
-  // Filtered quotes for quick list
   const displayQuotes = quotes.filter((q) => {
     if (selectedCategory === 'all') return true;
     if (selectedCategory === 'commodities') return ['commodities', 'forex'].includes(q.category);
@@ -163,7 +160,6 @@ export default function OverviewPage({
 
   return (
     <div className="space-y-5">
-      {/* Sleek Market Status Bar */}
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--border-subtle)] pb-3">
         <div className="flex items-center gap-2">
           <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-[var(--accent-subtle)] text-[var(--accent-primary)]">
@@ -180,7 +176,6 @@ export default function OverviewPage({
         </div>
 
         <div className="flex items-center gap-2">
-          {/* Default Landing Page Picker */}
           <div className="hidden sm:flex items-center gap-1.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-2.5 py-1 text-xs">
             <span className="text-[var(--text-muted)] text-[11px]">Start page:</span>
             <select
@@ -213,10 +208,8 @@ export default function OverviewPage({
         </div>
       </div>
 
-
-      {/* Simple First-Use Flow: 3-Step Guided Roadmap */}
       {showTip && (
-        <section className="relative rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-3.5 shadow-sm">
+        <section className="relative rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-3.5 shadow-sm animate-fade-in">
           <div className="flex items-center justify-between border-b border-[var(--border-subtle)] pb-2 mb-2.5">
             <div className="flex items-center gap-1.5 text-xs font-semibold text-[var(--text-primary)]">
               <Sparkles className="h-3.5 w-3.5 text-[var(--accent-primary)]" />
@@ -254,7 +247,6 @@ export default function OverviewPage({
         </section>
       )}
 
-      {/* Market Benchmarks Deck (NIFTY 50, BANK NIFTY, SENSEX prominently together) */}
       <section aria-labelledby="benchmarks-heading">
         <div className="mb-2.5 flex items-center justify-between">
           <h2 id="benchmarks-heading" className="text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)]">
@@ -266,7 +258,7 @@ export default function OverviewPage({
         {loading && !quotes.length ? (
           <Loading label="Loading market benchmarks…" />
         ) : (
-          <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-7">
+          <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-7 animate-fade-in">
             {benchmarks.map((quote) => (
               <BenchmarkCard
                 key={quote.symbol}
@@ -278,7 +270,6 @@ export default function OverviewPage({
         )}
       </section>
 
-      {/* Category Filter Pills & Instrument Directory */}
       <section className="space-y-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
@@ -313,15 +304,14 @@ export default function OverviewPage({
           </button>
         </div>
 
-        {/* Clean Responsive Quotes Grid with Direct Watchlist Save/Remove */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2.5">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2.5 animate-fade-in">
           {displayQuotes.slice(0, 12).map((quote) => {
             const isGain = (quote.changePercent ?? 0) >= 0;
             const isIndex = isIndexInstrument(quote.symbol, quote.sector, quote.currency);
             return (
               <div
                 key={quote.symbol}
-                className="group w-full flex items-center justify-between rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-3 hover:border-[var(--border-default)] hover:bg-[var(--bg-surface-hover)] transition shadow-sm"
+                className="group w-full flex items-center justify-between rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-3 hover:border-[var(--accent-border)] hover:bg-[var(--bg-surface-hover)] transition-all duration-200 hover:shadow-sm"
               >
                 <button
                   type="button"
@@ -376,10 +366,8 @@ export default function OverviewPage({
         )}
       </section>
 
-      {/* Top Gainers & Losers */}
       <section className="grid gap-3 sm:grid-cols-2">
-        {/* Gainers */}
-        <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-3.5">
+        <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-3.5">
           <div className="flex items-center justify-between border-b border-[var(--border-subtle)] pb-2 mb-2.5">
             <h3 className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-emerald-400">
               <TrendingUp className="h-4 w-4" />
@@ -413,8 +401,7 @@ export default function OverviewPage({
           </div>
         </div>
 
-        {/* Losers */}
-        <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-3.5">
+        <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-3.5">
           <div className="flex items-center justify-between border-b border-[var(--border-subtle)] pb-2 mb-2.5">
             <h3 className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-rose-400">
               <TrendingDown className="h-4 w-4" />
@@ -449,10 +436,8 @@ export default function OverviewPage({
         </div>
       </section>
 
-      {/* Latest Market News & Scenario Hub */}
       <div className="grid gap-4 lg:grid-cols-3">
-        {/* News Feed Preview */}
-        <div className="lg:col-span-2 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-4">
+        <div className="lg:col-span-2 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-4">
           <div className="mb-3 flex items-center justify-between border-b border-[var(--border-subtle)] pb-2">
             <h3 className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-[var(--text-primary)]">
               <Newspaper className="h-4 w-4 text-[var(--accent-primary)]" />
@@ -480,7 +465,7 @@ export default function OverviewPage({
                 <article
                   key={article.id}
                   onClick={() => onNavigate('news')}
-                  className="rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-subtle)] p-2.5 text-xs hover:border-[var(--border-default)] transition cursor-pointer"
+                  className="rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-subtle)] p-2.5 text-xs hover:border-[var(--accent-border)] transition-all duration-200 cursor-pointer"
                 >
                   <div className="flex items-center justify-between gap-2 text-[10px] text-[var(--text-muted)]">
                     <span className="font-semibold text-[var(--accent-text)]">{article.source}</span>
@@ -495,8 +480,7 @@ export default function OverviewPage({
           )}
         </div>
 
-        {/* AI & Scenario Assistant Card */}
-        <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-4 flex flex-col justify-between">
+        <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-4 flex flex-col justify-between">
           <div>
             <div className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-[var(--text-primary)] mb-2">
               <FlaskConical className="h-4 w-4 text-[var(--accent-primary)]" />

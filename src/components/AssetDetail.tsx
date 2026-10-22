@@ -116,7 +116,6 @@ export default function AssetDetail({
       }}
     >
       <div className="p-5 sm:p-7">
-        {/* Header Bar */}
         <div className="flex items-start justify-between gap-4 border-b border-[var(--border-subtle)] pb-4">
           <div>
             <div className="flex flex-wrap items-center gap-2 mb-2">
@@ -155,7 +154,6 @@ export default function AssetDetail({
           </button>
         </div>
 
-        {/* Pricing & Key Metrics Strip */}
         <div className="my-5 grid gap-4 sm:grid-cols-2">
           <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface-elevated)] p-4">
             <span className="text-[11px] font-medium uppercase tracking-wider text-[var(--text-muted)]">
@@ -211,14 +209,12 @@ export default function AssetDetail({
           </p>
         )}
 
-        {/* Historical Price Section */}
         <section className="my-5 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-2">
               <h3 className="text-sm font-semibold text-[var(--text-primary)]">
                 Historical Price Data
               </h3>
-              {/* Chart vs Data Table Alternative Toggle */}
               <div className="ml-2 inline-flex rounded-md border border-[var(--border-default)] p-0.5" role="group" aria-label="Data display mode">
                 <button
                   type="button"
@@ -265,7 +261,6 @@ export default function AssetDetail({
               </div>
             </div>
 
-            {/* Range Controls for standard chart & table */}
             {viewMode !== 'candles' && (
               <div className="flex flex-wrap gap-1" aria-label="History time range selector">
                 {ranges.map((v) => (
@@ -307,7 +302,6 @@ export default function AssetDetail({
             </div>
           ) : history && history.points.length >= 2 ? (
             viewMode === 'chart' ? (
-              /* Graphical Chart View */
               <div className="mt-4 h-64 min-w-0 w-full" tabIndex={0} aria-label={`${quote.symbol} ${range} price chart`}>
                 <ResponsiveContainer width="100%" height="100%" minWidth={0}>
                   <AreaChart data={chartData} margin={{ top: 8, right: 8, bottom: 8, left: 0 }}>
@@ -366,7 +360,6 @@ export default function AssetDetail({
                 </ResponsiveContainer>
               </div>
             ) : (
-              /* Accessible Text / Table Alternative */
               <div
                 tabIndex={0}
                 role="region"
@@ -424,7 +417,6 @@ export default function AssetDetail({
           )}
         </section>
 
-        {/* AI Market Assessment Section */}
         <section className="space-y-3 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <h3 className="section-heading text-sm">

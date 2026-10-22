@@ -207,7 +207,10 @@ export function createApp(config: ServerConfig, production = config.NODE_ENV ===
       res.status(503).json({ error: 'Background news delivery is not configured.' }); return;
     }
     if (usesOneSignal()) {
-      const result = await oneSignalPush.deliver(() => marketService.news(true));
+      const result = await oneSignalPush.deliver(
+        () => marketService.news(true),
+        () => marketService.overview()
+      );
       const degraded = result.failed > 0 || ('feedUnavailable' in result && result.feedUnavailable) || ('review' in result && result.review > 0);
       res.status(degraded ? 503 : 200).json({ ok: !degraded, ...result, timestamp: new Date().toISOString() });
       return;

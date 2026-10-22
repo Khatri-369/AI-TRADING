@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { logger } from '../logger';
 import { appDiagnostics, classifyPushResponse } from './diagnostics';
 import { RedisNewsQueue, queueHeadline, type NewsQueue, type QueuedHeadline } from './newsQueue';
+import { newsNotificationBody, type QuoteLike } from '../../shared/newsNotification';
 import type { NewsResponse } from '../../shared/types';
 
 export function authorizedNewsJob(header: string | undefined, secret = process.env.CRON_SECRET) {
@@ -15,6 +16,7 @@ const optionsSchema = z.object({ appId: z.string().uuid(), apiKey: z.string().tr
 interface Options {
   appId?: string; apiKey?: string; queue?: NewsQueue; fetcher?: typeof fetch;
   now?: () => number; sleep?: (ms: number) => Promise<void>;
+  batchLimit?: number;
 }
 export function notificationKey(appId: string, key: string, generation = 0) {
   const bytes = createHash('sha256').update(`${appId}:${key}${generation ? `:retry-${generation}` : ''}`).digest().subarray(0, 16);
@@ -31,7 +33,10 @@ export function retryDelay(attempts: number, retryAfter: string | null, now: num
 export class OneSignalNewsPush {
   constructor(private options: Options) {}
   get configured() { return optionsSchema.safeParse(this.options).success && Boolean(this.options.queue?.configured); }
-  async deliver(getNews: (() => Promise<NewsResponse>) | NewsResponse) {
+  async deliver(
+    getNews: (() => Promise<NewsResponse>) | NewsResponse,
+    getOverview?: (() => Promise<{ quotes?: QuoteLike[] }>) | { quotes?: QuoteLike[] }
+  ) {
     const options = optionsSchema.parse(this.options);
     const queue = this.options.queue;
     if (!queue?.configured) throw new Error('Persistent news queue is required');
@@ -40,7 +45,15 @@ export class OneSignalNewsPush {
     const now = this.options.now ?? Date.now;
     const sleep = this.options.sleep ?? (ms => new Promise(resolve => setTimeout(resolve, ms)));
     const deadline = now() + 20000;
+    const batchLimit = Math.max(1, this.options.batchLimit ?? 40);
     let detected = 0; let accepted = 0; let failed = 0; let feedUnavailable = false;
+    let quotes: QuoteLike[] = [];
+    if (getOverview) {
+      try {
+        const overview = typeof getOverview === 'function' ? await getOverview() : getOverview;
+        if (overview?.quotes) quotes = overview.quotes;
+      } catch { /* optional quotes lookup */ }
+    }
     try {
       if (await queue.pollDue(now())) {
         let news: NewsResponse | undefined;
@@ -53,13 +66,13 @@ export class OneSignalNewsPush {
         if (news) {
           feedUnavailable = news.status === 'unavailable' || news.status === 'stale' || Boolean(news.error);
           // Even cached/stale observations can contain unseen headlines. Dedup is durable.
-          const records = news.articles.map(queueHeadline);
+          const records = news.articles.map(article => queueHeadline(article, quotes));
           detected = await queue.enqueue(owner, records, now());
           if (feedUnavailable) logger.warn('News provider coverage incomplete; saved available headlines');
         }
       }
       // Bounded work per invocation; all excess remains in Redis for the next job.
-      for (let batch = 0; batch < 40 && now() < deadline; batch++) {
+      for (let batch = 0; batch < batchLimit && now() < deadline; batch++) {
         const record = await queue.next(owner, now());
         if (!record) break;
         if (now() - record.firstAttempt! >= 28 * 86400000) {
@@ -68,7 +81,7 @@ export class OneSignalNewsPush {
           logger.error('Headline requires review before idempotency expires', { key: record.key });
           continue;
         }
-        const result = await this.send(record, options);
+        const result = await this.send(record, options, quotes);
         if (result.id) {
           if (result.warning) logger.warn('Push accepted with recipient warnings', { key: record.key, reason: result.warning });
           record.state = 'accepted'; record.messageId = result.id; delete record.error;
@@ -98,8 +111,11 @@ export class OneSignalNewsPush {
       try { await queue.release(owner); } catch { logger.error('News job lease release failed; lease will expire'); }
     }
   }
-  private async send(record: QueuedHeadline, options: { appId: string; apiKey: string }): Promise<{ id?: string; warning?: string; error?: string; httpStatus?: number; retryAfter?: string | null; pause?: boolean; definitelyNotCreated?: boolean }> {
+  private async send(record: QueuedHeadline, options: { appId: string; apiKey: string }, quotes?: QuoteLike[]): Promise<{ id?: string; warning?: string; error?: string; httpStatus?: number; retryAfter?: string | null; pause?: boolean; definitelyNotCreated?: boolean }> {
     const id = notificationKey(options.appId, record.key, record.deliveryGeneration);
+    const bodyContent = quotes && quotes.length
+      ? newsNotificationBody(record.article.headline, record.article.relatedAssets, quotes)
+      : (record.notificationBody ?? record.article.headline);
     try {
       const response = await (this.options.fetcher ?? fetch)('https://api.onesignal.com/notifications', {
         method: 'POST', redirect: 'error', headers: { Authorization: `Key ${options.apiKey}`, 'Content-Type': 'application/json' },
@@ -107,7 +123,7 @@ export class OneSignalNewsPush {
         body: JSON.stringify({ app_id: options.appId, target_channel: 'push',
           filters: [{ field: 'tag', key: 'market_news', relation: '=', value: 'on' }],
           headings: { en: `TRADEXA · ${record.article.source}` },
-          contents: { en: record.notificationBody ?? record.article.headline }, url: record.article.url,
+          contents: { en: bodyContent }, url: record.article.url,
           data: { articleId: record.article.id, publisher: record.article.source, articleUrl: record.article.url, relatedAssets: record.article.relatedAssets },
           ttl: 86400, priority: 10, idempotency_key: id,
         }),
@@ -131,5 +147,6 @@ export class OneSignalNewsPush {
 
 export const oneSignalPush = new OneSignalNewsPush({ appId: process.env.ONESIGNAL_APP_ID, apiKey: process.env.ONESIGNAL_REST_API_KEY,
   queue: new RedisNewsQueue(process.env.UPSTASH_REDIS_REST_URL, process.env.UPSTASH_REDIS_REST_TOKEN, process.env.ONESIGNAL_APP_ID),
+  batchLimit: process.env.NEWS_PUSH_BATCH_LIMIT ? Number(process.env.NEWS_PUSH_BATCH_LIMIT) : 1,
 });
 export const usesOneSignal = () => Boolean(process.env.ONESIGNAL_APP_ID || process.env.ONESIGNAL_REST_API_KEY);

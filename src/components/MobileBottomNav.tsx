@@ -6,7 +6,6 @@ import {
   Newspaper,
   MoreHorizontal,
   Layers,
-  FlaskConical,
   Settings,
   Info,
   X,

@@ -5,7 +5,6 @@ import {
   LayoutDashboard,
   BarChart3,
   Newspaper,
-  FlaskConical,
   Sun,
   Moon,
   Menu,
@@ -45,7 +44,6 @@ export const navItems = [
   { id: 'watchlist' as Tab, label: 'Watchlist', path: '/watchlist', icon: Star },
   { id: 'desk' as Tab, label: 'Research Desk', path: '/desk', icon: BarChart3 },
   { id: 'news' as Tab, label: 'News & Sentiment', path: '/news', icon: Newspaper },
-  { id: 'scenarios' as Tab, label: 'Scenarios', path: '/scenarios', icon: FlaskConical },
   { id: 'diagnostics' as Tab, label: 'Diagnostics', path: '/diagnostics', icon: Settings },
 ];
 
@@ -234,7 +232,6 @@ export default function Header({
             {theme === 'dark' ? <Sun className="h-4 w-4 text-amber-400" /> : <Moon className="h-4 w-4" />}
           </button>
 
-          {/* Desktop App & News Alerts */}
           <button
             type="button"
             className="icon-button min-h-[44px] min-w-[44px] rounded-lg"
@@ -245,7 +242,6 @@ export default function Header({
             <Download className="h-4 w-4" />
           </button>
 
-          {/* Data Sources & Legal Disclosures */}
           {onOpenDisclosures && (
             <button
               type="button"
@@ -258,7 +254,6 @@ export default function Header({
             </button>
           )}
 
-          {/* Settings / Diagnostics Button */}
           <button
             type="button"
             className={`icon-button min-h-[44px] min-w-[44px] rounded-lg ${
@@ -273,7 +268,6 @@ export default function Header({
             <Settings className="h-4 w-4" />
           </button>
 
-          {/* Mobile menu toggle */}
           <button
             type="button"
             className="icon-button min-h-[44px] min-w-[44px] rounded-lg md:hidden"
@@ -285,7 +279,6 @@ export default function Header({
         </div>
       </div>
 
-      {/* Mobile Search Row (visible on small mobile screens) */}
       <div className="block sm:hidden px-3 pb-2.5">
         <div className="relative w-full">
           <Search className="pointer-events-none absolute left-3 top-2.5 h-3.5 w-3.5 text-[var(--text-muted)]" />
@@ -300,7 +293,6 @@ export default function Header({
         </div>
       </div>
 
-      {/* Desktop Navigation Shell */}
       <nav
         className="hidden border-t border-[var(--border-subtle)] bg-[var(--bg-subtle)] px-4 sm:px-6 lg:px-8 md:block"
         aria-label="Primary navigation"
@@ -331,7 +323,6 @@ export default function Header({
         </div>
       </nav>
 
-      {/* Mobile Navigation Drawer */}
       {mobileMenuOpen && (
         <nav
           className="border-t border-[var(--border-subtle)] bg-[var(--bg-surface)] px-4 py-3 md:hidden"

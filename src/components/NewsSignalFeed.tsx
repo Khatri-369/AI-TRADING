@@ -10,11 +10,13 @@ import {
   ChevronUp,
   BarChart2,
   HelpCircle,
+  TrendingUp,
+  TrendingDown,
 } from 'lucide-react';
-import type { AnalysisEntry, Engine, NewsArticle, NewsResponse } from '../types/market';
+import type { AnalysisEntry, Engine, NewsArticle, NewsResponse, Quote } from '../types/market';
 import { analysisKey } from '../hooks/useAIAnalysis';
 import { safeArticleUrl } from '../services/api';
-import { formatTime } from '../utils/format';
+import { formatTime, formatPercent } from '../utils/format';
 import { Empty, ErrorNotice, Loading } from './Feedback';
 import AnalysisResult from './AnalysisResult';
 import StatusBadge from './StatusBadge';
@@ -24,6 +26,7 @@ import AssetIcon from './AssetIcon';
 
 interface Props {
   data: NewsResponse | null;
+  quotes?: Quote[];
   loading: boolean;
   error: string | null;
   search: string;
@@ -63,6 +66,7 @@ interface ClusteredArticle extends NewsArticle {
 
 export default function NewsSignalFeed({
   data,
+  quotes = [],
   loading,
   error,
   search,
@@ -74,6 +78,13 @@ export default function NewsSignalFeed({
 }: Props) {
   const [, navigate] = useRouter();
   const { symbols: watchlistSymbols } = useWatchlist();
+  const quotesMap = useMemo(() => {
+    const map = new Map<string, Quote>();
+    for (const q of quotes) {
+      if (q?.symbol) map.set(q.symbol.toUpperCase(), q);
+    }
+    return map;
+  }, [quotes]);
   const [feedFilter, setFeedFilter] = useState<'all' | 'watchlist' | 'saved'>('all');
   const [region, setRegion] = useState<'all' | 'india' | 'global'>('all');
   const [expandedWhy, setExpandedWhy] = useState<Record<string, boolean>>({});
@@ -465,21 +476,38 @@ export default function NewsSignalFeed({
                 <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-[var(--border-subtle)] pt-2.5">
                   <div className="flex flex-wrap items-center gap-1.5">
                     {article.relatedAssets.length > 0 ? (
-                      article.relatedAssets.map((sym) => (
-                        <button
-                          key={sym}
-                          type="button"
-                          onClick={() => {
-                            localStorage.setItem('last_chart_symbol', sym);
-                            navigate(`/desk?symbol=${encodeURIComponent(sym)}`);
-                          }}
-                          className="inline-flex items-center gap-1.5 rounded-md border border-[var(--border-default)] bg-[var(--bg-subtle)] px-2 py-1 font-mono text-[11px] font-medium text-[var(--text-primary)] hover:border-[var(--accent-primary)] hover:text-[var(--accent-text)] transition min-h-[32px] cursor-pointer"
-                          title={`${article.stockLinks?.find(link => link.symbol === sym)?.evidence ?? 'Linked by news provider'}. Open ${sym} chart.`}
-                        >
-                          <AssetIcon symbol={sym} size="xs" />
-                          <span>{sym}</span>
-                        </button>
-                      ))
+                      article.relatedAssets.map((sym) => {
+                        const q = quotesMap.get(sym.toUpperCase());
+                        const hasChange = q?.changePercent !== null && q?.changePercent !== undefined;
+                        const isGain = (q?.changePercent ?? 0) >= 0;
+                        return (
+                          <button
+                            key={sym}
+                            type="button"
+                            onClick={() => {
+                              localStorage.setItem('last_chart_symbol', sym);
+                              navigate(`/desk?symbol=${encodeURIComponent(sym)}`);
+                            }}
+                            className={`inline-flex items-center gap-1.5 rounded-md border px-2 py-1 font-mono text-[11px] font-medium transition min-h-[32px] cursor-pointer ${
+                              hasChange
+                                ? isGain
+                                  ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20'
+                                  : 'border-rose-500/30 bg-rose-500/10 text-rose-400 hover:bg-rose-500/20'
+                                : 'border-[var(--border-default)] bg-[var(--bg-subtle)] text-[var(--text-primary)] hover:border-[var(--accent-primary)] hover:text-[var(--accent-text)]'
+                            }`}
+                            title={`${article.stockLinks?.find(link => link.symbol === sym)?.evidence ?? 'Linked by news provider'}. Open ${sym} chart.`}
+                          >
+                            <AssetIcon symbol={sym} size="xs" />
+                            <span className="font-bold">{sym}</span>
+                            {hasChange && (
+                              <span className="inline-flex items-center gap-0.5 text-[10px] font-bold">
+                                {isGain ? <TrendingUp className="h-2.5 w-2.5" /> : <TrendingDown className="h-2.5 w-2.5" />}
+                                {formatPercent(q.changePercent)}
+                              </span>
+                            )}
+                          </button>
+                        );
+                      })
                     ) : (
                       <span className="text-[11px] text-[var(--text-muted)]">Macro context</span>
                     )}

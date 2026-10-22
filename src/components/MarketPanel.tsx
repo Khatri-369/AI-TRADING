@@ -75,7 +75,6 @@ export default function MarketPanel({
 
   return (
     <section className="panel" aria-label={title}>
-      {/* Panel Header & Controls */}
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-[var(--border-subtle)] pb-3.5">
         <div>
           <h2 className="section-heading text-base">
@@ -89,7 +88,6 @@ export default function MarketPanel({
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          {/* Active telemetry updating indicator */}
           {loading && quotes.length > 0 && (
             <div
               className="flex items-center gap-1.5 rounded-md border border-[var(--accent-border)] bg-[var(--accent-subtle)] px-2 py-1 text-[11px] font-semibold text-[var(--accent-text)]"
@@ -101,7 +99,6 @@ export default function MarketPanel({
             </div>
           )}
 
-          {/* Movement Filter */}
           <label>
             <span className="sr-only">{title} movement filter</span>
             <select
@@ -115,7 +112,6 @@ export default function MarketPanel({
             </select>
           </label>
 
-          {/* Sector Filter */}
           {sectors && sectorOptions.length > 0 && (
             <label>
               <span className="sr-only">Sector filter</span>
@@ -134,7 +130,6 @@ export default function MarketPanel({
             </label>
           )}
 
-          {/* Layout Toggle */}
           {allowLayoutSwitch && (
             <div className="hidden sm:inline-flex rounded-md border border-[var(--border-default)] p-0.5" role="group" aria-label="Layout view">
               <button
@@ -185,14 +180,13 @@ export default function MarketPanel({
         </div>
       ) : (
         <>
-          {/* Mobile-Native Stock Rows (shown on small screens) */}
           <div className="space-y-2 sm:hidden" role="region" aria-label={`${title} mobile quotes list`}>
             {visible.map((quote) => (
               <button
                 key={quote.symbol}
                 type="button"
                 onClick={() => onSelect(quote)}
-                className="w-full flex items-center justify-between rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-3 text-left transition active:scale-[0.99] hover:border-[var(--border-strong)] shadow-sm"
+                className="w-full flex items-center justify-between rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-3 text-left transition-all duration-200 active:scale-[0.98] hover:border-[var(--accent-border)] hover:shadow-sm"
               >
                 <div className="min-w-0 pr-2">
                   <div className="flex items-center gap-1.5">
@@ -226,7 +220,6 @@ export default function MarketPanel({
             ))}
           </div>
 
-          {/* Dense Analytical Table View (Desktop & Tablet) */}
           <div
             tabIndex={0}
             role="region"

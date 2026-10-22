@@ -16,7 +16,7 @@ export default function QuoteCard({
 
   return (
     <article
-      className="relative flex min-w-0 flex-col rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] hover:border-[var(--border-strong)] p-4 transition-colors duration-150"
+      className="relative flex min-w-0 flex-col rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] hover:border-[var(--accent-border)] p-4 transition-all duration-200 hover:shadow-md"
     >
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2 min-w-0">

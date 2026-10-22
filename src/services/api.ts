@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { chatResultSchema, type ChatInput } from '../../shared/chat';
 import { candleSchema } from '../../shared/research';
-import type { AIAnalysis, Engine, HistoryRange, ScenarioResult } from '../types/market';
+import type { AIAnalysis, Engine, HistoryRange } from '../types/market';
 
 const finite = z.number().finite();
 const timestamp = z.string().refine(value => Number.isFinite(Date.parse(value)), 'Invalid timestamp');
@@ -79,25 +79,6 @@ const analysisSchema = z.object({
   engine: z.string(),
   engineStatus: z.literal('available'),
   generatedAt: timestamp,
-  cached: z.boolean(),
-});
-
-const scenarioSchema = z.object({
-  scenario: z.string(),
-  summary: z.string(),
-  impacts: z.array(
-    z.object({
-      symbol: z.string(),
-      direction: z.enum(['up', 'down', 'mixed']),
-      estimatedChangePercent: finite.nullable(),
-      rationale: z.string(),
-    })
-  ),
-  risks: z.array(z.string()),
-  engine: z.string(),
-  engineStatus: z.literal('available'),
-  generatedAt: timestamp,
-  hypothetical: z.literal(true),
   cached: z.boolean(),
 });
 
@@ -196,8 +177,6 @@ export const analyze = (
   body: { headline: string; engine: Engine; symbol?: string },
   signal: AbortSignal
 ): Promise<AIAnalysis> => request('/api/ai/analyze', analysisSchema, signal, body);
-export const simulate = (scenario: string, signal: AbortSignal): Promise<ScenarioResult> =>
-  request('/api/ai/scenario', scenarioSchema, signal, { scenario });
 
 export async function getAdminDiagnostics(token: string, signal: AbortSignal) {
   const response = await fetch('/api/admin/diagnostics', {

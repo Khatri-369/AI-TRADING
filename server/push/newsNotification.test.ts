@@ -36,3 +36,19 @@ test('device notification keeps publisher, headline and linked symbols without l
     if (savedNotification) Object.defineProperty(globalThis, 'Notification', savedNotification); else Reflect.deleteProperty(globalThis, 'Notification');
   }
 });
+
+test('notification body formats related stock changes with prices and percentages when quotes are provided', () => {
+  const quotes = [
+    { symbol: 'RELIANCE', price: 2950.5, changePercent: 1.42, currency: 'INR' },
+    { symbol: 'TCS', price: 4120, changePercent: -0.75, currency: 'INR' },
+    { symbol: 'AAPL', price: 228.5, changePercent: 0.85, currency: 'USD' },
+  ];
+  assert.equal(
+    newsNotificationBody('Reliance expands renewable investments', ['RELIANCE'], quotes),
+    'Reliance expands renewable investments\nRelated stocks: RELIANCE ₹2,950.5 (+1.42%)'
+  );
+  assert.equal(
+    newsNotificationBody('Tech leaders report quarterly numbers', ['RELIANCE', 'TCS', 'AAPL'], quotes),
+    'Tech leaders report quarterly numbers\nRelated stocks: RELIANCE ₹2,950.5 (+1.42%), TCS ₹4,120 (-0.75%), AAPL $228.5 (+0.85%)'
+  );
+});

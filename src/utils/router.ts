@@ -22,9 +22,6 @@ export function parseRoute(pathname: string): RouteState {
   if (clean === '/news') {
     return { page: 'news', symbol: null, path: clean };
   }
-  if (clean === '/scenarios') {
-    return { page: 'scenarios', symbol: null, path: clean };
-  }
   if (clean === '/diagnostics') {
     return { page: 'diagnostics', symbol: null, path: clean };
   }

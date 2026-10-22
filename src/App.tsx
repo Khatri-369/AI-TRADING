@@ -9,7 +9,6 @@ import TickerTape from './components/TickerTape';
 import SettingsPanel from './components/SettingsPanel';
 import MarketPanel from './components/MarketPanel';
 import NewsSignalFeed from './components/NewsSignalFeed';
-import ScenarioSimulator from './components/ScenarioSimulator';
 import OverviewPage from './components/OverviewPage';
 import ProductDisclosuresModal from './components/ProductDisclosuresModal';
 import UpdatePrompt from './components/UpdatePrompt';
@@ -133,9 +132,6 @@ function MainApp() {
         break;
       case 'news':
         navigate('/news');
-        break;
-      case 'scenarios':
-        navigate('/scenarios');
         break;
       case 'diagnostics':
         navigate('/diagnostics');
@@ -399,6 +395,7 @@ function MainApp() {
             <div role="tabpanel" id="panel-news" aria-labelledby="tab-news">
               <NewsSignalFeed
                 data={news.data}
+                quotes={market.quotes}
                 loading={news.loading}
                 error={news.error}
                 search={search}
@@ -408,12 +405,6 @@ function MainApp() {
                 onAnalyze={(article) => void ai.run(`news:${article.id}`, article.headline, engine)}
                 onRefresh={news.refresh}
               />
-            </div>
-          )}
-
-          {route.page === 'scenarios' && (
-            <div role="tabpanel" id="panel-scenarios" aria-labelledby="tab-scenarios">
-              <ScenarioSimulator />
             </div>
           )}
         </main>
