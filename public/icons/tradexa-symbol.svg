@@ -1,0 +1,25 @@
+
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100" height="100" fill="none">
+  <defs>
+    <linearGradient id="txCyan" x1="0%" y1="100%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#0284C7"/>
+      <stop offset="50%" stop-color="#00F0FF"/>
+      <stop offset="100%" stop-color="#70E2FF"/>
+    </linearGradient>
+    <linearGradient id="txBlue" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0EA5E9"/>
+      <stop offset="100%" stop-color="#0369A1"/>
+    </linearGradient>
+  </defs>
+  <!-- Candlestick Wicks -->
+  <line x1="50" y1="12" x2="50" y2="88" stroke="#00F0FF" stroke-width="2.75" stroke-linecap="round" opacity="0.6"/>
+  <!-- Left Crossbar -->
+  <path d="M 19 25 C 19 22.8 20.8 21 23 21 H 46 C 47.7 21 49 22.3 49 24 V 35 C 49 36.7 47.7 38 46 38 H 23 C 20.8 38 19 36.2 19 34 Z" fill="url(#txBlue)" stroke="rgba(255,255,255,0.15)" stroke-width="0.5"/>
+  <!-- Center Stem Candlestick -->
+  <rect x="43" y="34" width="14" height="46" rx="4" fill="url(#txCyan)" stroke="rgba(255,255,255,0.25)" stroke-width="0.75"/>
+  <!-- Ascending Breakout Right Arm -->
+  <path d="M 51 21 L 76 13 C 78.8 12.1 81.8 14.1 82 17.1 L 82 25 C 82 27.2 80.5 29.1 78.4 29.8 L 51 39 Z" fill="url(#txCyan)" stroke="rgba(255,255,255,0.3)" stroke-width="0.75"/>
+  <!-- Apex Node -->
+  <circle cx="79" cy="19" r="3.2" fill="#FFFFFF"/>
+  <circle cx="79" cy="19" r="1.6" fill="#00F0FF"/>
+</svg>

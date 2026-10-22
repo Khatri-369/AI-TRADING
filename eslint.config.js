@@ -24,5 +24,14 @@ export default tseslint.config(
       '@typescript-eslint/no-explicit-any': 'warn',
       'no-constant-condition': 'warn',
     },
+  },
+  {
+    files: ['scripts/**'],
+    languageOptions: {
+      globals: {
+        console: 'readonly',
+        process: 'readonly',
+      },
+    },
   }
 );

@@ -6,6 +6,7 @@ import { useResearchStore } from '../hooks/useResearchStore';
 import { recordSchemas } from '../../shared/research';
 import { formatPrice, formatPercent, isIndexInstrument } from '../utils/format';
 import AssetIcon from './AssetIcon';
+import { QuoteCardSkeleton } from './Feedback';
 
 const storageKey = 'markets.watchlist.v1';
 const RECOMMENDED_INDIAN_STOCKS = ['RELIANCE', 'TCS', 'HDFCBANK', 'INFY', 'ICICIBANK', 'SBIN'];
@@ -260,9 +261,7 @@ export default function WatchlistPage({
       </p>
 
       {loading && !quotes.length ? (
-        <p role="status" className="text-xs text-[var(--text-muted)]">
-          Loading market quotes…
-        </p>
+        <QuoteCardSkeleton count={6} />
       ) : !filtered.length ? (
         <div className="rounded-xl border border-[var(--border-default)] p-8 text-center space-y-3">
           <h2 className="font-semibold text-base">

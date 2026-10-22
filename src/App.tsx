@@ -14,6 +14,7 @@ import ProductDisclosuresModal from './components/ProductDisclosuresModal';
 import UpdatePrompt from './components/UpdatePrompt';
 import NotificationPrompt from './components/NotificationPrompt';
 import MobileBottomNav from './components/MobileBottomNav';
+import SplashScreen from './components/SplashScreen';
 import { ErrorNotice, Loading } from './components/Feedback';
 import { useMarketData, useNews } from './hooks/useMarketData';
 import { useAIAnalysis, analysisKey } from './hooks/useAIAnalysis';
@@ -201,6 +202,7 @@ function MainApp() {
       data-theme={theme}
       className="min-h-screen bg-[var(--bg-canvas)] text-[var(--text-primary)] flex flex-col justify-between"
     >
+      <SplashScreen isAppReady={!market.loading || market.quotes.length > 0} />
       <div>
         <Header
           theme={theme}

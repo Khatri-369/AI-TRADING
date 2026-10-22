@@ -14,6 +14,7 @@ import {
 import { getCandles } from '../services/api';
 import { chartLayoutSchema, movingAverage, type Drawing } from '../../shared/research';
 import { useResearchStore } from '../hooks/useResearchStore';
+import { TradexaLoader } from './Feedback';
 import type { HistoryRange, ThemeType } from '../types/market';
 
 export interface PlanLevels {
@@ -788,10 +789,18 @@ export default function CandleWorkspace({
 
       {/* Main Chart or Accessible Table View */}
       {loading ? (
-        <div className="flex h-72 items-center justify-center rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface-elevated)] p-6">
-          <p role="status" className="text-sm text-[var(--text-secondary)]">
-            Loading provider candles…
-          </p>
+        <div className="relative flex h-80 flex-col items-center justify-center rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-6 overflow-hidden skeleton-shimmer">
+          <div className="relative z-10 flex flex-col items-center gap-3 text-center">
+            <TradexaLoader size={40} />
+            <div>
+              <p role="status" className="font-semibold text-xs text-[var(--text-primary)] tracking-wide uppercase">
+                Loading {symbol} Candle Telemetry…
+              </p>
+              <p className="text-[11px] text-[var(--text-muted)] mt-0.5">
+                Fetching verified OHLCV historical time series
+              </p>
+            </div>
+          </div>
         </div>
       ) : data?.candles.length ? (
         table ? (

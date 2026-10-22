@@ -1,5 +1,7 @@
 <div align="center">
 
+<img src="public/icons/tradexa-512.png" alt="TRADEXA Logo" width="128" style="border-radius: 28px; box-shadow: 0 8px 32px rgba(0, 240, 255, 0.25);" />
+
 # 📈 TRADEXA
 ### Global Markets Command Center
 

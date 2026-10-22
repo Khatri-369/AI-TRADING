@@ -4,7 +4,7 @@ import type { Quote } from '../types/market';
 import { changeClass, formatPercent, formatPrice, formatTime, isIndexInstrument } from '../utils/format';
 import StatusBadge from './StatusBadge';
 import QuoteCard from './QuoteCard';
-import { Empty, Loading } from './Feedback';
+import { Empty, MarketTableSkeleton, QuoteCardSkeleton } from './Feedback';
 
 interface Props {
   title: string;
@@ -166,7 +166,11 @@ export default function MarketPanel({
       </div>
 
       {loading && !quotes.length ? (
-        <Loading label={`Loading ${title}…`} />
+        currentLayout === 'cards' ? (
+          <QuoteCardSkeleton count={6} />
+        ) : (
+          <MarketTableSkeleton rows={6} />
+        )
       ) : !visible.length ? (
         <Empty
           title="No matching instruments"

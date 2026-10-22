@@ -19,7 +19,7 @@ import {
   formatTime,
   isIndexInstrument,
 } from '../utils/format';
-import { Loading } from './Feedback';
+import { BenchmarkSkeleton, QuoteCardSkeleton, NewsFeedSkeleton } from './Feedback';
 import { useWatchlist } from '../hooks/useWatchlist';
 import WatchlistToggle from './WatchlistToggle';
 
@@ -255,7 +255,7 @@ export default function OverviewPage({
         </div>
 
         {loading && !quotes.length ? (
-          <Loading label="Loading market benchmarks…" />
+          <BenchmarkSkeleton count={7} />
         ) : (
           <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-7 animate-fade-in">
             {benchmarks.map((quote) => (
@@ -303,7 +303,10 @@ export default function OverviewPage({
           </button>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2.5 animate-fade-in">
+        {loading && !quotes.length ? (
+          <QuoteCardSkeleton count={8} />
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2.5 animate-fade-in">
           {displayQuotes.slice(0, 12).map((quote) => {
             const isGain = (quote.changePercent ?? 0) >= 0;
             const isIndex = isIndexInstrument(quote.symbol, quote.sector, quote.currency);
@@ -351,6 +354,7 @@ export default function OverviewPage({
             );
           })}
         </div>
+        )}
 
         {displayQuotes.length > 12 && (
           <div className="text-center pt-1">
@@ -453,7 +457,7 @@ export default function OverviewPage({
           </div>
 
           {newsLoading && !newsArticles.length ? (
-            <Loading label="Fetching latest headlines…" />
+            <NewsFeedSkeleton count={3} />
           ) : newsArticles.length === 0 ? (
             <p className="py-4 text-center text-xs text-[var(--text-muted)]">
               No recent news articles available.

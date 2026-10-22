@@ -17,6 +17,7 @@ import {
 import type { NewsArticle, Quote, Tab, ThemeType } from '../types/market';
 import { usePwaInstall } from '../hooks/usePwaInstall';
 import NewsAlerts from './NewsAlerts';
+import TradexaLogo from './TradexaLogo';
 
 interface Props {
   theme: ThemeType;
@@ -109,21 +110,10 @@ export default function Header({
               onNavigate('overview');
               setMobileMenuOpen(false);
             }}
-            className="flex items-center gap-2.5 text-left transition hover:opacity-90 min-h-[44px]"
+            className="flex items-center text-left transition hover:opacity-90 min-h-[44px]"
             aria-label="Tradexa Global Markets Research"
           >
-            <div className="relative flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--accent-primary)] text-white font-bold text-sm shadow-sm">
-              T
-              <span className="absolute -bottom-0.5 -right-0.5 h-2 w-2 rounded-full bg-emerald-400 ring-2 ring-[var(--bg-surface)]" />
-            </div>
-            <div>
-              <span className="block text-sm sm:text-base font-bold tracking-tight text-[var(--text-primary)]">
-                Tradexa
-              </span>
-              <span className="hidden sm:block text-[10px] text-[var(--text-muted)] font-medium -mt-0.5">
-                Market Research & Intelligence
-              </span>
-            </div>
+            <TradexaLogo size="md" variant="full" />
           </button>
         </div>
 

@@ -16,7 +16,7 @@ import type { AnalysisEntry, Engine, NewsArticle, NewsResponse, Quote } from '..
 import { analysisKey } from '../hooks/useAIAnalysis';
 import { safeArticleUrl } from '../services/api';
 import { formatTime, formatPercent } from '../utils/format';
-import { Empty, ErrorNotice, Loading } from './Feedback';
+import { Empty, ErrorNotice, Loading, NewsFeedSkeleton } from './Feedback';
 import AnalysisResult from './AnalysisResult';
 import StatusBadge from './StatusBadge';
 import { useWatchlist } from '../hooks/useWatchlist';
@@ -333,7 +333,7 @@ export default function NewsSignalFeed({
       )}
 
       {loading && !data ? (
-        <Loading label="Loading verified market headlines…" />
+        <NewsFeedSkeleton count={5} />
       ) : !filteredArticles.length ? (
         <Empty
           title={
