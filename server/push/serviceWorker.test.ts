@@ -21,11 +21,36 @@ test('shared worker leaves OneSignal push and click events to the SDK', () => {
   assert.equal(closed, 0);
 });
 
-test('shared worker does not install silently without the OneSignal SDK', () => {
-  let listenerAdded = false;
-  assert.throws(() => runInNewContext(source, {
-    importScripts: () => { throw new Error('offline'); },
-    self: { addEventListener: () => { listenerAdded = true; } },
-  }), /offline/);
-  assert.equal(listenerAdded, false);
+test('PWA worker does not import OneSignal (push uses /onesignal/ scope)', () => {
+  assert.doesNotMatch(source, /importScripts\s*\(\s*['"]https:\/\/cdn\.onesignal\.com/);
+});
+
+test('PWA worker activates even when offline precache fails', () => {
+  let skipWaitingCalled = false;
+  const handlers: Record<string, (event: { waitUntil: (p: Promise<unknown>) => void }) => void> = {};
+  runInNewContext(source, {
+    caches: {
+      open: async () => ({
+        addAll: async () => {
+          throw new Error('offline');
+        },
+      }),
+      keys: async () => [],
+    },
+    self: {
+      skipWaiting: () => {
+        skipWaitingCalled = true;
+      },
+      addEventListener: (name: string, handler: (event: { waitUntil: (p: Promise<unknown>) => void }) => void) => {
+        handlers[name] = handler;
+      },
+      clients: { claim: async () => undefined },
+    },
+    fetch: () => Promise.reject(new Error('offline')),
+    URL,
+    Response: class {},
+  });
+  assert.equal(typeof handlers.install, 'function');
+  handlers.install({ waitUntil: promise => void promise });
+  assert.equal(skipWaitingCalled, true);
 });

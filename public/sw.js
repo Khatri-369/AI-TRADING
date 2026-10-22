@@ -1,8 +1,6 @@
-/* global self, caches, fetch, URL, Response, importScripts */
-// Fail installation if the push handler cannot load; keep the previous working
-// worker instead of silently activating a worker that cannot deliver news.
-importScripts('https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.sw.js');
-const CACHE_NAME = 'tradexa-static-v5';
+/* global self, caches, fetch, URL, Response */
+// PWA caching only. OneSignal push uses /onesignal/OneSignalSDKWorker.js at scope /onesignal/.
+const CACHE_NAME = 'tradexa-static-v6';
 const STATIC_ASSETS = [
   '/',
   '/offline.html',
@@ -15,7 +13,15 @@ const STATIC_ASSETS = [
 
 self.addEventListener('install', event => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then(cache => cache.addAll(STATIC_ASSETS)).then(() => self.skipWaiting())
+    (async () => {
+      await self.skipWaiting();
+      try {
+        const cache = await caches.open(CACHE_NAME);
+        await cache.addAll(STATIC_ASSETS);
+      } catch {
+        /* Precache is best-effort; do not block push or app updates on slow networks. */
+      }
+    })()
   );
 });
 

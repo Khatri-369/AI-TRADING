@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 
-for (const slowInit of [false, true]) test(`OneSignal shared worker registers and recovers from slow initialization (${slowInit})`, async ({ page }) => {
+test('OneSignal registration uses the /onesignal/ worker and follows enable, disable and scope preferences', async ({ page }) => {
   const errors: string[] = []; page.on('pageerror', error => errors.push(error.message));
   await page.addInitScript(() => {
     localStorage.setItem('markets.alerts.settings.v1', JSON.stringify({ enabled: true, device: true, scope: 'all', quiet: false }));
@@ -11,7 +11,7 @@ for (const slowInit of [false, true]) test(`OneSignal shared worker registers an
     window.sdkLoads = (window.sdkLoads || 0) + 1;
     window.pushCalls = [];
     const tags = {};
-    const sdk = { Notifications: { isPushSupported: () => true, requestPermission: () => new Promise(() => {}), addEventListener: () => {} }, init: async options => { window.initCount = (window.initCount || 0) + 1; window.workerOptions = options; await new Promise(resolve => setTimeout(resolve, ${slowInit ? 17000 : 0})); if (options.autoResubscribe) await new Promise(() => {}); }, User: {
+    const sdk = { Notifications: { isPushSupported: () => true, requestPermission: () => new Promise(() => {}), addEventListener: () => {} }, init: async options => { window.initCount = (window.initCount || 0) + 1; window.workerOptions = options; }, User: {
       onesignalId: 'c93d06ef-e58a-43a0-8f00-87a7b632f11a', getTags: () => tags, addEventListener: () => {},
       addTag: (key, value) => { tags[key] = value; window.pushCalls.push(key + '=' + value); },
       PushSubscription: { addEventListener: () => {}, id: 'c93d06ef-e58a-43a0-8f00-87a7b632f11ab', optedIn: false,
@@ -27,15 +27,14 @@ for (const slowInit of [false, true]) test(`OneSignal shared worker registers an
   await page.route('**/api/news', route => route.fulfill({ json: { articles: [], provider: 'Fixture', status: 'unavailable', cached: false, fetchedAt: null } }));
   await page.route('**/api/stream/live-ticks', route => route.abort());
   await page.goto('/');
-  if (slowInit) {
-    await page.getByRole('button', { name: 'Desktop app and news alerts' }).click();
-    await expect(page.getByRole('status').filter({ hasText: 'Push setup delayed while initializing OneSignal configuration' })).toBeVisible({ timeout: 20000 });
-    await page.getByRole('button', { name: 'Close desktop settings' }).click();
-  }
   const calls = () => page.evaluate(() => (window as unknown as { pushCalls: string[] }).pushCalls);
   await expect.poll(calls).toContain('market_news=on');
-  expect(await page.evaluate(() => (window as unknown as { workerOptions: { serviceWorkerParam: { scope: string } } }).workerOptions.serviceWorkerParam.scope)).toBe('/');
-  expect(await page.evaluate(() => (window as unknown as { workerOptions: { autoResubscribe: boolean } }).workerOptions.autoResubscribe)).toBe(false);
+  const workerOptions = () => page.evaluate(() => (window as unknown as { workerOptions: { serviceWorkerPath: string; serviceWorkerParam: { scope: string }; autoResubscribe: boolean } }).workerOptions);
+  expect(await workerOptions()).toMatchObject({
+    serviceWorkerPath: 'onesignal/OneSignalSDKWorker.js',
+    serviceWorkerParam: { scope: '/onesignal/' },
+    autoResubscribe: false,
+  });
   await page.getByRole('button', { name: 'Desktop app and news alerts' }).click();
   await page.getByRole('button', { name: 'Disable background alerts' }).click();
   await expect.poll(async () => (await calls()).at(-1)).toBe('opt-out');
@@ -83,4 +82,47 @@ for (const remoteTagged of [true, false]) test(`late OneSignal subscription is v
   await page.evaluate(()=> (window as unknown as {completeRegistration:()=>void}).completeRegistration());
   await expect(page.getByRole('status').filter({hasText:remoteTagged?'All market news confirmed':'market_news tag is not confirmed'})).toBeVisible();
   expect(await page.evaluate(()=>(window as unknown as {sdkLoads:number}).sdkLoads)).toBe(1);
+});
+
+test('stalled OneSignal init reports the service-worker stage', async ({ page }) => {
+  test.setTimeout(45_000);
+  await page.addInitScript(() => {
+    localStorage.setItem('markets.alerts.settings.v1', JSON.stringify({ enabled: false, device: false, scope: 'all', quiet: false }));
+    Object.defineProperty(window, 'Notification', { value: class { static permission = 'granted'; static requestPermission = async () => 'granted'; } });
+  });
+  await page.route('**/api/notifications/config', route => route.fulfill({ json: { provider: 'onesignal', configured: true, appId: 'c93d06ef-e58a-43a0-8f00-87a7b632f11a', publicKey: null, intervalMinutes: 5 } }));
+  await page.route('**/api/notifications/verify', route => route.fulfill({ json: { registered: true, subscribed: true, tagged: true, ready: true } }));
+  await page.route('**/api/workspace/session', route => route.fulfill({ json: { user: null } }));
+  await page.route('**/api/markets/overview', route => route.fulfill({ json: { quotes: [], generatedAt: new Date().toISOString() } }));
+  await page.route('**/api/news', route => route.fulfill({ json: { articles: [], provider: 'Fixture', status: 'unavailable', cached: false, fetchedAt: null } }));
+  await page.route('**/api/stream/live-ticks', route => route.abort());
+  await page.route('https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js', route => route.fulfill({
+    contentType: 'application/javascript',
+    body: `
+      const tags = {};
+      const sdk = {
+        init: async () => new Promise(() => {}),
+        Notifications: { isPushSupported: () => true, addEventListener: () => {} },
+        User: {
+          onesignalId: 'c93d06ef-e58a-43a0-8f00-87a7b632f11a',
+          getTags: () => tags,
+          addEventListener: () => {},
+          addTag: (k, v) => { tags[k] = v; },
+          PushSubscription: {
+            id: 'c93d06ef-e58a-43a0-8f00-87a7b632f11ab',
+            optedIn: false,
+            optIn: async function() { this.optedIn = true; },
+            optOut: async () => {},
+            addEventListener: () => {},
+          },
+        },
+      };
+      window.OneSignalDeferred.forEach(cb => cb(sdk));
+    `,
+  }));
+
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Desktop app and news alerts' }).click();
+  await page.getByRole('button', { name: 'Enable news alerts', exact: true }).click();
+  await expect(page.getByRole('status').filter({ hasText: /OneSignal is waiting on its service worker/i })).toBeVisible({ timeout: 20_000 });
 });

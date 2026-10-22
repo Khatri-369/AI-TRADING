@@ -2,6 +2,12 @@ import { z } from 'zod';
 import { getStoredAlertSettings } from './notifications';
 
 const schema = z.object({ provider: z.string().optional(), configured: z.boolean(), appId: z.string().uuid().optional() });
+/** OneSignal worker path (Custom Code). Kept separate from the PWA /sw.js scope per OneSignal PWA guidance. */
+export const ONESIGNAL_SERVICE_WORKER_PATH = 'onesignal/OneSignalSDKWorker.js';
+export const ONESIGNAL_SERVICE_WORKER_SCOPE = '/onesignal/';
+const ONESIGNAL_PAGE_SDK = 'https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js';
+const SDK_LOAD_TIMEOUT_MS = 15_000;
+
 interface SDK {
   init(options: object): Promise<void>;
   Notifications: {
@@ -21,6 +27,7 @@ interface SDK {
     };
   };
 }
+type SdkLoadStage = 'boot' | 'script' | 'deferred' | 'init';
 let eventTimer: ReturnType<typeof setTimeout> | undefined;
 function onSubscriptionChange() {
   clearTimeout(eventTimer);
@@ -37,54 +44,92 @@ let sdkPromise: Promise<SDK> | undefined;
 let backgroundActive = false;
 let verifiedDevice: { key: string; at: number } | undefined;
 export const hasActiveBackgroundPush = () => backgroundActive;
-let sdkStage = 'loading OneSignal scripts';
-async function loadSDK(appId: string) {
-  if (!sdkPromise) sdkPromise = new Promise<SDK>((resolve, reject) => {
-    const host = window as unknown as { OneSignalDeferred?: Array<(sdk: SDK) => void> };
+function sdkLoadTimeoutMessage(stage: SdkLoadStage): string {
+  switch (stage) {
+    case 'boot':
+    case 'script':
+      return 'Push service script did not load. Check mobile data, VPN or content blockers, then retry Enable news alerts.';
+    case 'deferred':
+      return 'Push service loaded but did not start. Reload the page and retry Enable news alerts.';
+    case 'init':
+      return 'OneSignal is waiting on its service worker (/onesignal/). Reload once, then retry Enable news alerts.';
+    default:
+      return 'Push setup timed out. Reload and try again.';
+  }
+}
+
+function resetSdkLoad() {
+  sdkPromise = undefined;
+}
+
+function loadSDK(appId: string) {
+  const host = window as unknown as { OneSignal?: SDK; OneSignalDeferred?: Array<(sdk: SDK) => void> };
+  if (host.OneSignal) {
+    return Promise.resolve(host.OneSignal);
+  }
+  if (sdkPromise) return sdkPromise;
+
+  let stage: SdkLoadStage = 'boot';
+  sdkPromise = new Promise<SDK>((resolve, reject) => {
+    const fail = (message: string) => {
+      clearTimeout(timer);
+      resetSdkLoad();
+      reject(new Error(message));
+    };
+    const timer = setTimeout(() => {
+      fail(sdkLoadTimeoutMessage(stage));
+    }, SDK_LOAD_TIMEOUT_MS);
+
     host.OneSignalDeferred = host.OneSignalDeferred ?? [];
     host.OneSignalDeferred.push(async sdk => {
-      sdkStage = 'initializing OneSignal configuration';
+      stage = 'deferred';
       try {
+        stage = 'init';
         await sdk.init({
           appId,
-          serviceWorkerPath: 'sw.js',
-          serviceWorkerParam: { scope: '/' },
+          serviceWorkerPath: ONESIGNAL_SERVICE_WORKER_PATH,
+          serviceWorkerParam: { scope: ONESIGNAL_SERVICE_WORKER_SCOPE },
           notifyButton: { enable: false },
           welcomeNotification: { disable: true },
-          // Subscribe explicitly after initialization so browser push registration
-          // cannot hold the initialization promise open.
+          // Explicit opt-in via PushSubscription.optIn() — autoResubscribe during init can stall on Android.
           autoResubscribe: false,
           promptOptions: { slidedown: { prompts: [{ type: 'push', autoPrompt: false }] } },
         });
       } catch (err) {
         const msg = String(err);
         if (!msg.toLowerCase().includes('already initialized')) {
-          reject(new Error('OneSignal initialization failed. Check the site origin and worker, then reload to retry.'));
+          fail('OneSignal initialization failed. Check the site origin and /onesignal/ worker, then reload to retry.');
           return;
         }
       }
       sdk.User.PushSubscription.addEventListener('change', onSubscriptionChange);
       sdk.User.addEventListener('change', onSubscriptionChange);
       sdk.Notifications.addEventListener('permissionChange', onSubscriptionChange);
-      sdkStage = 'ready';
+      clearTimeout(timer);
       resolve(sdk);
-      onSubscriptionChange();
     });
-    const script = document.createElement('script'); script.src = 'https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js'; script.defer = true;
+
+    const existing = document.querySelector(`script[src="${ONESIGNAL_PAGE_SDK}"]`);
+    if (existing) {
+      stage = 'deferred';
+      return;
+    }
+
+    stage = 'script';
+    const script = document.createElement('script');
+    script.src = ONESIGNAL_PAGE_SDK;
+    script.defer = true;
     script.onerror = () => {
-      reject(new Error('Push service could not load (check network/content blocker).'));
+      fail('Push service could not load (check network/content blocker).');
+    };
+    script.onload = () => {
+      if (stage === 'script') stage = 'deferred';
     };
     document.head.appendChild(script);
   });
-  // Keep the real initialization promise alive: a slow successful init must
-  // recover without loading a second SDK or permanently caching a timeout.
-  let timer: ReturnType<typeof setTimeout> | undefined;
-  try {
-    return await Promise.race([sdkPromise, new Promise<SDK>((_, reject) => {
-      timer = setTimeout(() => reject(new Error(`Push setup delayed while ${sdkStage}. Retry Enable news alerts; if it persists, send this message.`)), 15_000);
-    })]);
-  } finally { clearTimeout(timer); }
+  return sdkPromise;
 }
+
 let queue: Promise<unknown> = Promise.resolve();
 export function syncBackgroundPush(): Promise<string | null> {
   const next = queue.then(async () => {
@@ -117,8 +162,19 @@ export function syncBackgroundPush(): Promise<string | null> {
       window.dispatchEvent(new CustomEvent('market-background-push-status', { detail: statusMsg }));
       return statusMsg;
     }
-    // Native permission was already checked above. Re-requesting through the SDK
-    // can wait for its prompt lifecycle and block the serialized registration queue.
+    // When permission is already granted, optIn() alone may update preference
+    // without triggering OneSignal's worker registration if a subscription is missing.
+    // Call OneSignal's registration flow with a bounded wait to kick off subscription without stalling.
+    if ((!sdk.User.PushSubscription.id || !sdk.User.PushSubscription.optedIn) && typeof sdk.Notifications.requestPermission === 'function') {
+      try {
+        await Promise.race([
+          Promise.resolve(sdk.Notifications.requestPermission()).catch(() => undefined),
+          new Promise(resolve => setTimeout(resolve, 2500)),
+        ]);
+      } catch {
+        /* Bounded fallback; proceed to optIn */
+      }
+    }
     if (!sdk.User.PushSubscription.optedIn || !sdk.User.PushSubscription.id) {
       try {
         await Promise.race([

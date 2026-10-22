@@ -16,6 +16,8 @@ export function usePwaUpdate() {
 
     // Reload the app to run the new version ONLY when the user explicitly triggered an update
     const handleControllerChange = () => {
+      setHasUpdate(false);
+      setIsUpdating(false);
       if (refreshing || !updatingRef.current) return;
       refreshing = true;
       window.location.reload();
@@ -29,6 +31,8 @@ export function usePwaUpdate() {
       // 1. If a worker is already waiting, an update is ready
       if (reg.waiting && navigator.serviceWorker.controller) {
         setHasUpdate(true);
+      } else if (!reg.waiting) {
+        setHasUpdate(false);
       }
 
       // 2. Listen for newly discovered updates
@@ -40,6 +44,9 @@ export function usePwaUpdate() {
           // If installed and there's already an active controller, this is an update!
           if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
             setHasUpdate(true);
+          } else if (newWorker.state === 'activated' || newWorker.state === 'redundant') {
+            setHasUpdate(false);
+            setIsUpdating(false);
           }
         });
       });
@@ -89,6 +96,8 @@ export function usePwaUpdate() {
     } else if (reg?.installing) {
       reg.installing.postMessage({ type: 'SKIP_WAITING' });
     } else {
+      setHasUpdate(false);
+      setIsUpdating(false);
       // Fallback reload if worker reference is missing
       window.location.reload();
     }
