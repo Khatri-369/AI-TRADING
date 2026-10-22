@@ -60,17 +60,9 @@ The project prioritizes **data provenance over fake precision**: when a source i
 
 ## 🧩 Architecture
 
-```mermaid
-flowchart TD
-    U[Browser / React Dashboard] -->|REST requests| API[Express API]
-    U <-->|Server-Sent Events| API
-    API --> M[Market Provider Adapters & Cache]
-    API --> A[AI Research Services]
-    API --> N[News & Notification Services]
-    M --> P[Upstox / Finnhub / CoinGecko / Metals / FX]
-    A --> G[Gemini / FinBERT]
-    N --> Q[Optional Push / OneSignal / Redis]
-```
+<p align="center">
+  <img src="public/architecture.svg" alt="Tradexa Architecture Diagram" width="100%" style="max-width: 840px;" />
+</p>
 
 **Repository guide**
 

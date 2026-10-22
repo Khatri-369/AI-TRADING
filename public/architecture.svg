@@ -1,0 +1,136 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 500" width="100%" height="100%" fill="none">
+  <defs>
+    <!-- Background Gradient -->
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0B1322"/>
+      <stop offset="60%" stop-color="#060A13"/>
+      <stop offset="100%" stop-color="#020408"/>
+    </linearGradient>
+
+    <!-- Card Backgrounds -->
+    <linearGradient id="nodeGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#111B2E"/>
+      <stop offset="100%" stop-color="#0B1322"/>
+    </linearGradient>
+
+    <linearGradient id="primaryNodeGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#142642"/>
+      <stop offset="100%" stop-color="#0D1A2D"/>
+    </linearGradient>
+
+    <!-- Node Borders -->
+    <linearGradient id="primaryBorder" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#38BDF8"/>
+      <stop offset="100%" stop-color="#0284C7"/>
+    </linearGradient>
+
+    <linearGradient id="subtleBorder" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="rgba(56, 189, 248, 0.3)"/>
+      <stop offset="100%" stop-color="rgba(14, 165, 233, 0.1)"/>
+    </linearGradient>
+
+    <!-- Outer Rim -->
+    <linearGradient id="outerRim" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="rgba(56, 189, 248, 0.35)"/>
+      <stop offset="50%" stop-color="rgba(14, 165, 233, 0.1)"/>
+      <stop offset="100%" stop-color="rgba(255, 255, 255, 0.05)"/>
+    </linearGradient>
+
+    <!-- Arrow Marker -->
+    <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 1.5 L 8 5 L 0 8.5 z" fill="#38BDF8"/>
+    </marker>
+
+    <!-- Bidirectional Marker -->
+    <marker id="arrowStart" viewBox="0 0 10 10" refX="2" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 8 1.5 L 0 5 L 8 8.5 z" fill="#38BDF8"/>
+    </marker>
+  </defs>
+
+  <!-- Container -->
+  <rect x="2" y="2" width="896" height="496" rx="20" fill="url(#bgGrad)" stroke="url(#outerRim)" stroke-width="1.5"/>
+
+  <!-- Subtle Glow Spots -->
+  <circle cx="450" cy="50" r="120" fill="#0284C7" opacity="0.08"/>
+  <circle cx="450" cy="200" r="140" fill="#38BDF8" opacity="0.05"/>
+
+  <!-- ================= TOP NODE: Browser / React Dashboard ================= -->
+  <g transform="translate(340, 30)">
+    <rect width="220" height="52" rx="10" fill="url(#primaryNodeGrad)" stroke="url(#primaryBorder)" stroke-width="1.5"/>
+    <text x="110" y="32" fill="#F8FAFC" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="13" font-weight="600" text-anchor="middle">Browser / React Dashboard</text>
+  </g>
+
+  <!-- Connectors: Browser to API -->
+  <!-- Left path: REST requests -->
+  <path d="M 405 82 L 405 168" stroke="#38BDF8" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <g transform="translate(355, 115)">
+    <rect x="-4" y="-11" width="102" height="20" rx="5" fill="#09101D" stroke="rgba(56,189,248,0.25)" stroke-width="1"/>
+    <text x="47" y="3" fill="#94A3B8" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="10.5" font-weight="500" text-anchor="middle">REST requests</text>
+  </g>
+
+  <!-- Right path: Server-Sent Events -->
+  <path d="M 495 82 L 495 168" stroke="#38BDF8" stroke-width="1.5" marker-start="url(#arrowStart)" marker-end="url(#arrow)"/>
+  <g transform="translate(495, 115)">
+    <rect x="8" y="-11" width="128" height="20" rx="5" fill="#09101D" stroke="rgba(56,189,248,0.25)" stroke-width="1"/>
+    <text x="72" y="3" fill="#38BDF8" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="10.5" font-weight="500" text-anchor="middle">Server-Sent Events</text>
+  </g>
+
+  <!-- ================= CENTER NODE: Express API ================= -->
+  <g transform="translate(365, 170)">
+    <rect width="170" height="50" rx="10" fill="url(#primaryNodeGrad)" stroke="url(#primaryBorder)" stroke-width="1.5"/>
+    <text x="85" y="31" fill="#F8FAFC" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="14" font-weight="700" text-anchor="middle">Express API</text>
+  </g>
+
+  <!-- Connectors: API to Middle Tier -->
+  <!-- Left branch -->
+  <path d="M 400 220 L 400 255 L 175 255 L 175 288" stroke="#38BDF8" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <!-- Center branch -->
+  <path d="M 450 220 L 450 288" stroke="#38BDF8" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <!-- Right branch -->
+  <path d="M 500 220 L 500 255 L 725 255 L 725 288" stroke="#38BDF8" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <!-- ================= MIDDLE TIER ================= -->
+  <!-- Middle Left: Market Provider Adapters & Cache -->
+  <g transform="translate(60, 290)">
+    <rect width="230" height="54" rx="10" fill="url(#nodeGrad)" stroke="url(#subtleBorder)" stroke-width="1.25"/>
+    <text x="115" y="27" fill="#F8FAFC" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="12.5" font-weight="600" text-anchor="middle">Market Provider Adapters</text>
+    <text x="115" y="43" fill="#94A3B8" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11" font-weight="500" text-anchor="middle">&amp; Memory Cache</text>
+  </g>
+
+  <!-- Middle Center: AI Research Services -->
+  <g transform="translate(350, 290)">
+    <rect width="200" height="54" rx="10" fill="url(#nodeGrad)" stroke="url(#subtleBorder)" stroke-width="1.25"/>
+    <text x="100" y="33" fill="#F8FAFC" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="13" font-weight="600" text-anchor="middle">AI Research Services</text>
+  </g>
+
+  <!-- Middle Right: News & Notification Services -->
+  <g transform="translate(615, 290)">
+    <rect width="220" height="54" rx="10" fill="url(#nodeGrad)" stroke="url(#subtleBorder)" stroke-width="1.25"/>
+    <text x="110" y="27" fill="#F8FAFC" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="12.5" font-weight="600" text-anchor="middle">News &amp; Notification</text>
+    <text x="110" y="43" fill="#94A3B8" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11" font-weight="500" text-anchor="middle">Services &amp; Queue</text>
+  </g>
+
+  <!-- Connectors: Middle Tier to Bottom Tier -->
+  <path d="M 175 344 L 175 398" stroke="#38BDF8" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <path d="M 450 344 L 450 398" stroke="#38BDF8" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <path d="M 725 344 L 725 398" stroke="#38BDF8" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <!-- ================= BOTTOM TIER ================= -->
+  <!-- Bottom Left: Upstox / Finnhub / CoinGecko / Metals / FX -->
+  <g transform="translate(50, 400)">
+    <rect width="250" height="52" rx="10" fill="url(#nodeGrad)" stroke="url(#subtleBorder)" stroke-width="1.25"/>
+    <text x="125" y="32" fill="#E2E8F0" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="12" font-weight="500" text-anchor="middle">Upstox / Finnhub / CoinGecko / FX</text>
+  </g>
+
+  <!-- Bottom Center: Gemini / FinBERT -->
+  <g transform="translate(360, 400)">
+    <rect width="180" height="52" rx="10" fill="url(#nodeGrad)" stroke="url(#subtleBorder)" stroke-width="1.25"/>
+    <text x="90" y="32" fill="#E2E8F0" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="12.5" font-weight="500" text-anchor="middle">Gemini / FinBERT</text>
+  </g>
+
+  <!-- Bottom Right: Optional Push / OneSignal / Redis -->
+  <g transform="translate(615, 400)">
+    <rect width="220" height="52" rx="10" fill="url(#nodeGrad)" stroke="url(#subtleBorder)" stroke-width="1.25"/>
+    <text x="110" y="32" fill="#E2E8F0" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="12" font-weight="500" text-anchor="middle">Push / OneSignal / Redis</text>
+  </g>
+</svg>
