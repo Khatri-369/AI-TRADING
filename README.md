@@ -108,3 +108,12 @@ AI-generated signals are informational and are not financial advice. Market data
 - `/watchlist`: browser-local saved instruments, market/search filters, change sorting, and a three-instrument comparison with currencies, provider freshness and observation times. Watchlists do not sync between devices.
 - `POST /api/ai/chat`: accepts `{ message, history?, symbols? }`; validates bounded input and output, rejects client-supplied market evidence, uses the existing access/CSRF/quota gates and never exposes provider credentials. Recent conversation turns are sent to Gemini as untrusted context. Conversations remain in app memory across navigation and closing the panel, and clear on reload or New conversation; successful answers may be cached briefly in bounded server memory.
 - Tests: `npm test` covers the chat provider and HTTP contracts. `npm run test:browser -- tests/browser/research.spec.ts` verifies both themes, source references, follow-up error recovery, saved-list persistence and comparison limits using explicit test fixtures. These fixtures are not production data.
+
+## Contributing
+
+Contributions, bug reports, and feature proposals are welcome! Please read [CONTRIBUTING.md](CONTRIBUTING.md) for details on code standards, local setup, test commands, and pull request guidelines.
+
+## License
+
+This project is open-source software licensed under the [MIT License](LICENSE).
+
