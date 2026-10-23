@@ -59,11 +59,11 @@ test('notification body formats related stock changes with prices and percentage
   ];
   assert.equal(
     newsNotificationBody('Reliance expands renewable investments', ['RELIANCE'], quotes),
-    'Reliance expands renewable investments\nRelated stocks (quote snapshot): Reliance Industries (RELIANCE) ₹2,950.5 (+1.42%)'
+    'Reliance expands renewable investments\nRelated stocks (quote snapshot): Reliance Industries (RELIANCE) ₹2,950.5 (🟢 ▲ +1.42%)'
   );
   assert.equal(
     newsNotificationBody('Tech leaders report quarterly numbers', ['RELIANCE', 'TCS', 'AAPL'], quotes),
-    'Tech leaders report quarterly numbers\nRelated stocks (quote snapshot): Reliance Industries (RELIANCE) ₹2,950.5 (+1.42%), Tata Consultancy Services (TCS) ₹4,120 (-0.75%), Apple (AAPL) $228.5 (+0.85%)'
+    'Tech leaders report quarterly numbers\nRelated stocks (quote snapshot): Reliance Industries (RELIANCE) ₹2,950.5 (🟢 ▲ +1.42%), Tata Consultancy Services (TCS) ₹4,120 (🔴 ▼ -0.75%), Apple (AAPL) $228.5 (🟢 ▲ +0.85%)'
   );
 });
 
@@ -72,7 +72,7 @@ test('Indian broad-market headlines show index context, not unrelated companies'
     { symbol: 'NIFTY50', changePercent: 0.42 }, { symbol: 'SENSEX', changePercent: -0.31 },
     { symbol: 'AAPL', changePercent: 2 },
   ]);
-  assert.match(record.notificationBody!, /Market context \(quote snapshot\): NIFTY 50 \(NIFTY50\) \(\+0.42%\), BSE SENSEX \(SENSEX\) \(-0.31%\)/);
+  assert.match(record.notificationBody!, /Market context \(quote snapshot\): NIFTY 50 \(NIFTY50\) \(🟢 ▲ \+0.42%\), BSE SENSEX \(SENSEX\) \(🔴 ▼ -0.31%\)/);
   assert.doesNotMatch(record.notificationBody!, /Apple|AAPL|Related stocks/);
   assert.deepEqual(record.article.relatedAssets, []);
 });
@@ -82,7 +82,7 @@ test('missing and stale changes are explicit, while real zero is preserved', () 
     { symbol: 'INFY', changePercent: 0 }, { symbol: 'TCS', changePercent: 3, status: 'stale' },
     { symbol: 'MSFT', changePercent: Number.NaN },
   ]);
-  assert.match(body, /Infosys \(INFY\) \(0.00%\)/);
+  assert.match(body, /Infosys \(INFY\) \(⚪ — 0.00%\)/);
   assert.match(body, /Tata Consultancy Services \(TCS\) — change unavailable/);
   assert.match(body, /Microsoft \(MSFT\) — change unavailable/);
   assert.match(body, /Apple \(AAPL\) — change unavailable/);
@@ -92,9 +92,9 @@ test('missing and stale changes are explicit, while real zero is preserved', () 
 test('unmapped IPO companies retain their explicit name and listing basis without invented quotes', () => {
   const headline = 'Fusion CX lists at 5% premium over IPO price after 3.3x subscription';
   const record = queueHeadline({ id: 'fusion', headline, summary: '', region: 'india', source: 'Business Standard', url: 'https://example.com/fusion', publishedAt: new Date().toISOString(), relatedAssets: [] }, [{ symbol: 'AAPL', changePercent: 2 }]);
-  assert.equal(record.notificationBody, `${headline}\nCompany in headline: Fusion CX — 5% listing premium vs IPO price (reported); live change unavailable`);
+  assert.equal(record.notificationBody, `${headline}\nCompany in headline: Fusion CX — 🟢 ▲ 5% listing premium vs IPO price (reported); live change unavailable`);
   assert.deepEqual(record.article.relatedAssets, []);
   assert.doesNotMatch(record.notificationBody!, /AAPL|NIFTY|No specific/);
-  assert.match(newsNotificationBody('Example Ltd debuts at 2.5% discount to issue price'), /Example Ltd — 2.5% listing discount/);
+  assert.match(newsNotificationBody('Example Ltd debuts at 2.5% discount to issue price'), /Example Ltd — 🔴 ▼ 2.5% listing discount/);
   assert.equal(newsNotificationBody('Could Example Ltd list at 5% premium over IPO price?'), 'Could Example Ltd list at 5% premium over IPO price?\nNo verified stock ticker linked');
 });

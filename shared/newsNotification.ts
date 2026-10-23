@@ -24,7 +24,8 @@ export function formatStockChange(quote: QuoteLike): string {
   if (quote.status === 'unavailable' || quote.status === 'stale') return `${symbol} — change unavailable`;
   if (typeof quote.changePercent === 'number' && Number.isFinite(quote.changePercent)) {
     const sign = quote.changePercent > 0 ? '+' : '';
-    const pct = `${sign}${quote.changePercent.toFixed(2)}%`;
+    const indicator = quote.changePercent > 0 ? '🟢 ▲' : quote.changePercent < 0 ? '🔴 ▼' : '⚪ —';
+    const pct = `${indicator} ${sign}${quote.changePercent.toFixed(2)}%`;
     if (typeof quote.price === 'number' && Number.isFinite(quote.price)) {
       const cur = quote.currency === 'INR' ? '₹' : quote.currency === 'USD' ? '$' : '';
       const formattedPrice = quote.price >= 1 ? quote.price.toLocaleString('en-US', { maximumFractionDigits: 2 }) : quote.price.toFixed(4);
@@ -41,7 +42,8 @@ export function ipoHeadlineContext(headline: string): string | undefined {
   const match = headline.match(/^([\p{L}\p{N}][\p{L}\p{N} &'.()-]{0,79}?)\s+(?:lists|listed|debuts|debuted)\s+at\s+(\d+(?:\.\d+)?)%\s+(premium|discount)\s+(?:over|to|against)\s+(?:the\s+)?(?:IPO|issue)\s+price\b/iu);
   if (!match) return undefined;
   const [, company, percent, direction] = match;
-  return `Company in headline: ${company} — ${percent}% listing ${direction.toLowerCase()} vs IPO price (reported); live change unavailable`;
+  const indicator = Number(percent) === 0 ? '⚪ —' : direction.toLowerCase() === 'premium' ? '🟢 ▲' : '🔴 ▼';
+  return `Company in headline: ${company} — ${indicator} ${percent}% listing ${direction.toLowerCase()} vs IPO price (reported); live change unavailable`;
 }
 
 /** Article links indicate relevance, not a prediction or proof of price impact. */
