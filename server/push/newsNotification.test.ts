@@ -5,16 +5,16 @@ import { queueHeadline } from './newsQueue';
 import { sendSystemNotification } from '../../src/utils/notifications';
 
 test('stock relevance is article-specific and never falls back to market leaders', () => {
-  assert.equal(newsNotificationBody('TCS wins contract', ['TCS', 'TCS']), 'TCS wins contract\nRelated stocks: TCS');
+  assert.equal(newsNotificationBody('TCS wins contract', ['TCS', 'TCS']), 'TCS wins contract\nRelated stocks (quote snapshot): Tata Consultancy Services (TCS) — change unavailable');
   assert.equal(newsNotificationBody('Central bank announces policy'), 'Central bank announces policy\nNo specific stock identified');
-  assert.equal(newsNotificationBody('Microsoft earnings', ['MSFT']), 'Microsoft earnings\nRelated stocks: MSFT');
+  assert.equal(newsNotificationBody('Microsoft earnings', ['MSFT']), 'Microsoft earnings\nRelated stocks (quote snapshot): Microsoft (MSFT) — change unavailable');
 });
 
 test('new queue records freeze stock relevance for idempotent notification retries', () => {
   const article = { id: 'tcs', headline: 'TCS wins contract', relatedAssets: ['TCS'], summary: '', source: 'Publisher', url: 'https://example.com/tcs', publishedAt: '2026-10-19T10:00:00Z' };
   const record = queueHeadline(article);
   article.relatedAssets.push('AAPL');
-  assert.equal(record.notificationBody, 'TCS wins contract\nRelated stocks: TCS');
+  assert.equal(record.notificationBody, 'TCS wins contract\nRelated stocks (quote snapshot): Tata Consultancy Services (TCS) — change unavailable');
 });
 
 test('device notification keeps publisher, headline and linked symbols without loaded quotes', async () => {
@@ -29,7 +29,7 @@ test('device notification keeps publisher, headline and linked symbols without l
   try {
     assert.equal(await sendSystemNotification('TCS wins contract', 'Publisher', [], 'tcs', ['TCS'], 'https://example.com/tcs'), true);
     assert.equal(captured[0].title, 'TRADEXA · TCS · Publisher');
-    assert.equal(captured[0].options.body, 'TCS wins contract\nRelated stocks: TCS');
+    assert.equal(captured[0].options.body, 'TCS wins contract\nRelated stocks (quote snapshot): Tata Consultancy Services (TCS) — change unavailable');
     assert.equal(captured[0].options.data.url, 'https://example.com/tcs');
   } finally {
     if (savedWindow) Object.defineProperty(globalThis, 'window', savedWindow); else Reflect.deleteProperty(globalThis, 'window');
@@ -59,10 +59,32 @@ test('notification body formats related stock changes with prices and percentage
   ];
   assert.equal(
     newsNotificationBody('Reliance expands renewable investments', ['RELIANCE'], quotes),
-    'Reliance expands renewable investments\nRelated stocks: RELIANCE ₹2,950.5 (+1.42%)'
+    'Reliance expands renewable investments\nRelated stocks (quote snapshot): Reliance Industries (RELIANCE) ₹2,950.5 (+1.42%)'
   );
   assert.equal(
     newsNotificationBody('Tech leaders report quarterly numbers', ['RELIANCE', 'TCS', 'AAPL'], quotes),
-    'Tech leaders report quarterly numbers\nRelated stocks: RELIANCE ₹2,950.5 (+1.42%), TCS ₹4,120 (-0.75%), AAPL $228.5 (+0.85%)'
+    'Tech leaders report quarterly numbers\nRelated stocks (quote snapshot): Reliance Industries (RELIANCE) ₹2,950.5 (+1.42%), Tata Consultancy Services (TCS) ₹4,120 (-0.75%), Apple (AAPL) $228.5 (+0.85%)'
   );
+});
+
+test('Indian broad-market headlines show index context, not unrelated companies', () => {
+  const record = queueHeadline({ id: 'macro', headline: 'Mkt re-rating unlikely amid global uncertainty', summary: '', source: 'Business Standard', region: 'india', url: 'https://example.com/macro', publishedAt: new Date().toISOString(), relatedAssets: [] }, [
+    { symbol: 'NIFTY50', changePercent: 0.42 }, { symbol: 'SENSEX', changePercent: -0.31 },
+    { symbol: 'AAPL', changePercent: 2 },
+  ]);
+  assert.match(record.notificationBody!, /Market context \(quote snapshot\): NIFTY 50 \(NIFTY50\) \(\+0.42%\), BSE SENSEX \(SENSEX\) \(-0.31%\)/);
+  assert.doesNotMatch(record.notificationBody!, /Apple|AAPL|Related stocks/);
+  assert.deepEqual(record.article.relatedAssets, []);
+});
+
+test('missing and stale changes are explicit, while real zero is preserved', () => {
+  const body = newsNotificationBody('Company updates', ['INFY', 'TCS', 'MSFT', 'AAPL'], [
+    { symbol: 'INFY', changePercent: 0 }, { symbol: 'TCS', changePercent: 3, status: 'stale' },
+    { symbol: 'MSFT', changePercent: Number.NaN },
+  ]);
+  assert.match(body, /Infosys \(INFY\) \(0.00%\)/);
+  assert.match(body, /Tata Consultancy Services \(TCS\) — change unavailable/);
+  assert.match(body, /Microsoft \(MSFT\) — change unavailable/);
+  assert.match(body, /Apple \(AAPL\) — change unavailable/);
+  assert.doesNotMatch(body, /3.00%|NaN/);
 });

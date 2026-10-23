@@ -1,9 +1,12 @@
+import { ASSET_BY_SYMBOL } from './assets';
+
 export interface QuoteLike {
   symbol: string;
   price?: number | null;
   change?: number | null;
   changePercent?: number | null;
   currency?: string;
+  status?: string;
 }
 
 /** Put article-linked symbols in the collapsed mobile notification too. */
@@ -15,7 +18,10 @@ export function newsNotificationTitle(publisher: string, symbols: string[] = [])
 }
 
 export function formatStockChange(quote: QuoteLike): string {
-  const symbol = quote.symbol;
+  const ticker = quote.symbol.trim().toUpperCase();
+  const name = ASSET_BY_SYMBOL.get(ticker)?.name;
+  const symbol = name && name !== ticker ? `${name} (${ticker})` : ticker;
+  if (quote.status === 'unavailable' || quote.status === 'stale') return `${symbol} — change unavailable`;
   if (typeof quote.changePercent === 'number' && Number.isFinite(quote.changePercent)) {
     const sign = quote.changePercent > 0 ? '+' : '';
     const pct = `${sign}${quote.changePercent.toFixed(2)}%`;
@@ -26,25 +32,18 @@ export function formatStockChange(quote: QuoteLike): string {
     }
     return `${symbol} (${pct})`;
   }
-  return symbol;
+  return `${symbol} — change unavailable`;
 }
 
 /** Article links indicate relevance, not a prediction or proof of price impact. */
-export function newsNotificationBody(headline: string, symbols: string[] = [], quotes?: QuoteLike[]) {
-  const related = [...new Set(symbols.map(symbol => symbol.trim()).filter(Boolean))];
-  if (!related.length) return `${headline}\nNo specific stock identified`;
-
-  if (quotes && quotes.length > 0) {
-    const quoteMap = new Map<string, QuoteLike>();
-    for (const q of quotes) {
-      if (q?.symbol) quoteMap.set(q.symbol.toUpperCase(), q);
-    }
-    const formatted = related.map(sym => {
-      const found = quoteMap.get(sym.toUpperCase());
-      return found ? formatStockChange(found) : sym;
-    });
-    return `${headline}\nRelated stocks: ${formatted.join(', ')}`;
-  }
-
-  return `${headline}\nRelated stocks: ${related.join(', ')}`;
+export function newsNotificationBody(headline: string, symbols: string[] = [], quotes: QuoteLike[] = [], region?: 'india' | 'global') {
+  const related = [...new Set(symbols.map(symbol => symbol.trim().toUpperCase()).filter(Boolean))];
+  // Regional indices provide context, never evidence that an unnamed company was affected.
+  const context = !related.length && region === 'india';
+  const selected = context ? ['NIFTY50', 'SENSEX'] : related;
+  if (!selected.length) return `${headline}\nNo specific stock identified`;
+  const quoteMap = new Map(quotes.filter(q => q?.symbol).map(q => [q.symbol.toUpperCase(), q]));
+  const formatted = selected.map(symbol => formatStockChange(quoteMap.get(symbol) ?? { symbol }));
+  const label = context ? 'Market context (quote snapshot)' : 'Related stocks (quote snapshot)';
+  return `${headline}\n${label}: ${formatted.join(', ')}`;
 }
