@@ -4,7 +4,7 @@ import { z } from 'zod';
 import type { NewsArticle, Quote } from '../types/market';
 import { useWatchlist } from '../hooks/useWatchlist';
 import { formatPercent } from '../utils/format';
-import { hasActiveBackgroundPush } from '../utils/backgroundPush';
+import { hasActiveBackgroundPush, syncBackgroundPush } from '../utils/backgroundPush';
 import AssetIcon from './AssetIcon';
 
 import {
@@ -462,9 +462,10 @@ export default function NewsAlerts({
       {open && (
         <section
           aria-label="News notification inbox"
-          className="fixed top-14 right-2 sm:right-6 z-50 w-[min(380px,calc(100vw-16px))] max-h-[calc(100dvh-120px)] overflow-y-auto rounded-2xl border border-[var(--border-default)] bg-[var(--bg-surface)] p-4 shadow-2xl space-y-3.5"
+          className="fixed top-14 right-2 sm:right-6 z-50 flex flex-col w-[min(380px,calc(100vw-16px))] max-h-[calc(100dvh-135px)] md:max-h-[calc(100dvh-80px)] rounded-2xl border border-[var(--border-default)] bg-[var(--bg-surface)] shadow-2xl overflow-hidden"
         >
-          <div className="flex items-center justify-between border-b border-[var(--border-subtle)] pb-2.5">
+          {/* Fixed Header */}
+          <div className="flex items-center justify-between border-b border-[var(--border-subtle)] p-4 pb-3 shrink-0 bg-[var(--bg-surface)]">
             <div>
               <h2 className="text-sm font-bold text-[var(--text-primary)]">News & Stock Alerts</h2>
               <p className="text-[11px] text-[var(--text-muted)]">
@@ -481,206 +482,251 @@ export default function NewsAlerts({
             </button>
           </div>
 
-          {/* Prominent Quick-Action Allow Button */}
-          {(!settings.device || !settings.enabled) && (
-            <div className="rounded-xl border border-[var(--accent-primary)]/30 bg-[var(--accent-subtle)] p-3 space-y-2">
-              <div className="flex items-center gap-2 text-xs font-semibold text-[var(--accent-text)]">
-                <Sparkles size={14} />
-                <span>Allow Live Mobile Notifications</span>
-              </div>
-              <p className="text-[11px] text-[var(--text-secondary)] leading-relaxed">
-                Receive market headlines with article-linked stocks and available price changes.
-              </p>
-              <button
-                type="button"
-                disabled={busy}
-                onClick={handleAllowNotification}
-                className="button-primary text-xs min-h-[38px] w-full flex items-center justify-center gap-1.5 cursor-pointer"
-              >
-                <Bell size={14} />
-                <span>Allow & Enable News Alerts</span>
-              </button>
-            </div>
-          )}
-
-          {/* Controls */}
-          <div className="space-y-2 rounded-xl bg-[var(--bg-subtle)] p-3 text-xs">
-            <label className="flex items-center gap-2.5 font-medium min-h-[32px] cursor-pointer">
-              <input
-                type="checkbox"
-                checked={settings.enabled}
-                onChange={(e) => saveSettings({ ...settings, enabled: e.target.checked })}
-                className="h-4 w-4 rounded accent-[var(--accent-primary)]"
-              />
-              <span>Enable live news alerts</span>
-            </label>
-
-            <div className="flex items-center justify-between gap-2 pt-1 border-t border-[var(--border-subtle)]">
-              <span className="text-[var(--text-secondary)]">Coverage:</span>
-              <select
-                aria-label="Alert coverage"
-                disabled={!settings.enabled}
-                value={settings.scope}
-                onChange={(e) =>
-                  saveSettings({ ...settings, scope: e.target.value as 'watchlist' | 'all' })
-                }
-                className="field text-xs py-1 px-2 h-8 w-auto rounded-lg"
-              >
-                <option value="watchlist">Watchlist only ({symbols.length})</option>
-                <option value="all">All market news</option>
-              </select>
-            </div>
-
-            <label className="flex items-center gap-2.5 text-[var(--text-secondary)] min-h-[32px] cursor-pointer">
-              <input
-                type="checkbox"
-                disabled={!settings.enabled}
-                checked={settings.quiet}
-                onChange={(e) => saveSettings({ ...settings, quiet: e.target.checked })}
-                className="h-4 w-4 rounded accent-[var(--accent-primary)]"
-              />
-              <span>Quiet hours (10 PM – 8 AM)</span>
-            </label>
-
-            <div className="pt-2 border-t border-[var(--border-subtle)] flex flex-wrap gap-2">
-              <button
-                type="button"
-                disabled={busy}
-                onClick={
-                  settings.device
-                    ? () => saveSettings({ ...settings, device: false })
-                    : handleAllowNotification
-                }
-                className="button-secondary text-xs min-h-[36px] flex-1"
-              >
-                {settings.device ? 'Disable system notifications' : 'Enable system notifications'}
-              </button>
-              <button
-                type="button"
-                onClick={handleTestAlert}
-                title="Trigger a test alert on your screen with stock changes"
-                className="button-secondary text-xs min-h-[36px] flex items-center gap-1 shrink-0"
-              >
-                <Play size={12} />
-                <span>Test Alert</span>
-              </button>
-            </div>
-          </div>
-
-
-          {message && (
-            <p role="status" className="text-xs text-amber-500 font-medium">
-              {message}
-            </p>
-          )}
-
-          {/* Inbox Feed */}
-          <div className="border-t border-[var(--border-subtle)] pt-2.5">
-            <div className="flex items-center justify-between mb-2">
-              <h3 className="text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)]">
-                Recent Alerts ({notices.length})
-              </h3>
-              {notices.length > 0 && (
+          {/* Scrollable Content Area */}
+          <div className="flex-1 overflow-y-auto p-4 pt-3 space-y-3.5 overscroll-contain">
+            {/* Prominent Quick-Action Allow Button */}
+            {(!settings.device || !settings.enabled) && (
+              <div className="rounded-xl border border-[var(--accent-primary)]/30 bg-[var(--accent-subtle)] p-3 space-y-2">
+                <div className="flex items-center gap-2 text-xs font-semibold text-[var(--accent-text)]">
+                  <Sparkles size={14} />
+                  <span>Allow Live Mobile Notifications</span>
+                </div>
+                <p className="text-[11px] text-[var(--text-secondary)] leading-relaxed">
+                  Receive market headlines with article-linked stocks and available price changes.
+                </p>
                 <button
                   type="button"
-                  onClick={() => saveNotices(notices.map((n) => ({ ...n, read: true })))}
-                  className="text-[11px] text-[var(--accent-text)] hover:underline flex items-center gap-1 cursor-pointer"
+                  disabled={busy}
+                  onClick={handleAllowNotification}
+                  className="button-primary text-xs min-h-[38px] w-full flex items-center justify-center gap-1.5 cursor-pointer"
                 >
-                  <Check size={12} />
-                  <span>Mark all read</span>
+                  <Bell size={14} />
+                  <span>Allow & Enable News Alerts</span>
                 </button>
-              )}
-            </div>
-
-            {!notices.length ? (
-              <p className="py-4 text-center text-xs text-[var(--text-muted)]">
-                {settings.enabled
-                  ? 'No new alerts yet. Fresh matching stories will arrive here.'
-                  : 'Alerts are currently paused. Turn on alerts above to start.'}
-              </p>
-            ) : (
-              <div className="divide-y divide-[var(--border-subtle)] max-h-56 overflow-y-auto">
-                {notices.map((notice) => {
-                  const relatedStocks = getRelatedQuotes(notice.relatedAssets, quotes);
-                  return (
-                    <div
-                      key={notice.id}
-                      className="py-2.5 px-1 hover:bg-[var(--bg-surface-hover)] transition text-xs space-y-1.5"
-                    >
-                      <button
-                        type="button"
-                        onClick={() => {
-                          saveNotices(
-                            notices.map((n) => (n.id === notice.id ? { ...n, read: true } : n))
-                          );
-                          setOpen(false);
-                          onOpenNews();
-                        }}
-                        className="w-full text-left cursor-pointer"
-                      >
-                        <div className="flex items-center justify-between gap-1 text-[10px] text-[var(--text-muted)]">
-                          <span>{notice.source ?? 'Market Wire'}</span>
-                          <span>
-                            {new Date(notice.time).toLocaleTimeString([], {
-                              hour: '2-digit',
-                              minute: '2-digit',
-                            })}
-                          </span>
-                        </div>
-                        <p
-                          className={`mt-1 line-clamp-2 leading-snug ${
-                            notice.read
-                              ? 'text-[var(--text-secondary)] font-normal'
-                              : 'text-[var(--text-primary)] font-semibold'
-                          }`}
-                        >
-                          {notice.headline}
-                        </p>
-                      </button>
-
-                      {/* Related stock changes (positive / negative) */}
-                      {relatedStocks.length > 0 && (
-                        <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
-                          {relatedStocks.map((stock) => {
-                            const isGain = (stock.changePercent ?? 0) >= 0;
-                            return (
-                              <button
-                                key={stock.symbol}
-                                type="button"
-                                onClick={() => {
-                                  setOpen(false);
-                                  if (onSelectAsset) {
-                                    onSelectAsset(stock);
-                                  } else {
-                                    onOpenNews();
-                                  }
-                                }}
-                                className={`inline-flex items-center gap-1 rounded px-1.5 py-0.5 font-mono text-[10px] font-bold transition cursor-pointer ${
-                                  isGain
-                                    ? 'bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 border border-emerald-500/20'
-                                    : 'bg-rose-500/10 text-rose-400 hover:bg-rose-500/20 border border-rose-500/20'
-                                }`}
-                              >
-                                <AssetIcon symbol={stock.symbol} category={stock.category} size="xs" />
-                                <span>{stock.symbol}</span>
-                                <span className="flex items-center">
-                                  {isGain ? (
-                                    <TrendingUp className="h-2.5 w-2.5" />
-                                  ) : (
-                                    <TrendingDown className="h-2.5 w-2.5" />
-                                  )}
-                                  {formatPercent(stock.changePercent)}
-                                </span>
-                              </button>
-                            );
-                          })}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
               </div>
             )}
+
+            {/* Controls */}
+            <div className="space-y-2 rounded-xl bg-[var(--bg-subtle)] p-3 text-xs">
+              <label className="flex items-center gap-2.5 font-medium min-h-[32px] cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={settings.enabled}
+                  onChange={(e) => saveSettings({ ...settings, enabled: e.target.checked })}
+                  className="h-4 w-4 rounded accent-[var(--accent-primary)]"
+                />
+                <span>Enable live news alerts</span>
+              </label>
+
+              <div className="flex items-center justify-between gap-2 pt-1 border-t border-[var(--border-subtle)]">
+                <span className="text-[var(--text-secondary)]">Coverage:</span>
+                <select
+                  aria-label="Alert coverage"
+                  disabled={!settings.enabled}
+                  value={settings.scope}
+                  onChange={(e) =>
+                    saveSettings({ ...settings, scope: e.target.value as 'watchlist' | 'all' })
+                  }
+                  className="field text-xs py-1 px-2 h-8 w-auto rounded-lg"
+                >
+                  <option value="watchlist">Watchlist only ({symbols.length})</option>
+                  <option value="all">All market news</option>
+                </select>
+              </div>
+
+              <label className="flex items-center gap-2.5 text-[var(--text-secondary)] min-h-[32px] cursor-pointer">
+                <input
+                  type="checkbox"
+                  disabled={!settings.enabled}
+                  checked={settings.quiet}
+                  onChange={(e) => saveSettings({ ...settings, quiet: e.target.checked })}
+                  className="h-4 w-4 rounded accent-[var(--accent-primary)]"
+                />
+                <span>Quiet hours (10 PM – 8 AM)</span>
+              </label>
+
+              <div className="pt-2 border-t border-[var(--border-subtle)] flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={
+                    settings.device
+                      ? () => saveSettings({ ...settings, device: false })
+                      : handleAllowNotification
+                  }
+                  className="button-secondary text-xs min-h-[36px] flex-1"
+                >
+                  {settings.device ? 'Disable system notifications' : 'Enable system notifications'}
+                </button>
+                <button
+                  type="button"
+                  onClick={handleTestAlert}
+                  title="Trigger a test alert on your screen with stock changes"
+                  className="button-secondary text-xs min-h-[36px] flex items-center gap-1 shrink-0"
+                >
+                  <Play size={12} />
+                  <span>Test Alert</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Status / Diagnostic Feedback Message */}
+            {message && (
+              <div
+                role="status"
+                className={`rounded-xl border p-3 text-xs flex items-start justify-between gap-2.5 ${
+                  message.includes('confirmed') || message.includes('enabled') || message.includes('dispatched')
+                    ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-400'
+                    : message.includes('off') || message.includes('disabled') || message.includes('paused')
+                    ? 'border-[var(--border-subtle)] bg-[var(--bg-subtle)] text-[var(--text-secondary)]'
+                    : 'border-amber-500/30 bg-amber-500/10 text-amber-400'
+                }`}
+              >
+                <div className="flex-1 space-y-1.5">
+                  <p className="font-medium leading-relaxed">{message}</p>
+                  {message.includes('OneSignal has not confirmed') && (
+                    <div className="pt-1 flex items-center justify-between gap-2 border-t border-amber-500/20">
+                      <span className="text-[10px] text-amber-400/80 leading-tight">
+                        In-app news & screen alerts are active.
+                      </span>
+                      <button
+                        type="button"
+                        disabled={busy}
+                        onClick={async () => {
+                          setBusy(true);
+                          try {
+                            const res = await syncBackgroundPush();
+                            if (res) setMessage(res);
+                          } finally {
+                            setBusy(false);
+                          }
+                        }}
+                        className="px-2 py-0.5 rounded border border-amber-500/40 bg-amber-500/20 text-[10px] font-semibold text-amber-300 hover:bg-amber-500/30 transition shrink-0 cursor-pointer"
+                      >
+                        {busy ? 'Retrying…' : 'Retry Sync'}
+                      </button>
+                    </div>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  aria-label="Dismiss message"
+                  onClick={() => setMessage('')}
+                  className="text-[var(--text-muted)] hover:text-[var(--text-primary)] p-0.5 shrink-0 transition cursor-pointer"
+                >
+                  <X size={14} />
+                </button>
+              </div>
+            )}
+
+            {/* Inbox Feed */}
+            <div className="border-t border-[var(--border-subtle)] pt-2.5">
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)]">
+                  Recent Alerts ({notices.length})
+                </h3>
+                {notices.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => saveNotices(notices.map((n) => ({ ...n, read: true })))}
+                    className="text-[11px] text-[var(--accent-text)] hover:underline flex items-center gap-1 cursor-pointer"
+                  >
+                    <Check size={12} />
+                    <span>Mark all read</span>
+                  </button>
+                )}
+              </div>
+
+              {!notices.length ? (
+                <p className="py-4 text-center text-xs text-[var(--text-muted)]">
+                  {settings.enabled
+                    ? 'No new alerts yet. Fresh matching stories will arrive here.'
+                    : 'Alerts are currently paused. Turn on alerts above to start.'}
+                </p>
+              ) : (
+                <div className="divide-y divide-[var(--border-subtle)]">
+                  {notices.map((notice) => {
+                    const relatedStocks = getRelatedQuotes(notice.relatedAssets, quotes);
+                    return (
+                      <div
+                        key={notice.id}
+                        className="py-2.5 px-1 hover:bg-[var(--bg-surface-hover)] transition text-xs space-y-1.5"
+                      >
+                        <button
+                          type="button"
+                          onClick={() => {
+                            saveNotices(
+                              notices.map((n) => (n.id === notice.id ? { ...n, read: true } : n))
+                            );
+                            setOpen(false);
+                            onOpenNews();
+                          }}
+                          className="w-full text-left cursor-pointer"
+                        >
+                          <div className="flex items-center justify-between gap-1 text-[10px] text-[var(--text-muted)]">
+                            <span>{notice.source ?? 'Market Wire'}</span>
+                            <span>
+                              {new Date(notice.time).toLocaleTimeString([], {
+                                hour: '2-digit',
+                                minute: '2-digit',
+                              })}
+                            </span>
+                          </div>
+                          <p
+                            className={`mt-1 line-clamp-2 leading-snug ${
+                              notice.read
+                                ? 'text-[var(--text-secondary)] font-normal'
+                                : 'text-[var(--text-primary)] font-semibold'
+                            }`}
+                          >
+                            {notice.headline}
+                          </p>
+                        </button>
+
+                        {/* Related stock changes (positive / negative) */}
+                        {relatedStocks.length > 0 && (
+                          <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+                            {relatedStocks.map((stock) => {
+                              const isGain = (stock.changePercent ?? 0) >= 0;
+                              return (
+                                <button
+                                  key={stock.symbol}
+                                  type="button"
+                                  onClick={() => {
+                                    setOpen(false);
+                                    if (onSelectAsset) {
+                                      onSelectAsset(stock);
+                                    } else {
+                                      onOpenNews();
+                                    }
+                                  }}
+                                  className={`inline-flex items-center gap-1 rounded px-1.5 py-0.5 font-mono text-[10px] font-bold transition cursor-pointer ${
+                                    isGain
+                                      ? 'bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 border border-emerald-500/20'
+                                      : 'bg-rose-500/10 text-rose-400 hover:bg-rose-500/20 border border-rose-500/20'
+                                  }`}
+                                >
+                                  <AssetIcon symbol={stock.symbol} category={stock.category} size="xs" />
+                                  <span>{stock.symbol}</span>
+                                  <span className="flex items-center">
+                                    {isGain ? (
+                                      <TrendingUp className="h-2.5 w-2.5" />
+                                    ) : (
+                                      <TrendingDown className="h-2.5 w-2.5" />
+                                    )}
+                                    {formatPercent(stock.changePercent)}
+                                  </span>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
           </div>
         </section>
       )}
