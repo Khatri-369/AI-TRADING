@@ -13,8 +13,8 @@ const configSchema = z.object({
   AI_ACCESS_TOKEN: z.string().optional(), // Kept as alias for ADMIN_DIAGNOSTICS_TOKEN for backwards-compat
 
   // AI spending limits & quotas
-  AI_DAILY_BUDGET_LIMIT: z.coerce.number().int().min(1).default(100),
-  AI_PER_CLIENT_DAILY_LIMIT: z.coerce.number().int().min(1).default(5),
+  AI_DAILY_BUDGET_LIMIT: z.coerce.number().int().min(1).default(500),
+  AI_PER_CLIENT_DAILY_LIMIT: z.coerce.number().int().min(1).default(50),
   ANONYMOUS_AI_QUOTA_ENABLED: z
     .preprocess((val) => (typeof val === 'string' ? val.toLowerCase() === 'true' || val === '1' : Boolean(val ?? true)), z.boolean())
     .default(true),

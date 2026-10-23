@@ -586,8 +586,13 @@ export default function NewsSignalFeed({
                 {/* AI Sentiment Analysis Card */}
                 {entry && (
                   <div className="mt-3 border-t border-[var(--border-subtle)] pt-3">
-                    {entry.loading && <Loading label="Running AI sentiment analysis…" />}
-                    {entry.error && <ErrorNotice message={entry.error} />}
+                    {entry.loading && <Loading label="Running AI sentiment analysis…" showTimer={true} />}
+                    {entry.error && (
+                      <ErrorNotice
+                        message={entry.error}
+                        onRetry={() => onAnalyze(article)}
+                      />
+                    )}
                     {entry.result && <AnalysisResult result={entry.result} />}
                   </div>
                 )}

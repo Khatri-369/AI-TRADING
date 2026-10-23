@@ -26,14 +26,18 @@ export function ErrorNotice({ message, onRetry }: { message: string; onRetry?: (
  * Branded Tradexa Micro Loader
  */
 export function TradexaLoader({ size = 28, className = '' }: { size?: number; className?: string }) {
+  const iconSize = Math.max(14, Math.round(size * 0.65));
   return (
-    <div className={`relative inline-flex items-center justify-center ${className}`}>
+    <div
+      className={`relative inline-flex items-center justify-center shrink-0 ${className}`}
+      style={{ width: size, height: size }}
+    >
       {/* Outer ambient spin ring */}
       <div
-        className="absolute inset-0 rounded-full border-2 border-cyan-500/20 border-t-cyan-400 animate-spin"
-        style={{ width: size, height: size }}
+        className="absolute inset-0 rounded-full border-2 border-cyan-500/25 border-t-cyan-400 animate-spin"
       />
-      <TradexaSymbol size={Math.round(size * 0.7)} framed={false} />
+      {/* Centered Tradexa Symbol */}
+      <TradexaSymbol size={iconSize} framed={false} />
     </div>
   );
 }
@@ -65,7 +69,7 @@ export function Loading({
     <div
       role="status"
       aria-live="polite"
-      className="flex flex-col items-center justify-center gap-3 py-10 text-sm text-[var(--text-muted)] animate-fade-in"
+      className="flex flex-col items-center justify-center gap-2.5 py-6 text-sm text-[var(--text-muted)] animate-fade-in"
     >
       <div className="flex items-center gap-3">
         <TradexaLoader size={30} />

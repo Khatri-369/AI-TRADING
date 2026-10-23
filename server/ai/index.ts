@@ -181,8 +181,10 @@ export function createAIService(options: ServiceOptions = {}) {
     if (!candidate || candidate.finishReason !== 'STOP') {
       throw new AIServiceError(502, 'AI_INVALID_RESPONSE', 'Gemini did not return a complete, unblocked analysis.', 'gemini');
     }
-    const text = candidate.content.parts.filter(part => !part.thought).map(part => part.text ?? '').join('');
-    try { return JSON.parse(text) as unknown; }
+    const parts = candidate.content.parts.filter(part => !part.thought && part.text);
+    const text = (parts.length > 0 ? parts : candidate.content.parts).map(part => part.text ?? '').join('');
+    const cleaned = text.trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim();
+    try { return JSON.parse(cleaned) as unknown; }
     catch { throw new AIServiceError(502, 'AI_INVALID_RESPONSE', 'Gemini returned invalid structured analysis.', 'gemini'); }
   }
 
@@ -228,7 +230,15 @@ export function createAIService(options: ServiceOptions = {}) {
         } satisfies AnalysisResult;
       }
       const output = await gemini('Assess financial sentiment using the headline and any available server market evidence.', value, serverContext, analysisJsonSchema);
-      const analysis = analysisOutputSchema.safeParse(output);
+      let normalizedOutput = output;
+      if (normalizedOutput && typeof normalizedOutput === 'object') {
+        const raw = { ...(normalizedOutput as Record<string, unknown>) };
+        if (typeof raw.confidence === 'number' && raw.confidence <= 1 && raw.confidence > 0) {
+          raw.confidence = Math.round(raw.confidence * 100);
+        }
+        normalizedOutput = raw;
+      }
+      const analysis = analysisOutputSchema.safeParse(normalizedOutput);
       if (!analysis.success) throw new AIServiceError(502, 'AI_INVALID_RESPONSE', 'Gemini returned analysis that failed validation.', engine);
       return { ...analysis.data, engine, engineStatus: 'available', generatedAt: new Date(now()).toISOString(), cached: false } satisfies AnalysisResult;
     }, () => new AIServiceError(429, 'AI_BUSY', 'Too many analyses are running. Try again shortly.', engine))) as AnalysisResult;

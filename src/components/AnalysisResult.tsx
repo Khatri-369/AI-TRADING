@@ -6,7 +6,7 @@ export default function AnalysisResult({ result }: { result: AIAnalysis }) {
     <div className="space-y-3 rounded-lg border border-[var(--border-default)] bg-[var(--bg-surface-elevated)] p-4 text-[var(--text-primary)]">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <span className="text-xs font-semibold uppercase tracking-wider text-[var(--accent-text)]">
-          {result.engine}
+          {result.engine === 'gemini' ? 'Google Gemini' : 'FinBERT NLP'}
           {result.cached ? ' · cached' : ''}
         </span>
         <span
