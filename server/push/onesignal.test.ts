@@ -87,6 +87,20 @@ test('batch overflow persists and is drained even after it disappears from provi
   t.advance(300000); await t.sender().deliver(feed([]));
   assert.equal(t.calls.length, 45); assert.equal((await t.queue.counts()).pending, 0);
 });
+
+test('related stocks appear in push title and retry payload stays frozen when quotes change', async () => {
+  const t = setup();
+  const news = feed();
+  news.articles[0] = { ...article('a'), headline: 'Infosys wins contract' };
+  t.setResponse(() => new Response('{}', { status: 503 }));
+  await t.sender().deliver(news, { quotes: [{ symbol: 'INFY', price: 1500, changePercent: 1, currency: 'INR' }] });
+  assert.deepEqual(t.calls[0].headings, { en: 'TRADEXA · INFY · Publisher' });
+  assert.match(JSON.stringify(t.calls[0].contents), /INFY/);
+  t.advance(300000);
+  t.setResponse(() => new Response('{"id":"accepted"}'));
+  await t.sender().deliver(feed([]), { quotes: [{ symbol: 'INFY', price: 1600, changePercent: 4, currency: 'INR' }] });
+  assert.deepEqual(t.calls[1], t.calls[0]);
+});
 test('partial failure retains only failed article and uses identical retry key', async () => {
   const t = setup(); let attempt = 0;
   t.setResponse(() => ++attempt === 2 ? new Response('{}', { status: 400 }) : new Response('{"id":"ok"}'));

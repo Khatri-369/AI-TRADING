@@ -6,6 +6,14 @@ export interface QuoteLike {
   currency?: string;
 }
 
+/** Put article-linked symbols in the collapsed mobile notification too. */
+export function newsNotificationTitle(publisher: string, symbols: string[] = []) {
+  const related = [...new Set(symbols.map(symbol => symbol.trim().toUpperCase()).filter(Boolean))];
+  const visible = related.slice(0, 3).join(', ');
+  const extra = related.length > 3 ? ` +${related.length - 3}` : '';
+  return `TRADEXA · ${visible ? `${visible}${extra} · ` : ''}${publisher || 'Market News'}`;
+}
+
 export function formatStockChange(quote: QuoteLike): string {
   const symbol = quote.symbol;
   if (typeof quote.changePercent === 'number' && Number.isFinite(quote.changePercent)) {

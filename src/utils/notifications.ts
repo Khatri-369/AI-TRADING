@@ -1,5 +1,5 @@
 import type { Quote } from '../types/market';
-import { newsNotificationBody } from '../../shared/newsNotification';
+import { newsNotificationBody, newsNotificationTitle } from '../../shared/newsNotification';
 
 export const STORAGE_ALERT_SETTINGS = 'markets.alerts.settings.v1';
 export const STORAGE_ALERT_INBOX = 'markets.alerts.inbox.v1';
@@ -92,7 +92,7 @@ export async function sendSystemNotification(
   if (typeof window === 'undefined' || typeof Notification === 'undefined') return false;
   if (Notification.permission !== 'granted') return false;
 
-  const title = `Tradexa · ${source || 'Market News'}`;
+  const title = newsNotificationTitle(source, relatedSymbols);
   const body = newsNotificationBody(headline, relatedSymbols, relatedStocks);
 
   const options: NotificationOptions = {

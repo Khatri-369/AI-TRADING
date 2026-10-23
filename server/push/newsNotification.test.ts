@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { newsNotificationBody } from '../../shared/newsNotification';
+import { newsNotificationBody, newsNotificationTitle } from '../../shared/newsNotification';
 import { queueHeadline } from './newsQueue';
 import { sendSystemNotification } from '../../src/utils/notifications';
 
@@ -28,13 +28,27 @@ test('device notification keeps publisher, headline and linked symbols without l
   } });
   try {
     assert.equal(await sendSystemNotification('TCS wins contract', 'Publisher', [], 'tcs', ['TCS'], 'https://example.com/tcs'), true);
-    assert.equal(captured[0].title, 'Tradexa · Publisher');
+    assert.equal(captured[0].title, 'TRADEXA · TCS · Publisher');
     assert.equal(captured[0].options.body, 'TCS wins contract\nRelated stocks: TCS');
     assert.equal(captured[0].options.data.url, 'https://example.com/tcs');
   } finally {
     if (savedWindow) Object.defineProperty(globalThis, 'window', savedWindow); else Reflect.deleteProperty(globalThis, 'window');
     if (savedNotification) Object.defineProperty(globalThis, 'Notification', savedNotification); else Reflect.deleteProperty(globalThis, 'Notification');
   }
+});
+
+test('collapsed notification shows only relevant symbols, with bounded ticker count', () => {
+  assert.equal(newsNotificationTitle('Reuters', ['TCS', ' tcs ', 'HDFCBANK']), 'TRADEXA · TCS, HDFCBANK · Reuters');
+  assert.equal(newsNotificationTitle('Reuters', ['TCS', 'INFY', 'MSFT', 'NVDA']), 'TRADEXA · TCS, INFY, MSFT +1 · Reuters');
+  assert.equal(newsNotificationTitle('Reuters'), 'TRADEXA · Reuters');
+});
+
+test('queue infers named companies even without provider tickers and excludes unrelated quotes', () => {
+  const record = queueHeadline({ id: 'deal', headline: 'Infosys signs deal with Microsoft', summary: '', source: 'Reuters', url: 'https://example.com/deal', publishedAt: new Date().toISOString(), relatedAssets: [] }, [{ symbol: 'AAPL', price: 200, changePercent: 1 }]);
+  assert.deepEqual(new Set(record.article.relatedAssets), new Set(['INFY', 'MSFT']));
+  assert.match(record.notificationTitle!, /INFY/);
+  assert.match(record.notificationTitle!, /MSFT/);
+  assert.doesNotMatch(record.notificationBody!, /AAPL/);
 });
 
 test('notification body formats related stock changes with prices and percentages when quotes are provided', () => {

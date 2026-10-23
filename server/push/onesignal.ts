@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { logger } from '../logger';
 import { appDiagnostics, classifyPushResponse } from './diagnostics';
 import { RedisNewsQueue, queueHeadline, type NewsQueue, type QueuedHeadline } from './newsQueue';
-import { newsNotificationBody, type QuoteLike } from '../../shared/newsNotification';
+import { type QuoteLike } from '../../shared/newsNotification';
 import type { NewsResponse } from '../../shared/types';
 
 export function authorizedNewsJob(header: string | undefined, secret = process.env.CRON_SECRET) {
@@ -81,7 +81,7 @@ export class OneSignalNewsPush {
           logger.error('Headline requires review before idempotency expires', { key: record.key });
           continue;
         }
-        const result = await this.send(record, options, quotes);
+        const result = await this.send(record, options);
         if (result.id) {
           if (result.warning) logger.warn('Push accepted with recipient warnings', { key: record.key, reason: result.warning });
           record.state = 'accepted'; record.messageId = result.id; delete record.error;
@@ -111,18 +111,16 @@ export class OneSignalNewsPush {
       try { await queue.release(owner); } catch { logger.error('News job lease release failed; lease will expire'); }
     }
   }
-  private async send(record: QueuedHeadline, options: { appId: string; apiKey: string }, quotes?: QuoteLike[]): Promise<{ id?: string; warning?: string; error?: string; httpStatus?: number; retryAfter?: string | null; pause?: boolean; definitelyNotCreated?: boolean }> {
+  private async send(record: QueuedHeadline, options: { appId: string; apiKey: string }): Promise<{ id?: string; warning?: string; error?: string; httpStatus?: number; retryAfter?: string | null; pause?: boolean; definitelyNotCreated?: boolean }> {
     const id = notificationKey(options.appId, record.key, record.deliveryGeneration);
-    const bodyContent = quotes && quotes.length
-      ? newsNotificationBody(record.article.headline, record.article.relatedAssets, quotes)
-      : (record.notificationBody ?? record.article.headline);
+    const bodyContent = record.notificationBody ?? record.article.headline;
     try {
       const response = await (this.options.fetcher ?? fetch)('https://api.onesignal.com/notifications', {
         method: 'POST', redirect: 'error', headers: { Authorization: `Key ${options.apiKey}`, 'Content-Type': 'application/json' },
         signal: AbortSignal.timeout(6000),
         body: JSON.stringify({ app_id: options.appId, target_channel: 'push',
           filters: [{ field: 'tag', key: 'market_news', relation: '=', value: 'on' }],
-          headings: { en: `TRADEXA · ${record.article.source}` },
+          headings: { en: record.notificationTitle ?? `TRADEXA · ${record.article.source}` },
           contents: { en: bodyContent }, url: record.article.url,
           data: { articleId: record.article.id, publisher: record.article.source, articleUrl: record.article.url, relatedAssets: record.article.relatedAssets },
           ttl: 86400, priority: 10, idempotency_key: id,
