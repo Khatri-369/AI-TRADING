@@ -67,9 +67,8 @@ export default function SplashScreen({ onComplete, isAppReady = true }: SplashSc
 
   return (
     <div
-      role="dialog"
-      aria-modal="true"
       aria-label="Tradexa Startup Screen"
+      aria-hidden={phase === 'exit'}
       className={`fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-[#070B14] select-none transition-opacity duration-500 ease-out ${
         phase === 'exit' ? 'opacity-0 pointer-events-none' : 'opacity-100'
       }`}
