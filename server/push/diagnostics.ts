@@ -7,11 +7,26 @@ const userSchema = z.object({
 });
 export function summarizeDevice(raw: unknown, appId: string, subscriptionId: string) {
   const data = userSchema.parse(raw);
-  const subscription = data.subscriptions.find(item => item.id === subscriptionId && (!item.app_id || item.app_id === appId));
+  const subscription =
+    data.subscriptions.find(item => item.id === subscriptionId && (!item.app_id || item.app_id === appId)) ??
+    (subscriptionId !== 'unknown'
+      ? data.subscriptions.find(
+          item =>
+            (!item.app_id || item.app_id === appId) &&
+            item.type.endsWith('Push') &&
+            item.enabled &&
+            (item.notification_types === undefined || item.notification_types > 0)
+        )
+      : undefined);
   const registered = Boolean(subscription);
-  const subscribed = Boolean(subscription?.enabled && subscription.type.endsWith('Push') && subscription.token && (subscription.notification_types === undefined || subscription.notification_types > 0));
+  const subscribed = Boolean(
+    subscription?.enabled &&
+      subscription.type.endsWith('Push') &&
+      (subscription.token === undefined || Boolean(subscription.token)) &&
+      (subscription.notification_types === undefined || subscription.notification_types > 0)
+  );
   const tagged = data.properties?.tags?.market_news === 'on';
-  return { registered, subscribed, tagged, ready: subscribed && tagged };
+  return { registered, subscribed, tagged, ready: registered && subscribed && tagged };
 }
 export async function verifyDevice(appId: string, key: string, userId: string, subscriptionId: string, fetcher = fetch) {
   const response = await fetcher(`https://api.onesignal.com/apps/${appId}/users/by/onesignal_id/${userId}`, {

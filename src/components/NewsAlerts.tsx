@@ -575,7 +575,7 @@ export default function NewsAlerts({
               <div
                 role="status"
                 className={`rounded-xl border p-3 text-xs flex items-start justify-between gap-2.5 ${
-                  message.includes('confirmed') || message.includes('enabled') || message.includes('dispatched')
+                  !message.includes('not confirmed') && (message.includes('confirmed') || message.includes('enabled') || message.includes('dispatched'))
                     ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-400'
                     : message.includes('off') || message.includes('disabled') || message.includes('paused')
                     ? 'border-[var(--border-subtle)] bg-[var(--bg-subtle)] text-[var(--text-secondary)]'
