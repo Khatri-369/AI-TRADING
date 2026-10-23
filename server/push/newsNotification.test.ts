@@ -6,7 +6,7 @@ import { sendSystemNotification } from '../../src/utils/notifications';
 
 test('stock relevance is article-specific and never falls back to market leaders', () => {
   assert.equal(newsNotificationBody('TCS wins contract', ['TCS', 'TCS']), 'TCS wins contract\nRelated stocks (quote snapshot): Tata Consultancy Services (TCS) — change unavailable');
-  assert.equal(newsNotificationBody('Central bank announces policy'), 'Central bank announces policy\nNo specific stock identified');
+  assert.equal(newsNotificationBody('Central bank announces policy'), 'Central bank announces policy\nNo verified stock ticker linked');
   assert.equal(newsNotificationBody('Microsoft earnings', ['MSFT']), 'Microsoft earnings\nRelated stocks (quote snapshot): Microsoft (MSFT) — change unavailable');
 });
 
@@ -87,4 +87,14 @@ test('missing and stale changes are explicit, while real zero is preserved', () 
   assert.match(body, /Microsoft \(MSFT\) — change unavailable/);
   assert.match(body, /Apple \(AAPL\) — change unavailable/);
   assert.doesNotMatch(body, /3.00%|NaN/);
+});
+
+test('unmapped IPO companies retain their explicit name and listing basis without invented quotes', () => {
+  const headline = 'Fusion CX lists at 5% premium over IPO price after 3.3x subscription';
+  const record = queueHeadline({ id: 'fusion', headline, summary: '', region: 'india', source: 'Business Standard', url: 'https://example.com/fusion', publishedAt: new Date().toISOString(), relatedAssets: [] }, [{ symbol: 'AAPL', changePercent: 2 }]);
+  assert.equal(record.notificationBody, `${headline}\nCompany in headline: Fusion CX — 5% listing premium vs IPO price (reported); live change unavailable`);
+  assert.deepEqual(record.article.relatedAssets, []);
+  assert.doesNotMatch(record.notificationBody!, /AAPL|NIFTY|No specific/);
+  assert.match(newsNotificationBody('Example Ltd debuts at 2.5% discount to issue price'), /Example Ltd — 2.5% listing discount/);
+  assert.equal(newsNotificationBody('Could Example Ltd list at 5% premium over IPO price?'), 'Could Example Ltd list at 5% premium over IPO price?\nNo verified stock ticker linked');
 });

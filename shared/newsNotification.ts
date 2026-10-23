@@ -35,13 +35,24 @@ export function formatStockChange(quote: QuoteLike): string {
   return `${symbol} — change unavailable`;
 }
 
+/** Extract an explicitly named IPO subject, without inventing a ticker or live quote. */
+export function ipoHeadlineContext(headline: string): string | undefined {
+  if (/[?]/.test(headline) || /^(?:could|will|can|may|might|should|would)\b/i.test(headline)) return undefined;
+  const match = headline.match(/^([\p{L}\p{N}][\p{L}\p{N} &'.()-]{0,79}?)\s+(?:lists|listed|debuts|debuted)\s+at\s+(\d+(?:\.\d+)?)%\s+(premium|discount)\s+(?:over|to|against)\s+(?:the\s+)?(?:IPO|issue)\s+price\b/iu);
+  if (!match) return undefined;
+  const [, company, percent, direction] = match;
+  return `Company in headline: ${company} — ${percent}% listing ${direction.toLowerCase()} vs IPO price (reported); live change unavailable`;
+}
+
 /** Article links indicate relevance, not a prediction or proof of price impact. */
 export function newsNotificationBody(headline: string, symbols: string[] = [], quotes: QuoteLike[] = [], region?: 'india' | 'global') {
   const related = [...new Set(symbols.map(symbol => symbol.trim().toUpperCase()).filter(Boolean))];
+  const ipoContext = !related.length ? ipoHeadlineContext(headline) : undefined;
+  if (ipoContext) return `${headline}\n${ipoContext}`;
   // Regional indices provide context, never evidence that an unnamed company was affected.
   const context = !related.length && region === 'india';
   const selected = context ? ['NIFTY50', 'SENSEX'] : related;
-  if (!selected.length) return `${headline}\nNo specific stock identified`;
+  if (!selected.length) return `${headline}\nNo verified stock ticker linked`;
   const quoteMap = new Map(quotes.filter(q => q?.symbol).map(q => [q.symbol.toUpperCase(), q]));
   const formatted = selected.map(symbol => formatStockChange(quoteMap.get(symbol) ?? { symbol }));
   const label = context ? 'Market context (quote snapshot)' : 'Related stocks (quote snapshot)';

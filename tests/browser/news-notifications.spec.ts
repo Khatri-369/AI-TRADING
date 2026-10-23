@@ -37,14 +37,14 @@ test('real news polling delivers in a hidden tab, queues cooldown arrivals and r
   await page.clock.runFor(60_100);
   await expect.poll(() => calls).toBe(3);
   await page.clock.runFor(100);
-  await expect.poll(delivered).toEqual(['Fresh headline 1\nNo specific stock identified']);
+  await expect.poll(delivered).toEqual(['Fresh headline 1\nNo verified stock ticker linked']);
   batch = 2;
   await page.evaluate(() => window.dispatchEvent(new Event('online')));
   await expect.poll(() => calls).toBe(4);
   await page.clock.runFor(100);
   expect(await delivered()).toHaveLength(1);
   await page.clock.runFor(30_100);
-  await expect.poll(delivered).toEqual(['Fresh headline 1\nNo specific stock identified', 'Fresh headline 2\nNo specific stock identified']);
+  await expect.poll(delivered).toEqual(['Fresh headline 1\nNo verified stock ticker linked', 'Fresh headline 2\nNo verified stock ticker linked']);
   await page.evaluate(() => window.dispatchEvent(new Event('online')));
   await expect.poll(() => calls).toBe(5);
   await page.clock.runFor(100);
