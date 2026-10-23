@@ -45,6 +45,7 @@ export interface NewsArticle {
   publishedAt: string;
   summary: string;
   relatedAssets: string[];
+  sentiment?: 'Positive' | 'Negative' | 'Neutral';
 }
 
 export interface NewsResponse {

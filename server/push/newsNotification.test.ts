@@ -98,3 +98,15 @@ test('unmapped IPO companies retain their explicit name and listing basis withou
   assert.match(newsNotificationBody('Example Ltd debuts at 2.5% discount to issue price'), /Example Ltd — 🔴 ▼ 2.5% listing discount/);
   assert.equal(newsNotificationBody('Could Example Ltd list at 5% premium over IPO price?'), 'Could Example Ltd list at 5% premium over IPO price?\nNo verified stock ticker linked');
 });
+
+test('notification body formats stock identification and sentiment', () => {
+  assert.equal(
+    newsNotificationBody('Fusion CX lists at 5% premium over IPO price after 3.3x subscription', [], undefined, undefined, 'Positive'),
+    'Fusion CX lists at 5% premium over IPO price after 3.3x subscription\nCompany in headline: Fusion CX — 🟢 ▲ 5% listing premium vs IPO price (reported); live change unavailable · Sentiment: Positive'
+  );
+  assert.equal(
+    newsNotificationBody('Central bank announces policy', [], undefined, undefined, 'Neutral'),
+    'Central bank announces policy\nNo verified stock ticker linked · Sentiment: Neutral'
+  );
+});
+

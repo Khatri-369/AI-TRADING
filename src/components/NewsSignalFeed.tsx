@@ -387,6 +387,17 @@ export default function NewsSignalFeed({
                         (Read)
                       </span>
                     )}
+                    {article.sentiment && (
+                      <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold ${
+                        article.sentiment === 'Positive'
+                          ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
+                          : article.sentiment === 'Negative'
+                          ? 'bg-rose-500/15 text-rose-400 border border-rose-500/30'
+                          : 'bg-slate-500/15 text-slate-300 border border-slate-500/30'
+                      }`}>
+                        {article.sentiment}
+                      </span>
+                    )}
                   </div>
 
                   <div className="flex items-center gap-1">

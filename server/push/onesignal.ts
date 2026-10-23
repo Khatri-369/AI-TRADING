@@ -122,7 +122,7 @@ export class OneSignalNewsPush {
           filters: [{ field: 'tag', key: 'market_news', relation: '=', value: 'on' }],
           headings: { en: record.notificationTitle ?? `TRADEXA · ${record.article.source}` },
           contents: { en: bodyContent }, url: record.article.url,
-          data: { articleId: record.article.id, publisher: record.article.source, articleUrl: record.article.url, relatedAssets: record.article.relatedAssets },
+          data: { articleId: record.article.id, publisher: record.article.source, articleUrl: record.article.url, relatedAssets: record.article.relatedAssets, sentiment: record.article.sentiment },
           ttl: 86400, priority: 10, idempotency_key: id,
         }),
       });

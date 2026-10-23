@@ -47,16 +47,24 @@ export function ipoHeadlineContext(headline: string): string | undefined {
 }
 
 /** Article links indicate relevance, not a prediction or proof of price impact. */
-export function newsNotificationBody(headline: string, symbols: string[] = [], quotes: QuoteLike[] = [], region?: 'india' | 'global') {
+export function newsNotificationBody(
+  headline: string,
+  symbols: string[] = [],
+  quotes: QuoteLike[] = [],
+  region?: 'india' | 'global',
+  sentiment?: 'Positive' | 'Negative' | 'Neutral'
+) {
   const related = [...new Set(symbols.map(symbol => symbol.trim().toUpperCase()).filter(Boolean))];
+  const sentimentSuffix = sentiment ? ` · Sentiment: ${sentiment}` : '';
   const ipoContext = !related.length ? ipoHeadlineContext(headline) : undefined;
-  if (ipoContext) return `${headline}\n${ipoContext}`;
+  if (ipoContext) return `${headline}\n${ipoContext}${sentimentSuffix}`;
   // Regional indices provide context, never evidence that an unnamed company was affected.
   const context = !related.length && region === 'india';
   const selected = context ? ['NIFTY50', 'SENSEX'] : related;
-  if (!selected.length) return `${headline}\nNo verified stock ticker linked`;
+  if (!selected.length) return `${headline}\nNo verified stock ticker linked${sentimentSuffix}`;
   const quoteMap = new Map(quotes.filter(q => q?.symbol).map(q => [q.symbol.toUpperCase(), q]));
   const formatted = selected.map(symbol => formatStockChange(quoteMap.get(symbol) ?? { symbol }));
   const label = context ? 'Market context (quote snapshot)' : 'Related stocks (quote snapshot)';
-  return `${headline}\n${label}: ${formatted.join(', ')}`;
+  return `${headline}\n${label}: ${formatted.join(', ')}${sentimentSuffix}`;
 }
+

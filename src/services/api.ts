@@ -40,6 +40,7 @@ const newsSchema = z.object({
       relatedAssets: z.array(z.string()),
       region: z.enum(['india', 'global']).optional(),
       stockLinks: z.array(z.object({ symbol: z.string(), basis: z.enum(['provider', 'mention']), evidence: z.string() })).optional(),
+      sentiment: z.enum(['Positive', 'Negative', 'Neutral']).optional(),
     })
   ),
   ...metadata,

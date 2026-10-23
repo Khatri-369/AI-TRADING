@@ -27,6 +27,7 @@ const noticeSchema = z.object({
   read: z.boolean(),
   source: z.string().optional(),
   relatedAssets: z.array(z.string()).optional(),
+  sentiment: z.enum(['Positive', 'Negative', 'Neutral']).optional(),
 });
 const noticesSchema = z.array(noticeSchema);
 
@@ -39,6 +40,7 @@ interface ActiveAlert {
   time: string;
   relatedStocks: Quote[];
   relatedSymbols: string[];
+  sentiment?: 'Positive' | 'Negative' | 'Neutral';
 }
 
 interface Props {
@@ -142,6 +144,7 @@ export default function NewsAlerts({
         time,
         relatedStocks: resolvedStocks,
         relatedSymbols: payload.relatedStocks !== undefined ? payload.relatedStocks.map(stock => stock.symbol) : fallbackArticle.relatedAssets,
+        sentiment: fallbackArticle.sentiment,
       });
 
       // Add to inbox
@@ -153,6 +156,7 @@ export default function NewsAlerts({
           read: false,
           source,
           relatedAssets: resolvedStocks.map((s) => s.symbol),
+          sentiment: fallbackArticle.sentiment,
         };
         const updated = [nextNotice, ...prev.filter((n) => n.id !== id)].slice(0, 20);
         try {
@@ -323,7 +327,7 @@ export default function NewsAlerts({
       setPendingDeviceAlerts(previous => previous.filter(item => item.id !== story.id));
       if (settings.quiet && (currentHour >= 22 || currentHour < 8)) return;
       lastDeviceNotifyTime.current = Date.now();
-      void sendSystemNotification(story.headline, story.source, getRelatedQuotes(story.relatedAssets, quotes), story.id, story.relatedAssets, story.url)
+      void sendSystemNotification(story.headline, story.source, getRelatedQuotes(story.relatedAssets, quotes), story.id, story.relatedAssets, story.url, story.sentiment)
         .then(sent => { if (!sent) setMessage('News arrived in your inbox, but the device notification could not be shown. Check browser notification permissions.'); });
     }, Math.max(0, 30_000 - (Date.now() - lastDeviceNotifyTime.current)));
     return () => clearTimeout(timer);
@@ -365,6 +369,7 @@ export default function NewsAlerts({
       time: topArticle.publishedAt,
       relatedStocks: fallbackRelated,
       relatedSymbols: topArticle.relatedAssets,
+      sentiment: topArticle.sentiment,
     });
 
     // Add to inbox
@@ -377,6 +382,7 @@ export default function NewsAlerts({
           read: false,
           source: topArticle.source,
           relatedAssets: topArticle.relatedAssets,
+          sentiment: topArticle.sentiment,
         },
         ...notices,
       ]);
@@ -390,7 +396,8 @@ export default function NewsAlerts({
         fallbackRelated,
         topArticle.id,
         topArticle.relatedAssets,
-        topArticle.url
+        topArticle.url,
+        topArticle.sentiment
       );
       setMessage('Mobile system & on-screen news alerts enabled!');
     } else {
@@ -422,6 +429,7 @@ export default function NewsAlerts({
       time: topArticle.publishedAt,
       relatedStocks: fallbackRelated,
       relatedSymbols: topArticle.relatedAssets,
+      sentiment: topArticle.sentiment ?? 'Positive',
     });
 
     const isDeviceAllowed =
@@ -433,7 +441,8 @@ export default function NewsAlerts({
         fallbackRelated,
         topArticle.id,
         topArticle.relatedAssets,
-        topArticle.url
+        topArticle.url,
+        topArticle.sentiment ?? 'Positive'
       );
     }
   };
@@ -770,9 +779,22 @@ export default function NewsAlerts({
             {activeAlert.headline}
           </button>
 
-          <p className="mt-2 text-[11px] text-[var(--text-secondary)]">
-            {activeAlert.relatedSymbols.length ? `Related stocks: ${activeAlert.relatedSymbols.join(', ')}` : 'No specific stock identified'}
-          </p>
+          <div className="mt-2 flex flex-wrap items-center justify-between gap-1 text-[11px] text-[var(--text-secondary)]">
+            <span>
+              {activeAlert.relatedSymbols.length ? `Related stocks: ${activeAlert.relatedSymbols.join(', ')}` : 'No specific stock identified'}
+            </span>
+            {activeAlert.sentiment && (
+              <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold ${
+                activeAlert.sentiment === 'Positive'
+                  ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                  : activeAlert.sentiment === 'Negative'
+                  ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30'
+                  : 'bg-slate-500/20 text-slate-300 border border-slate-500/30'
+              }`}>
+                {activeAlert.sentiment}
+              </span>
+            )}
+          </div>
           {/* Quotes are context, not evidence the headline caused the price change. */}
           {activeAlert.relatedStocks.length > 0 && (
             <div className="mt-2.5 flex flex-wrap items-center gap-1.5 pt-2 border-t border-[var(--border-subtle)]">

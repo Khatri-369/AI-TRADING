@@ -48,3 +48,24 @@ test('combined feed does not truncate available headlines at forty per source', 
   const news = await service.news(true);
   assert.equal(news.articles.length, 140);
 });
+
+test('identifies IPO company context and stocks with sentiment analysis', () => {
+  const fusion = enrichNews({
+    ...article,
+    headline: 'Fusion CX lists at 5% premium over IPO price after 3.3x subscription',
+  }, 'india');
+  assert.equal(fusion.sentiment, 'Positive');
+
+  const negative = enrichNews({
+    ...article,
+    headline: 'Ola Electric shares slump 6% amid regulatory probe',
+  }, 'india');
+  assert.ok(negative.relatedAssets.includes('Ola Electric'));
+  assert.equal(negative.sentiment, 'Negative');
+
+  const neutral = enrichNews({
+    ...article,
+    headline: 'RBI monetary policy committee keeps repo rate unchanged',
+  }, 'india');
+  assert.equal(neutral.sentiment, 'Neutral');
+});

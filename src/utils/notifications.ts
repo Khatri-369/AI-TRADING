@@ -87,13 +87,14 @@ export async function sendSystemNotification(
   relatedStocks: Quote[] = [],
   id: string = String(Date.now()),
   relatedSymbols: string[] = relatedStocks.map(stock => stock.symbol),
-  articleUrl: string = '/news'
+  articleUrl: string = '/news',
+  sentiment?: 'Positive' | 'Negative' | 'Neutral'
 ): Promise<boolean> {
   if (typeof window === 'undefined' || typeof Notification === 'undefined') return false;
   if (Notification.permission !== 'granted') return false;
 
   const title = newsNotificationTitle(source, relatedSymbols);
-  const body = newsNotificationBody(headline, relatedSymbols, relatedStocks);
+  const body = newsNotificationBody(headline, relatedSymbols, relatedStocks, undefined, sentiment);
 
   const options: NotificationOptions = {
     body,

@@ -3,6 +3,8 @@ import { XMLParser } from 'fast-xml-parser';
 import { ASSETS, ASSET_BY_SYMBOL } from '../../shared/assets';
 import type { NewsArticle } from '../../shared/types';
 import { fetchBytes, validTime, type Fetcher } from './http';
+import { extractStockEntities, analyzeHeadlineSentiment } from '../../shared/newsSentiment';
+import { ipoHeadlineContext } from '../../shared/newsNotification';
 
 const aliases: Record<string, string[]> = {
   // Indian Equities & Benchmarks
@@ -75,7 +77,25 @@ export function enrichNews(article: NewsArticle, region: 'india' | 'global'): Ne
       (asset.symbol.length >= 3 && !['META', 'SOL', 'XAU', 'XAG', 'BNB'].includes(asset.symbol) && mentions(text, asset.symbol, false));
     if (matched || tickerMatch) links.push({ symbol: asset.symbol, basis: 'mention', evidence: `Mentioned in headline or summary: ${matched ?? asset.symbol}` });
   }
-  return { ...article, region, relatedAssets: [...new Set(links.map(link => link.symbol))], stockLinks: links };
+
+  // Stock identification for companies/IPOs beyond core ASSETS (e.g. Zomato, Swiggy, etc.)
+  // When an IPO headline has listing metrics, ipoHeadlineContext preserves the named company directly without inventing unverified tickers.
+  if (!ipoHeadlineContext(article.headline)) {
+    const additionalEntities = extractStockEntities(text, links.map(link => link.symbol));
+    for (const entity of additionalEntities) {
+      if (!links.some(link => link.symbol.toLowerCase() === entity.symbolOrName.toLowerCase())) {
+        links.push({
+          symbol: entity.symbolOrName,
+          basis: 'mention',
+          evidence: entity.evidence,
+        });
+      }
+    }
+  }
+
+  const sentiment = article.sentiment ?? analyzeHeadlineSentiment(article.headline, article.summary);
+
+  return { ...article, region, relatedAssets: [...new Set(links.map(link => link.symbol))], stockLinks: links, sentiment };
 }
 
 export async function indianMarketNews(fetcher: Fetcher): Promise<NewsArticle[]> {
