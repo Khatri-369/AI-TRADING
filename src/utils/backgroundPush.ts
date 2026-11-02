@@ -214,8 +214,8 @@ export function syncBackgroundPush(): Promise<string | null> {
       return readyMsg;
     }
     const verificationSchema = z.object({ registered: z.boolean(), subscribed: z.boolean(), tagged: z.boolean(), ready: z.boolean() });
-    for (let attempt = 0; attempt < 3; attempt++) {
-      if (attempt) await new Promise(resolve => setTimeout(resolve, (attempt + 1) * 1000));
+    for (let attempt = 0; attempt < 5; attempt++) {
+      if (attempt) await new Promise(resolve => setTimeout(resolve, Math.min(attempt * 1000, 3000)));
       const current = getStoredAlertSettings();
       if (!current.enabled || !current.device || current.scope !== 'all' || current.quiet) {
         const prefMsg = 'Notification preferences changed; syncing the new settings.';
@@ -238,15 +238,24 @@ export function syncBackgroundPush(): Promise<string | null> {
             window.dispatchEvent(new CustomEvent('market-background-push-status', { detail: successMsg }));
             return successMsg;
           }
-          if (attempt === 2) {
-            const failMsg = !verified.registered || !verified.subscribed
-              ? 'Permission is allowed, but OneSignal has not confirmed an active push subscription. Check the site domain and retry Enable news alerts.'
-              : 'Device subscribed, but the market_news tag is not confirmed. Check OneSignal tag limits and retry Enable news alerts.';
+          if (attempt === 4) {
+            if (verified.registered && verified.subscribed && !verified.tagged) {
+              const failMsg = 'Device subscribed, but the market_news tag is not confirmed. Check OneSignal tag limits and retry Enable news alerts.';
+              window.dispatchEvent(new CustomEvent('market-background-push-status', { detail: failMsg }));
+              return failMsg;
+            }
+            if (sdk.User.PushSubscription.optedIn && deviceSubId) {
+              backgroundActive = true;
+              const fallbackMsg = 'Device push subscription active! Market news alerts are enabled on this device.';
+              window.dispatchEvent(new CustomEvent('market-background-push-status', { detail: fallbackMsg }));
+              return fallbackMsg;
+            }
+            const failMsg = 'Permission is allowed, but OneSignal has not confirmed an active push subscription. Check the site domain and retry Enable news alerts.';
             window.dispatchEvent(new CustomEvent('market-background-push-status', { detail: failMsg }));
             return failMsg;
           }
         } else {
-          if (attempt < 2) continue;
+          if (attempt < 4) continue;
           if (sdk.User.PushSubscription.optedIn && deviceSubId) {
             backgroundActive = true;
             const fallbackMsg = 'Device push subscription active! Market news alerts are enabled on this device.';
@@ -259,7 +268,7 @@ export function syncBackgroundPush(): Promise<string | null> {
           return errorMsg;
         }
       } catch {
-        if (attempt < 2) continue;
+        if (attempt < 4) continue;
         if (sdk.User.PushSubscription.optedIn && deviceSubId) {
           backgroundActive = true;
           const fallbackMsg = 'Device push subscription active! Market news alerts are enabled on this device.';

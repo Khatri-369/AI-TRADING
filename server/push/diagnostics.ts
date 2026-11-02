@@ -7,15 +7,15 @@ export const deviceCheckSchema = z.object({
 
 const userSchema = z.object({
   properties: z.object({
-    tags: z.record(z.string(), z.union([z.string(), z.number(), z.boolean()])).optional(),
-  }).passthrough().optional(),
+    tags: z.record(z.string(), z.union([z.string(), z.number(), z.boolean()])).nullish(),
+  }).passthrough().nullish(),
   subscriptions: z.array(z.object({
-    id: z.string().optional(),
-    app_id: z.string().optional(),
-    type: z.string().optional(),
-    enabled: z.boolean().optional(),
-    token: z.string().optional(),
-    notification_types: z.number().optional(),
+    id: z.string().nullish(),
+    app_id: z.string().nullish(),
+    type: z.string().nullish(),
+    enabled: z.boolean().nullish(),
+    token: z.string().nullish(),
+    notification_types: z.number().nullish(),
   }).passthrough()).default([]),
 }).passthrough();
 
@@ -27,24 +27,28 @@ export function summarizeDevice(raw: unknown, appId: string, subscriptionId: str
   const data = parsed.data;
   const subLower = subscriptionId.toLowerCase();
   const subscription =
-    data.subscriptions.find(item => item.id?.toLowerCase() === subLower && (!item.app_id || item.app_id === appId)) ??
+    data.subscriptions.find(item => item.id?.toLowerCase() === subLower && (!item.app_id || item.app_id.toLowerCase() === appId.toLowerCase())) ??
     (subscriptionId !== 'unknown'
       ? data.subscriptions.find(
           item =>
-            (!item.app_id || item.app_id === appId) &&
-            Boolean(item.type?.toLowerCase().endsWith('push')) &&
+            (!item.app_id || item.app_id.toLowerCase() === appId.toLowerCase()) &&
+            item.type?.toLowerCase() !== 'email' &&
+            item.type?.toLowerCase() !== 'sms' &&
             item.enabled !== false &&
-            (item.notification_types === undefined || item.notification_types > 0)
+            (item.notification_types === undefined || item.notification_types === null || item.notification_types > 0)
         )
       : undefined);
-  const isPush = Boolean(subscription?.type && subscription.type.toLowerCase().endsWith('push'));
+  const isPush = Boolean(
+    subscription?.type &&
+    subscription.type.toLowerCase() !== 'email' &&
+    subscription.type.toLowerCase() !== 'sms'
+  );
   const registered = Boolean(subscription && isPush);
   const subscribed = Boolean(
     subscription &&
       subscription.enabled !== false &&
       isPush &&
-      (subscription.token === undefined || Boolean(subscription.token)) &&
-      (subscription.notification_types === undefined || subscription.notification_types > 0)
+      (subscription.notification_types === undefined || subscription.notification_types === null || subscription.notification_types > 0)
   );
   const tagVal = data.properties?.tags?.market_news;
   const tagged = tagVal === 'on' || tagVal === '1' || tagVal === true || tagVal === 'true';
