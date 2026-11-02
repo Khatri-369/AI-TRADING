@@ -16,13 +16,12 @@ import {
 import type { AnalysisEntry, Engine, NewsArticle, NewsResponse, Quote } from '../types/market';
 import { analysisKey } from '../hooks/useAIAnalysis';
 import { safeArticleUrl } from '../services/api';
-import { formatTime, formatPercent } from '../utils/format';
+import { formatTime } from '../utils/format';
 import { Empty, ErrorNotice, Loading, NewsFeedSkeleton } from './Feedback';
 import AnalysisResult from './AnalysisResult';
 import StatusBadge from './StatusBadge';
 import { useWatchlist } from '../hooks/useWatchlist';
 import { useRouter } from '../utils/router';
-import AssetIcon from './AssetIcon';
 import StockBadge from './StockBadge';
 import { normalizeStockSymbol } from '../utils/stockDisplay';
 

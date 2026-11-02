@@ -1,11 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
-import { Bell, X, Check, Sparkles, TrendingUp, TrendingDown, Play } from 'lucide-react';
+import { Bell, X, Check, Sparkles, Play } from 'lucide-react';
 import { z } from 'zod';
 import type { NewsArticle, Quote } from '../types/market';
 import { useWatchlist } from '../hooks/useWatchlist';
-import { formatPercent } from '../utils/format';
 import { hasActiveBackgroundPush, syncBackgroundPush } from '../utils/backgroundPush';
-import AssetIcon from './AssetIcon';
 import StockBadge from './StockBadge';
 
 import {

@@ -18,13 +18,11 @@ export default function StockBadge({
   quote,
   onClick,
   title,
-  size = 'md',
+  size: _size = 'md',
   className = '',
 }: StockBadgeProps) {
   const data = getStockBadgeData(symbol, quote);
   const isGain = data.isGain;
-  const isLoss = data.hasChange && !isGain;
-  const isFlat = data.hasChange && data.changePercentFormatted?.includes('0.00%');
 
   // Badge styling matching green/red trend
   const colorClasses = data.hasChange
@@ -40,6 +38,7 @@ export default function StockBadge({
       type="button"
       onClick={onClick}
       disabled={!onClick}
+      aria-label={data.symbol}
       title={defaultTitle}
       className={`group inline-flex flex-wrap items-center gap-1.5 rounded-lg border px-2.5 py-1 font-mono transition text-left cursor-pointer min-h-[32px] ${colorClasses} ${className}`}
     >

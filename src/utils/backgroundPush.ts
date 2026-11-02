@@ -239,12 +239,6 @@ export function syncBackgroundPush(): Promise<string | null> {
             return successMsg;
           }
           if (attempt === 2) {
-            if (sdk.User.PushSubscription.optedIn) {
-              backgroundActive = true;
-              const activeMsg = 'Device push subscription active! Market news alerts are enabled on this device.';
-              window.dispatchEvent(new CustomEvent('market-background-push-status', { detail: activeMsg }));
-              return activeMsg;
-            }
             const failMsg = !verified.registered || !verified.subscribed
               ? 'Permission is allowed, but OneSignal has not confirmed an active push subscription. Check the site domain and retry Enable news alerts.'
               : 'Device subscribed, but the market_news tag is not confirmed. Check OneSignal tag limits and retry Enable news alerts.';
