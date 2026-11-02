@@ -729,34 +729,21 @@ export default function NewsSignalFeed({
         </div>
       )}
 
-      {/* Floating Scroll-Up and Action Pill */}
+      {/* Floating Scroll-Up Button */}
       {showScrollActions && (
         <div
           role="region"
-          aria-label="Quick scroll and trading controls"
-          className="fixed bottom-20 left-1/2 -translate-x-1/2 z-40 flex items-center gap-2 rounded-full border border-[var(--border-default)] bg-[var(--bg-surface)]/95 px-3 py-1.5 shadow-2xl backdrop-blur-md animate-in fade-in slide-in-from-bottom-3 duration-200"
+          aria-label="Quick scroll controls"
+          className="fixed bottom-20 left-1/2 -translate-x-1/2 z-40 flex items-center rounded-full border border-[var(--border-default)] bg-[var(--bg-surface)]/95 p-1 shadow-2xl backdrop-blur-md animate-in fade-in slide-in-from-bottom-3 duration-200"
         >
           <button
             type="button"
             onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold bg-blue-600 hover:bg-blue-500 text-white shadow-md active:scale-95 transition"
+            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full text-xs font-bold bg-blue-600 hover:bg-blue-500 text-white shadow-md active:scale-95 transition"
             title="Scroll up to top of feed"
           >
             <ArrowUp size={14} />
             <span>Scroll Up</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => setFeedFilter((prev) => (prev === 'bearish' ? 'all' : 'bearish'))}
-            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold shadow-md active:scale-95 transition ${
-              feedFilter === 'bearish'
-                ? 'bg-rose-700 text-white ring-2 ring-rose-400'
-                : 'bg-rose-600 hover:bg-rose-500 text-white'
-            }`}
-            title="Toggle bearish news"
-          >
-            <TrendingDown size={14} />
-            <span>{feedFilter === 'bearish' ? 'All Stories' : 'Bearish (Sell)'}</span>
           </button>
         </div>
       )}
