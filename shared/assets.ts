@@ -35,6 +35,8 @@ export const ASSETS: Asset[] = [
   { symbol: 'TITAN', name: 'Titan Company', category: 'india', currency: 'INR', sector: 'Consumer discretionary' },
   { symbol: 'ULTRACEMCO', name: 'UltraTech Cement', category: 'india', currency: 'INR', sector: 'Materials' },
   { symbol: 'POWERGRID', name: 'Power Grid Corporation', category: 'india', currency: 'INR', sector: 'Utilities' },
+  { symbol: 'INDIGO', name: 'InterGlobe Aviation (IndiGo)', category: 'india', currency: 'INR', sector: 'Aviation' },
+  { symbol: 'POLICYBZR', name: 'PB Fintech (Policybazaar)', category: 'india', currency: 'INR', sector: 'Fintech' },
   { symbol: 'BTC', name: 'Bitcoin', category: 'crypto', currency: 'USD' },
   { symbol: 'ETH', name: 'Ethereum', category: 'crypto', currency: 'USD' },
   { symbol: 'BNB', name: 'BNB', category: 'crypto', currency: 'USD' },

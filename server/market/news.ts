@@ -31,6 +31,8 @@ const aliases: Record<string, string[]> = {
   ULTRACEMCO: ['UltraTech Cement', 'UltraTech'],
   POWERGRID: ['Power Grid Corporation', 'Power Grid', 'PowerGrid'],
   NTPC: ['NTPC Ltd'],
+  INDIGO: ['IndiGo', 'InterGlobe Aviation', 'Indigo Airlines', 'Interglobe'],
+  POLICYBZR: ['PB Fintech', 'Policybazaar', 'Policy Bazaar', 'PBFintech'],
 
   // US Equities & Benchmarks
   SPY: ['S&P 500', 'S&P500', 'SP500', 'Wall Street', 'S&P index'],

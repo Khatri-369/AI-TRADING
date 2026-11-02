@@ -14,9 +14,19 @@ export interface StockBadgeData {
   currency: string;
 }
 
-export function getStockDisplayName(symbol: string): string {
+export function normalizeStockSymbol(symbol: string): string {
   if (!symbol) return '';
   const clean = symbol.trim().toUpperCase();
+  if (clean === 'PB FINTECH' || clean === 'PBFINTECH' || clean === 'POLICYBAZAAR') return 'POLICYBZR';
+  if (clean === 'INTERGLOBE' || clean === 'INTERGLOBE AVIATION') return 'INDIGO';
+  return clean;
+}
+
+export function getStockDisplayName(symbol: string): string {
+  if (!symbol) return '';
+  const clean = normalizeStockSymbol(symbol);
+  if (clean === 'POLICYBZR') return 'PB Fintech (Policybazaar)';
+  if (clean === 'INDIGO') return 'InterGlobe Aviation (IndiGo)';
   const asset = ASSET_BY_SYMBOL.get(clean);
   if (asset?.name) return asset.name;
   const aliases = EXPANDED_STOCK_ALIASES[clean];
@@ -29,7 +39,7 @@ export function getStockDisplayName(symbol: string): string {
 }
 
 export function getStockBadgeData(symbol: string, quote?: Quote | null): StockBadgeData {
-  const cleanSymbol = symbol.trim().toUpperCase();
+  const cleanSymbol = normalizeStockSymbol(symbol);
   const name = getStockDisplayName(cleanSymbol);
   const isIndian =
     cleanSymbol.endsWith('.BSE') ||

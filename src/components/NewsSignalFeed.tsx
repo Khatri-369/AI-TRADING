@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import {
   ExternalLink,
   Newspaper,
@@ -11,6 +11,7 @@ import {
   HelpCircle,
   TrendingUp,
   TrendingDown,
+  ArrowUp,
 } from 'lucide-react';
 import type { AnalysisEntry, Engine, NewsArticle, NewsResponse, Quote } from '../types/market';
 import { analysisKey } from '../hooks/useAIAnalysis';
@@ -23,6 +24,7 @@ import { useWatchlist } from '../hooks/useWatchlist';
 import { useRouter } from '../utils/router';
 import AssetIcon from './AssetIcon';
 import StockBadge from './StockBadge';
+import { normalizeStockSymbol } from '../utils/stockDisplay';
 
 interface Props {
   data: NewsResponse | null;
@@ -85,10 +87,19 @@ export default function NewsSignalFeed({
     }
     return map;
   }, [quotes]);
-  const [feedFilter, setFeedFilter] = useState<'all' | 'watchlist' | 'saved'>('all');
+  const [feedFilter, setFeedFilter] = useState<'all' | 'watchlist' | 'saved' | 'bullish' | 'bearish'>('all');
   const [region, setRegion] = useState<'all' | 'india' | 'global'>('all');
   const [expandedWhy, setExpandedWhy] = useState<Record<string, boolean>>({});
   const [shareToast, setShareToast] = useState('');
+  const [showScrollActions, setShowScrollActions] = useState(false);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      setShowScrollActions(window.scrollY > 150);
+    };
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
 
   // Persisted saved bookmarks
   const [savedIds, setSavedIds] = useState<string[]>(() => {
@@ -217,6 +228,20 @@ export default function NewsSignalFeed({
       return article.relatedAssets.some((sym) => watchlistSymbols.includes(sym));
     }
 
+    if (feedFilter === 'bullish') {
+      return (
+        article.sentiment === 'Positive' ||
+        /\b(?:surges|jumps|rallies|climbs|gains|up|profit|soars|record|higher|boost|jump)\b/i.test(article.headline)
+      );
+    }
+
+    if (feedFilter === 'bearish') {
+      return (
+        article.sentiment === 'Negative' ||
+        /\b(?:slumps|tanks|drops|falls|plunges|down|losses|deficit|declines|lower|sink|dips)\b/i.test(article.headline)
+      );
+    }
+
     return true;
   });
 
@@ -273,16 +298,16 @@ export default function NewsSignalFeed({
         </select>
         <span>Related stocks are provider links or company mentions—not confirmed price effects.</span>
       </label>
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--border-subtle)] pb-2.5">
+      <div className="sticky top-14 sm:top-16 z-20 -mx-2 sm:-mx-4 px-2 sm:px-4 py-2 bg-[var(--bg-surface)]/95 backdrop-blur-md border-b border-[var(--border-subtle)] shadow-xs flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar w-full sm:w-auto" role="tablist">
           <button
             type="button"
             role="tab"
             aria-selected={feedFilter === 'all'}
             onClick={() => setFeedFilter('all')}
-            className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition min-h-[36px] ${
+            className={`rounded-lg px-3 py-1.5 text-xs font-bold transition min-h-[36px] ${
               feedFilter === 'all'
-                ? 'bg-[var(--accent-primary)] text-white'
+                ? 'bg-blue-600 text-white shadow-xs'
                 : 'bg-[var(--bg-subtle)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
             }`}
           >
@@ -291,11 +316,39 @@ export default function NewsSignalFeed({
           <button
             type="button"
             role="tab"
+            aria-selected={feedFilter === 'bullish'}
+            onClick={() => setFeedFilter('bullish')}
+            className={`rounded-lg px-3 py-1.5 text-xs font-bold transition min-h-[36px] flex items-center gap-1 ${
+              feedFilter === 'bullish'
+                ? 'bg-emerald-600 text-white shadow-xs'
+                : 'bg-[var(--bg-subtle)] text-emerald-400 hover:text-emerald-300'
+            }`}
+          >
+            <TrendingUp size={12} />
+            <span>Bullish</span>
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={feedFilter === 'bearish'}
+            onClick={() => setFeedFilter('bearish')}
+            className={`rounded-lg px-3 py-1.5 text-xs font-bold transition min-h-[36px] flex items-center gap-1 ${
+              feedFilter === 'bearish'
+                ? 'bg-rose-600 text-white shadow-xs'
+                : 'bg-[var(--bg-subtle)] text-rose-400 hover:text-rose-300'
+            }`}
+          >
+            <TrendingDown size={12} />
+            <span>Bearish</span>
+          </button>
+          <button
+            type="button"
+            role="tab"
             aria-selected={feedFilter === 'watchlist'}
             onClick={() => setFeedFilter('watchlist')}
-            className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition min-h-[36px] ${
+            className={`rounded-lg px-3 py-1.5 text-xs font-bold transition min-h-[36px] ${
               feedFilter === 'watchlist'
-                ? 'bg-[var(--accent-primary)] text-white'
+                ? 'bg-blue-600 text-white shadow-xs'
                 : 'bg-[var(--bg-subtle)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
             }`}
           >
@@ -306,9 +359,9 @@ export default function NewsSignalFeed({
             role="tab"
             aria-selected={feedFilter === 'saved'}
             onClick={() => setFeedFilter('saved')}
-            className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition min-h-[36px] flex items-center gap-1 ${
+            className={`rounded-lg px-3 py-1.5 text-xs font-bold transition min-h-[36px] flex items-center gap-1 ${
               feedFilter === 'saved'
-                ? 'bg-[var(--accent-primary)] text-white'
+                ? 'bg-blue-600 text-white shadow-xs'
                 : 'bg-[var(--bg-subtle)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
             }`}
           >
@@ -487,11 +540,32 @@ export default function NewsSignalFeed({
                 <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-[var(--border-subtle)] pt-2.5">
                   <div className="flex flex-wrap items-center gap-1.5">
                     {(() => {
-                      const displaySymbols = article.relatedAssets.length > 0
-                        ? article.relatedAssets
-                        : article.region === 'india'
-                        ? ['NIFTY50', 'SENSEX']
-                        : [];
+                      const rawSymbols = [...article.relatedAssets];
+                      const text = `${article.headline} ${article.summary ?? ''}`;
+                      if (/\bindigo\b/i.test(text) && !rawSymbols.some((s) => s.toUpperCase() === 'INDIGO')) {
+                        rawSymbols.unshift('INDIGO');
+                      }
+                      if (
+                        /\b(?:pb fintech|policybazaar)\b/i.test(text) &&
+                        !rawSymbols.some((s) => s.toUpperCase() === 'POLICYBZR')
+                      ) {
+                        rawSymbols.unshift('POLICYBZR');
+                      }
+
+                      const normalized = rawSymbols.map((s) => normalizeStockSymbol(s));
+                      const specificStocks = normalized.filter(
+                        (s) => !['NIFTY50', 'SENSEX', 'BANKNIFTY', 'SPY', 'QQQ', 'DIA'].includes(s.toUpperCase())
+                      );
+
+                      const displaySymbols =
+                        specificStocks.length > 0
+                          ? Array.from(new Set(specificStocks))
+                          : normalized.length > 0
+                          ? Array.from(new Set(normalized))
+                          : article.region === 'india'
+                          ? ['NIFTY50', 'SENSEX']
+                          : [];
+
                       return displaySymbols.length > 0 ? (
                         displaySymbols.map((sym) => (
                           <StockBadge
@@ -502,7 +576,10 @@ export default function NewsSignalFeed({
                               localStorage.setItem('last_chart_symbol', sym);
                               navigate(`/desk?symbol=${encodeURIComponent(sym)}`);
                             }}
-                            title={`${article.stockLinks?.find((link) => link.symbol === sym)?.evidence ?? 'Linked market instrument'}. Open ${sym} chart.`}
+                            title={`${
+                              article.stockLinks?.find((link) => link.symbol === sym)?.evidence ??
+                              'Linked market instrument'
+                            }. Open ${sym} chart.`}
                           />
                         ))
                       ) : (
@@ -511,7 +588,69 @@ export default function NewsSignalFeed({
                     })()}
                   </div>
 
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
+                    {/* Blue Buy & Red Sell quick action buttons for the linked stock */}
+                    {(() => {
+                      const rawSymbols = [...article.relatedAssets];
+                      const text = `${article.headline} ${article.summary ?? ''}`;
+                      if (/\bindigo\b/i.test(text) && !rawSymbols.some((s) => s.toUpperCase() === 'INDIGO')) {
+                        rawSymbols.unshift('INDIGO');
+                      }
+                      if (
+                        /\b(?:pb fintech|policybazaar)\b/i.test(text) &&
+                        !rawSymbols.some((s) => s.toUpperCase() === 'POLICYBZR')
+                      ) {
+                        rawSymbols.unshift('POLICYBZR');
+                      }
+                      const specific = rawSymbols
+                        .map((s) => normalizeStockSymbol(s))
+                        .filter(
+                          (s) =>
+                            !['NIFTY50', 'SENSEX', 'BANKNIFTY', 'SPY', 'QQQ', 'DIA'].includes(s.toUpperCase())
+                        );
+                      const primaryStock =
+                        specific[0] ||
+                        (rawSymbols.length === 1 &&
+                        !['NIFTY50', 'SENSEX', 'BANKNIFTY'].includes(rawSymbols[0].toUpperCase())
+                          ? rawSymbols[0]
+                          : null);
+
+                      if (!primaryStock) return null;
+
+                      return (
+                        <div className="flex items-center gap-1">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              localStorage.setItem('last_chart_symbol', primaryStock);
+                              navigate(
+                                `/desk?symbol=${encodeURIComponent(primaryStock)}&tab=Practice&side=buy`
+                              );
+                            }}
+                            className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-bold bg-blue-600 hover:bg-blue-500 text-white shadow-xs transition active:scale-95"
+                            title={`Simulate Buy ${primaryStock}`}
+                          >
+                            <TrendingUp size={11} />
+                            <span>Buy {primaryStock}</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              localStorage.setItem('last_chart_symbol', primaryStock);
+                              navigate(
+                                `/desk?symbol=${encodeURIComponent(primaryStock)}&tab=Practice&side=sell`
+                              );
+                            }}
+                            className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-bold bg-rose-600 hover:bg-rose-500 text-white shadow-xs transition active:scale-95"
+                            title={`Simulate Sell ${primaryStock}`}
+                          >
+                            <TrendingDown size={11} />
+                            <span>Sell</span>
+                          </button>
+                        </div>
+                      );
+                    })()}
+
                     {/* "Why this may matter" Toggle */}
                     <button
                       type="button"
@@ -587,6 +726,38 @@ export default function NewsSignalFeed({
               </article>
             );
           })}
+        </div>
+      )}
+
+      {/* Floating Scroll-Up and Action Pill */}
+      {showScrollActions && (
+        <div
+          role="region"
+          aria-label="Quick scroll and trading controls"
+          className="fixed bottom-20 left-1/2 -translate-x-1/2 z-40 flex items-center gap-2 rounded-full border border-[var(--border-default)] bg-[var(--bg-surface)]/95 px-3 py-1.5 shadow-2xl backdrop-blur-md animate-in fade-in slide-in-from-bottom-3 duration-200"
+        >
+          <button
+            type="button"
+            onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold bg-blue-600 hover:bg-blue-500 text-white shadow-md active:scale-95 transition"
+            title="Scroll up to top of feed"
+          >
+            <ArrowUp size={14} />
+            <span>Scroll Up</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setFeedFilter((prev) => (prev === 'bearish' ? 'all' : 'bearish'))}
+            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold shadow-md active:scale-95 transition ${
+              feedFilter === 'bearish'
+                ? 'bg-rose-700 text-white ring-2 ring-rose-400'
+                : 'bg-rose-600 hover:bg-rose-500 text-white'
+            }`}
+            title="Toggle bearish news"
+          >
+            <TrendingDown size={14} />
+            <span>{feedFilter === 'bearish' ? 'All Stories' : 'Bearish (Sell)'}</span>
+          </button>
         </div>
       )}
 

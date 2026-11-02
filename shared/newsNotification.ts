@@ -19,7 +19,8 @@ export function newsNotificationTitle(publisher: string, symbols: string[] = [])
 }
 
 export function formatStockChange(quote: QuoteLike): string {
-  const ticker = quote.symbol.trim().toUpperCase();
+  const rawTicker = quote.symbol.trim().toUpperCase();
+  const ticker = rawTicker === 'PB FINTECH' || rawTicker === 'PBFINTECH' ? 'POLICYBZR' : rawTicker === 'INTERGLOBE' ? 'INDIGO' : rawTicker;
   const name = ASSET_BY_SYMBOL.get(ticker)?.name || EXPANDED_STOCK_ALIASES[ticker]?.[0];
   const symbol = name && name !== ticker ? `${name} (${ticker})` : ticker;
   if (quote.status === 'unavailable' || quote.status === 'stale') return `${symbol} — change unavailable`;

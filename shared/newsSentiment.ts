@@ -54,7 +54,8 @@ export const EXPANDED_STOCK_ALIASES: Record<string, string[]> = {
   BSE: ['BSE Ltd'],
   MCX: ['Multi Commodity Exchange', 'MCX'],
   NYKAA: ['FSN E-Commerce', 'Nykaa'],
-  POLICYBZR: ['PB Fintech', 'Policybazaar'],
+  POLICYBZR: ['PB Fintech', 'Policybazaar', 'Policy Bazaar', 'PBFintech'],
+  INDIGO: ['IndiGo', 'InterGlobe Aviation', 'Indigo Airlines', 'Interglobe'],
   DELHIVERY: ['Delhivery'],
   YESBANK: ['Yes Bank'],
   IDFCFIRSTB: ['IDFC First Bank'],
@@ -117,7 +118,7 @@ export function extractStockEntities(text: string, existingSymbols: string[] = [
   // 2. Syntactic entity extraction for IPOs and breaking stock news:
   // e.g. "Fusion CX lists at 5% premium...", "Acme Corp shares rally...", "Nova Tech IPO opens..."
   const leadMatch = text.match(
-    /^([A-Z][A-Za-z0-9&.'\s-]{1,35}?)\s+(?:lists|debuts|files for IPO|IPO|shares|stock|stocks|rallies|surges|jumps|tanks|plunges|falls|slips|gains|reports|posts|bags|wins|secures|announces|to raise|to acquire|to buy)\b/i
+    /^([A-Z][A-Za-z0-9&.'\s-]{1,35}?)\s+(?:lists|debuts|files for IPO|IPO|shares|stock|stocks|rallies|surges|jumps|tanks|plunges|falls|slips|gains|reports|posts|bags|wins|secures|announces|to raise|to acquire|to buy|up|down|rises|climbs|drops|soars|zooms|dips)\b/i
   );
   if (leadMatch && leadMatch[1]) {
     const rawCandidate = leadMatch[1].trim();
