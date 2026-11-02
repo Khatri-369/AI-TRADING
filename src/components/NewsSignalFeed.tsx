@@ -22,6 +22,7 @@ import StatusBadge from './StatusBadge';
 import { useWatchlist } from '../hooks/useWatchlist';
 import { useRouter } from '../utils/router';
 import AssetIcon from './AssetIcon';
+import StockBadge from './StockBadge';
 
 interface Props {
   data: NewsResponse | null;
@@ -485,42 +486,29 @@ export default function NewsSignalFeed({
                 {/* Footer: Related Instrument Chips with Direct Chart Links & Why this matters */}
                 <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-[var(--border-subtle)] pt-2.5">
                   <div className="flex flex-wrap items-center gap-1.5">
-                    {article.relatedAssets.length > 0 ? (
-                      article.relatedAssets.map((sym) => {
-                        const q = quotesMap.get(sym.toUpperCase());
-                        const hasChange = q?.changePercent !== null && q?.changePercent !== undefined;
-                        const isGain = (q?.changePercent ?? 0) >= 0;
-                        return (
-                          <button
+                    {(() => {
+                      const displaySymbols = article.relatedAssets.length > 0
+                        ? article.relatedAssets
+                        : article.region === 'india'
+                        ? ['NIFTY50', 'SENSEX']
+                        : [];
+                      return displaySymbols.length > 0 ? (
+                        displaySymbols.map((sym) => (
+                          <StockBadge
                             key={sym}
-                            type="button"
+                            symbol={sym}
+                            quote={quotesMap.get(sym.toUpperCase())}
                             onClick={() => {
                               localStorage.setItem('last_chart_symbol', sym);
                               navigate(`/desk?symbol=${encodeURIComponent(sym)}`);
                             }}
-                            className={`inline-flex items-center gap-1.5 rounded-md border px-2 py-1 font-mono text-[11px] font-medium transition min-h-[32px] cursor-pointer ${
-                              hasChange
-                                ? isGain
-                                  ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20'
-                                  : 'border-rose-500/30 bg-rose-500/10 text-rose-400 hover:bg-rose-500/20'
-                                : 'border-[var(--border-default)] bg-[var(--bg-subtle)] text-[var(--text-primary)] hover:border-[var(--accent-primary)] hover:text-[var(--accent-text)]'
-                            }`}
-                            title={`${article.stockLinks?.find(link => link.symbol === sym)?.evidence ?? 'Linked by news provider'}. Open ${sym} chart.`}
-                          >
-                            <AssetIcon symbol={sym} size="xs" />
-                            <span className="font-bold">{sym}</span>
-                            {hasChange && (
-                              <span className="inline-flex items-center gap-0.5 text-[10px] font-bold">
-                                {isGain ? <TrendingUp className="h-2.5 w-2.5" /> : <TrendingDown className="h-2.5 w-2.5" />}
-                                {formatPercent(q.changePercent)}
-                              </span>
-                            )}
-                          </button>
-                        );
-                      })
-                    ) : (
-                      <span className="text-[11px] text-[var(--text-muted)]">Macro context</span>
-                    )}
+                            title={`${article.stockLinks?.find((link) => link.symbol === sym)?.evidence ?? 'Linked market instrument'}. Open ${sym} chart.`}
+                          />
+                        ))
+                      ) : (
+                        <span className="text-[11px] text-[var(--text-muted)]">Macro market context</span>
+                      );
+                    })()}
                   </div>
 
                   <div className="flex items-center gap-2">

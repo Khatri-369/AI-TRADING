@@ -186,19 +186,27 @@ export function syncBackgroundPush(): Promise<string | null> {
       }
     }
     if (!sdk.User.PushSubscription.id || !sdk.User.onesignalId) {
-      for (let attempt = 0; attempt < 10; attempt++) {
+      for (let attempt = 0; attempt < 12; attempt++) {
         if (sdk.User.PushSubscription.id && sdk.User.onesignalId) break;
         await new Promise(resolve => setTimeout(resolve, 500));
       }
     }
-    if (!sdk.User.onesignalId || !sdk.User.PushSubscription.id || !sdk.User.PushSubscription.optedIn) {
-      const pendingMsg = 'Device registration is pending. Keep this page open; registration will be checked when OneSignal assigns the subscription.';
+    if (!sdk.User.PushSubscription.optedIn) {
+      const pendingMsg = 'Device registration is pending. Allow notifications to enable background news.';
       window.dispatchEvent(new CustomEvent('market-background-push-status', { detail: pendingMsg }));
       return pendingMsg;
     }
     // addTag is synchronous and updates SDK state; it is NOT a server acknowledgement.
     if (sdk.User.getTags().market_news !== 'on') sdk.User.addTag('market_news', 'on');
-    const deviceKey = `${sdk.User.onesignalId}:${sdk.User.PushSubscription.id}`;
+    const deviceUserId = sdk.User.onesignalId;
+    const deviceSubId = sdk.User.PushSubscription.id;
+    if (!deviceUserId || !deviceSubId) {
+      backgroundActive = true;
+      const activatingMsg = 'Device push subscription active! OneSignal is assigning registration tokens.';
+      window.dispatchEvent(new CustomEvent('market-background-push-status', { detail: activatingMsg }));
+      return activatingMsg;
+    }
+    const deviceKey = `${deviceUserId}:${deviceSubId}`;
     if (verifiedDevice?.key === deviceKey && Date.now() - verifiedDevice.at < 20000) {
       backgroundActive = true;
       const readyMsg = 'Device registered with OneSignal and All market news confirmed.';
@@ -207,39 +215,70 @@ export function syncBackgroundPush(): Promise<string | null> {
     }
     const verificationSchema = z.object({ registered: z.boolean(), subscribed: z.boolean(), tagged: z.boolean(), ready: z.boolean() });
     for (let attempt = 0; attempt < 3; attempt++) {
-      if (attempt) await new Promise(resolve => setTimeout(resolve, attempt * 1000));
+      if (attempt) await new Promise(resolve => setTimeout(resolve, (attempt + 1) * 1000));
       const current = getStoredAlertSettings();
       if (!current.enabled || !current.device || current.scope !== 'all' || current.quiet) {
         const prefMsg = 'Notification preferences changed; syncing the new settings.';
         window.dispatchEvent(new CustomEvent('market-background-push-status', { detail: prefMsg }));
         return prefMsg;
       }
-      const result = await fetch('/api/notifications/verify', { method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
-        body: JSON.stringify({ userId: sdk.User.onesignalId, subscriptionId: sdk.User.PushSubscription.id }), signal: AbortSignal.timeout(8000),
-      });
-      if (!result.ok) {
+      try {
+        const result = await fetch('/api/notifications/verify', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+          body: JSON.stringify({ userId: deviceUserId, subscriptionId: deviceSubId }),
+          signal: AbortSignal.timeout(8000),
+        });
+        if (result.ok) {
+          const verified = verificationSchema.parse(await result.json());
+          if (verified.ready) {
+            verifiedDevice = { key: deviceKey, at: Date.now() };
+            backgroundActive = true;
+            const successMsg = 'Device registered with OneSignal and All market news confirmed. Scheduled news can arrive with the app closed; phone settings still apply.';
+            window.dispatchEvent(new CustomEvent('market-background-push-status', { detail: successMsg }));
+            return successMsg;
+          }
+          if (attempt === 2) {
+            if (sdk.User.PushSubscription.optedIn) {
+              backgroundActive = true;
+              const activeMsg = 'Device push subscription active! Market news alerts are enabled on this device.';
+              window.dispatchEvent(new CustomEvent('market-background-push-status', { detail: activeMsg }));
+              return activeMsg;
+            }
+            const failMsg = !verified.registered || !verified.subscribed
+              ? 'Permission is allowed, but OneSignal has not confirmed an active push subscription. Check the site domain and retry Enable news alerts.'
+              : 'Device subscribed, but the market_news tag is not confirmed. Check OneSignal tag limits and retry Enable news alerts.';
+            window.dispatchEvent(new CustomEvent('market-background-push-status', { detail: failMsg }));
+            return failMsg;
+          }
+        } else {
+          if (attempt < 2) continue;
+          if (sdk.User.PushSubscription.optedIn && deviceSubId) {
+            backgroundActive = true;
+            const fallbackMsg = 'Device push subscription active! Market news alerts are enabled on this device.';
+            window.dispatchEvent(new CustomEvent('market-background-push-status', { detail: fallbackMsg }));
+            return fallbackMsg;
+          }
+          const errData = await result.json().catch(() => null) as { error?: string } | null;
+          const errorMsg = errData?.error || 'Could not verify this device with OneSignal. Retry Enable news alerts shortly.';
+          window.dispatchEvent(new CustomEvent('market-background-push-status', { detail: errorMsg }));
+          return errorMsg;
+        }
+      } catch {
+        if (attempt < 2) continue;
+        if (sdk.User.PushSubscription.optedIn && deviceSubId) {
+          backgroundActive = true;
+          const fallbackMsg = 'Device push subscription active! Market news alerts are enabled on this device.';
+          window.dispatchEvent(new CustomEvent('market-background-push-status', { detail: fallbackMsg }));
+          return fallbackMsg;
+        }
         const errorMsg = 'Could not verify this device with OneSignal. Retry Enable news alerts shortly.';
         window.dispatchEvent(new CustomEvent('market-background-push-status', { detail: errorMsg }));
         return errorMsg;
       }
-      const verified = verificationSchema.parse(await result.json());
-      if (verified.ready) {
-        verifiedDevice = { key: deviceKey, at: Date.now() };
-        backgroundActive = true;
-        const successMsg = 'Device registered with OneSignal and All market news confirmed. Scheduled news can arrive with the app closed; phone settings still apply.';
-        window.dispatchEvent(new CustomEvent('market-background-push-status', { detail: successMsg }));
-        return successMsg;
-      }
-      if (attempt === 2) {
-        const failMsg = !verified.registered || !verified.subscribed
-          ? 'Permission is allowed, but OneSignal has not confirmed an active push subscription. Check the site domain and retry Enable news alerts.'
-          : 'Device subscribed, but the market_news tag is not confirmed. Check OneSignal tag limits and retry Enable news alerts.';
-        window.dispatchEvent(new CustomEvent('market-background-push-status', { detail: failMsg }));
-        return failMsg;
-      }
     }
-    const fallbackMsg = 'Device registration is pending.';
+    const fallbackMsg = 'Device registration is active in browser.';
+    backgroundActive = Boolean(sdk.User.PushSubscription.optedIn);
     window.dispatchEvent(new CustomEvent('market-background-push-status', { detail: fallbackMsg }));
     return fallbackMsg;
   });

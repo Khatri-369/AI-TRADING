@@ -1,4 +1,5 @@
 import { ASSET_BY_SYMBOL } from './assets';
+import { EXPANDED_STOCK_ALIASES } from './newsSentiment';
 
 export interface QuoteLike {
   symbol: string;
@@ -19,7 +20,7 @@ export function newsNotificationTitle(publisher: string, symbols: string[] = [])
 
 export function formatStockChange(quote: QuoteLike): string {
   const ticker = quote.symbol.trim().toUpperCase();
-  const name = ASSET_BY_SYMBOL.get(ticker)?.name;
+  const name = ASSET_BY_SYMBOL.get(ticker)?.name || EXPANDED_STOCK_ALIASES[ticker]?.[0];
   const symbol = name && name !== ticker ? `${name} (${ticker})` : ticker;
   if (quote.status === 'unavailable' || quote.status === 'stale') return `${symbol} — change unavailable`;
   if (typeof quote.changePercent === 'number' && Number.isFinite(quote.changePercent)) {

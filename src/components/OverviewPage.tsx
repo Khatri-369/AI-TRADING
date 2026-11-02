@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import {
   Activity,
   ArrowRight,
@@ -22,6 +22,7 @@ import {
 import { BenchmarkSkeleton, QuoteCardSkeleton, NewsFeedSkeleton } from './Feedback';
 import { useWatchlist } from '../hooks/useWatchlist';
 import WatchlistToggle from './WatchlistToggle';
+import StockBadge from './StockBadge';
 
 interface Props {
   quotes: Quote[];
@@ -115,6 +116,13 @@ export default function OverviewPage({
   onNavigate,
 }: Props) {
   const { symbols } = useWatchlist();
+  const quotesMap = useMemo(() => {
+    const map = new Map<string, Quote>();
+    for (const q of quotes) {
+      if (q?.symbol) map.set(q.symbol.toUpperCase(), q);
+    }
+    return map;
+  }, [quotes]);
   const [selectedCategory, setSelectedCategory] = useState<'all' | 'india' | 'us' | 'crypto' | 'commodities'>('india');
   const [defaultLanding, setDefaultLanding] = useState<'overview' | 'watchlist'>(() => {
     return (localStorage.getItem('default_landing_page') as 'overview' | 'watchlist') || 'overview';
@@ -463,22 +471,50 @@ export default function OverviewPage({
               No recent news articles available.
             </p>
           ) : (
-            <div className="space-y-2">
-              {newsArticles.slice(0, 3).map((article) => (
-                <article
-                  key={article.id}
-                  onClick={() => onNavigate('news')}
-                  className="rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-subtle)] p-2.5 text-xs hover:border-[var(--accent-border)] transition-all duration-200 cursor-pointer"
-                >
-                  <div className="flex items-center justify-between gap-2 text-[10px] text-[var(--text-muted)]">
-                    <span className="font-semibold text-[var(--accent-text)]">{article.source}</span>
-                    <time dateTime={article.publishedAt}>{formatTime(article.publishedAt)}</time>
-                  </div>
-                  <h4 className="mt-1 font-medium text-[var(--text-primary)] line-clamp-1 hover:text-[var(--accent-text)] transition">
-                    {article.headline}
-                  </h4>
-                </article>
-              ))}
+            <div className="space-y-2.5">
+              {newsArticles.slice(0, 3).map((article) => {
+                const related = article.relatedAssets.length > 0
+                  ? article.relatedAssets
+                  : article.region === 'india'
+                  ? ['NIFTY50']
+                  : [];
+                return (
+                  <article
+                    key={article.id}
+                    onClick={() => onNavigate('news')}
+                    className="rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-subtle)] p-2.5 text-xs hover:border-[var(--accent-border)] transition-all duration-200 cursor-pointer space-y-2"
+                  >
+                    <div className="flex items-center justify-between gap-2 text-[10px] text-[var(--text-muted)]">
+                      <span className="font-semibold text-[var(--accent-text)]">{article.source}</span>
+                      <time dateTime={article.publishedAt}>{formatTime(article.publishedAt)}</time>
+                    </div>
+                    <h4 className="font-medium text-[var(--text-primary)] line-clamp-2 hover:text-[var(--accent-text)] transition leading-snug">
+                      {article.headline}
+                    </h4>
+                    {related.length > 0 && (
+                      <div className="flex flex-wrap items-center gap-1.5 pt-0.5" onClick={(e) => e.stopPropagation()}>
+                        {related.slice(0, 2).map((sym) => {
+                          const quote = quotesMap.get(sym.toUpperCase());
+                          return (
+                            <StockBadge
+                              key={sym}
+                              symbol={sym}
+                              quote={quote}
+                              onClick={() => {
+                                if (quote) {
+                                  onSelectAsset(quote);
+                                } else {
+                                  onNavigate('news');
+                                }
+                              }}
+                            />
+                          );
+                        })}
+                      </div>
+                    )}
+                  </article>
+                );
+              })}
             </div>
           )}
         </div>

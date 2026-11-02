@@ -6,6 +6,7 @@ import { useWatchlist } from '../hooks/useWatchlist';
 import { formatPercent } from '../utils/format';
 import { hasActiveBackgroundPush, syncBackgroundPush } from '../utils/backgroundPush';
 import AssetIcon from './AssetIcon';
+import StockBadge from './StockBadge';
 
 import {
   STORAGE_ALERT_INBOX,
@@ -695,39 +696,21 @@ export default function NewsAlerts({
                         {/* Related stock changes (positive / negative) */}
                         {relatedStocks.length > 0 && (
                           <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
-                            {relatedStocks.map((stock) => {
-                              const isGain = (stock.changePercent ?? 0) >= 0;
-                              return (
-                                <button
-                                  key={stock.symbol}
-                                  type="button"
-                                  onClick={() => {
-                                    setOpen(false);
-                                    if (onSelectAsset) {
-                                      onSelectAsset(stock);
-                                    } else {
-                                      onOpenNews();
-                                    }
-                                  }}
-                                  className={`inline-flex items-center gap-1 rounded px-1.5 py-0.5 font-mono text-[10px] font-bold transition cursor-pointer ${
-                                    isGain
-                                      ? 'bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 border border-emerald-500/20'
-                                      : 'bg-rose-500/10 text-rose-400 hover:bg-rose-500/20 border border-rose-500/20'
-                                  }`}
-                                >
-                                  <AssetIcon symbol={stock.symbol} category={stock.category} size="xs" />
-                                  <span>{stock.symbol}</span>
-                                  <span className="flex items-center">
-                                    {isGain ? (
-                                      <TrendingUp className="h-2.5 w-2.5" />
-                                    ) : (
-                                      <TrendingDown className="h-2.5 w-2.5" />
-                                    )}
-                                    {formatPercent(stock.changePercent)}
-                                  </span>
-                                </button>
-                              );
-                            })}
+                            {relatedStocks.map((stock) => (
+                              <StockBadge
+                                key={stock.symbol}
+                                symbol={stock.symbol}
+                                quote={stock}
+                                onClick={() => {
+                                  setOpen(false);
+                                  if (onSelectAsset) {
+                                    onSelectAsset(stock);
+                                  } else {
+                                    onOpenNews();
+                                  }
+                                }}
+                              />
+                            ))}
                           </div>
                         )}
                       </div>
@@ -799,35 +782,21 @@ export default function NewsAlerts({
           {activeAlert.relatedStocks.length > 0 && (
             <div className="mt-2.5 flex flex-wrap items-center gap-1.5 pt-2 border-t border-[var(--border-subtle)]">
               <span className="text-[10px] text-[var(--text-muted)] font-medium">Current quote change:</span>
-              {activeAlert.relatedStocks.map((stock) => {
-                const isGain = (stock.changePercent ?? 0) >= 0;
-                return (
-                  <button
-                    key={stock.symbol}
-                    type="button"
-                    onClick={() => {
-                      setActiveAlert(null);
-                      if (onSelectAsset) {
-                        onSelectAsset(stock);
-                      } else {
-                        onOpenNews();
-                      }
-                    }}
-                    className={`inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 font-mono text-[11px] font-bold transition cursor-pointer ${
-                      isGain
-                        ? 'bg-emerald-500/15 text-emerald-400 hover:bg-emerald-500/25 border border-emerald-500/30'
-                        : 'bg-rose-500/15 text-rose-400 hover:bg-rose-500/25 border border-rose-500/30'
-                    }`}
-                  >
-                    <AssetIcon symbol={stock.symbol} category={stock.category} size="xs" />
-                    <span>{stock.symbol}</span>
-                    <span className="flex items-center gap-0.5">
-                      {isGain ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
-                      {formatPercent(stock.changePercent)}
-                    </span>
-                  </button>
-                );
-              })}
+              {activeAlert.relatedStocks.map((stock) => (
+                <StockBadge
+                  key={stock.symbol}
+                  symbol={stock.symbol}
+                  quote={stock}
+                  onClick={() => {
+                    setActiveAlert(null);
+                    if (onSelectAsset) {
+                      onSelectAsset(stock);
+                    } else {
+                      onOpenNews();
+                    }
+                  }}
+                />
+              ))}
             </div>
           )}
         </aside>

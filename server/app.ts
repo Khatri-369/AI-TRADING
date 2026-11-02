@@ -178,13 +178,13 @@ export function createApp(config: ServerConfig, production = config.NODE_ENV ===
   app.post('/api/notifications/verify', notificationLimit, csrfProtection, asyncRoute(async (req, res) => {
     const parsed = deviceCheckSchema.safeParse(req.body);
     if (!parsed.success) { res.status(400).json({ error: 'Invalid device verification request.' }); return; }
-    if (!oneSignalPush.configured) { res.status(503).json({ error: 'Background push is not configured.' }); return; }
+    if (!process.env.ONESIGNAL_APP_ID || !process.env.ONESIGNAL_REST_API_KEY) { res.status(503).json({ error: 'Background push is not configured.' }); return; }
     try { res.json(await verifyDevice(process.env.ONESIGNAL_APP_ID!, process.env.ONESIGNAL_REST_API_KEY!, parsed.data.userId, parsed.data.subscriptionId)); }
     catch { logger.warn('Device registration verification unavailable'); res.status(503).json({ error: 'Device verification unavailable. Retry shortly.' }); }
   }));
   app.get('/api/notifications/diagnostics', asyncRoute(async (req, res) => {
     if (!authorizedNewsJob(req.get('authorization'))) { res.status(401).json({ error: 'Unauthorized diagnostics.' }); return; }
-    if (!oneSignalPush.configured) { res.status(503).json({ error: 'Background push is not configured.' }); return; }
+    if (!process.env.ONESIGNAL_APP_ID || !process.env.ONESIGNAL_REST_API_KEY) { res.status(503).json({ error: 'Background push is not configured.' }); return; }
     res.json(await appDiagnostics(process.env.ONESIGNAL_APP_ID!, process.env.ONESIGNAL_REST_API_KEY!, process.env.PUBLIC_SITE_URL));
   }));
   for (const action of ['subscribe', 'unsubscribe', 'test'] as const) {
