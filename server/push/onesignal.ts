@@ -2,7 +2,7 @@ import { createHash, randomUUID, timingSafeEqual } from 'node:crypto';
 import { z } from 'zod';
 import { logger } from '../logger';
 import { appDiagnostics, classifyPushResponse } from './diagnostics';
-import { RedisNewsQueue, queueHeadline, type NewsQueue, type QueuedHeadline } from './newsQueue';
+import { RedisNewsQueue, ResilientNewsQueue, queueHeadline, type NewsQueue, type QueuedHeadline } from './newsQueue';
 import { type QuoteLike } from '../../shared/newsNotification';
 import type { NewsResponse } from '../../shared/types';
 
@@ -129,7 +129,40 @@ export class OneSignalNewsPush {
       const body: unknown = await response.json().catch(() => null);
       const outcome = classifyPushResponse(response.status, body);
       if (outcome.id) return outcome;
-      if (outcome.error === 'audience-no-subscribed-recipients') {
+      if (outcome.error === 'audience-no-subscribed-recipients' || outcome.error === 'provider-audience-filter-rejected') {
+        try {
+          const fallbackId = notificationKey(options.appId, `${record.key}:sub`, record.deliveryGeneration);
+          const fallbackResp = await (this.options.fetcher ?? fetch)('https://api.onesignal.com/notifications', {
+            method: 'POST',
+            headers: { Authorization: `Key ${options.apiKey}`, 'Content-Type': 'application/json' },
+            redirect: 'error',
+            signal: AbortSignal.timeout(6000),
+            body: JSON.stringify({
+              app_id: options.appId,
+              target_channel: 'push',
+              included_segments: ['Subscribed Users'],
+              headings: { en: record.notificationTitle ?? `TRADEXA · ${record.article.source}` },
+              contents: { en: bodyContent },
+              url: record.article.url,
+              data: {
+                articleId: record.article.id,
+                publisher: record.article.source,
+                articleUrl: record.article.url,
+                relatedAssets: record.article.relatedAssets,
+                sentiment: record.article.sentiment,
+              },
+              ttl: 86400,
+              priority: 10,
+              idempotency_key: fallbackId,
+            }),
+          });
+          const fallbackBody: unknown = await fallbackResp.json().catch(() => null);
+          const fallbackOutcome = classifyPushResponse(fallbackResp.status, fallbackBody);
+          if (fallbackOutcome.id) {
+            logger.info('News push delivered via Subscribed Users fallback', { key: record.key, id: fallbackOutcome.id });
+            return fallbackOutcome;
+          }
+        } catch { /* fallback attempt */ }
         try {
           const diagnostic = await appDiagnostics(options.appId, options.apiKey, process.env.PUBLIC_SITE_URL, this.options.fetcher ?? fetch);
           logger.warn('OneSignal audience unavailable', { ...diagnostic,
@@ -143,8 +176,9 @@ export class OneSignalNewsPush {
   }
 }
 
+const redisQueue = new RedisNewsQueue(process.env.UPSTASH_REDIS_REST_URL, process.env.UPSTASH_REDIS_REST_TOKEN, process.env.ONESIGNAL_APP_ID);
 export const oneSignalPush = new OneSignalNewsPush({ appId: process.env.ONESIGNAL_APP_ID, apiKey: process.env.ONESIGNAL_REST_API_KEY,
-  queue: new RedisNewsQueue(process.env.UPSTASH_REDIS_REST_URL, process.env.UPSTASH_REDIS_REST_TOKEN, process.env.ONESIGNAL_APP_ID),
+  queue: new ResilientNewsQueue(redisQueue),
   batchLimit: process.env.NEWS_PUSH_BATCH_LIMIT ? Number(process.env.NEWS_PUSH_BATCH_LIMIT) : 1,
 });
 export const usesOneSignal = () => Boolean(process.env.ONESIGNAL_APP_ID || process.env.ONESIGNAL_REST_API_KEY);

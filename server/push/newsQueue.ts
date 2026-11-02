@@ -129,3 +129,110 @@ export class RedisNewsQueue implements NewsQueue {
     return { pending, review };
   }
 }
+
+export class MemoryNewsQueue implements NewsQueue {
+  private lockOwner: string | null = null;
+  private lockExpires = 0;
+  private lastPoll = 0;
+  private records = new Map<string, QueuedHeadline>();
+  private pending = new Map<string, number>();
+  private cooldownUntil = 0;
+
+  get configured() {
+    return true;
+  }
+
+  async acquire(owner: string): Promise<boolean> {
+    const now = Date.now();
+    if (this.lockOwner && now < this.lockExpires && this.lockOwner !== owner) {
+      return false;
+    }
+    this.lockOwner = owner;
+    this.lockExpires = now + 120000;
+    return true;
+  }
+
+  async release(owner: string): Promise<void> {
+    if (this.lockOwner === owner) {
+      this.lockOwner = null;
+      this.lockExpires = 0;
+    }
+  }
+
+  async pollDue(now: number): Promise<boolean> {
+    return now - this.lastPoll >= 240000;
+  }
+
+  async enqueue(_owner: string, records: QueuedHeadline[], now: number): Promise<number> {
+    this.lastPoll = now;
+    let added = 0;
+    for (const record of records) {
+      if (!this.records.has(record.key)) {
+        this.records.set(record.key, record);
+        this.pending.set(record.key, now);
+        added++;
+      }
+    }
+    return added;
+  }
+
+  async next(_owner: string, now: number): Promise<QueuedHeadline | null> {
+    if (now < this.cooldownUntil) return null;
+    let oldestKey: string | null = null;
+    let oldestDue = Infinity;
+    for (const [key, due] of this.pending.entries()) {
+      if (due <= now && due < oldestDue) {
+        oldestDue = due;
+        oldestKey = key;
+      }
+    }
+    if (!oldestKey) return null;
+    const record = this.records.get(oldestKey);
+    if (!record) return null;
+    if (!record.firstAttempt) record.firstAttempt = now;
+    record.attempts = (record.attempts || 0) + 1;
+    this.pending.set(oldestKey, now + 120000);
+    return record;
+  }
+
+  async save(_owner: string, record: QueuedHeadline, due: number, cooldown = 0): Promise<void> {
+    this.records.set(record.key, record);
+    if (record.state === 'pending') {
+      this.pending.set(record.key, due);
+    } else {
+      this.pending.delete(record.key);
+    }
+    if (cooldown > 0) {
+      this.cooldownUntil = cooldown;
+    }
+  }
+
+  async counts(): Promise<{ pending: number; review: number }> {
+    let review = 0;
+    for (const r of this.records.values()) {
+      if (r.state === 'review') review++;
+    }
+    return { pending: this.pending.size, review };
+  }
+}
+
+export class ResilientNewsQueue implements NewsQueue {
+  private memory = new MemoryNewsQueue();
+  constructor(private redis?: RedisNewsQueue) {}
+
+  get active(): NewsQueue {
+    return this.redis?.configured ? this.redis : this.memory;
+  }
+
+  get configured() {
+    return true;
+  }
+
+  acquire(owner: string) { return this.active.acquire(owner); }
+  release(owner: string) { return this.active.release(owner); }
+  pollDue(now: number) { return this.active.pollDue(now); }
+  enqueue(owner: string, records: QueuedHeadline[], now: number) { return this.active.enqueue(owner, records, now); }
+  next(owner: string, now: number) { return this.active.next(owner, now); }
+  save(owner: string, record: QueuedHeadline, due: number, cooldown?: number) { return this.active.save(owner, record, due, cooldown); }
+  counts() { return this.active.counts(); }
+}

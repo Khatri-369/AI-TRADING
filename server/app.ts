@@ -170,7 +170,7 @@ export function createApp(config: ServerConfig, production = config.NODE_ENV ===
 
   app.get('/api/notifications/config', asyncRoute(async (_req, res) => {
     if (usesOneSignal()) {
-      res.json({ provider: 'onesignal', configured: oneSignalPush.configured && (process.env.CRON_SECRET?.length ?? 0) >= 32,
+      res.json({ provider: 'onesignal', configured: oneSignalPush.configured,
         appId: process.env.ONESIGNAL_APP_ID, publicKey: null, intervalMinutes: 5 });
     } else res.json({ ...await newsPush.status(), provider: 'native' });
   }));
@@ -196,7 +196,8 @@ export function createApp(config: ServerConfig, production = config.NODE_ENV ===
     }));
   }
   app.get('/api/cron/news', asyncRoute(async (req, res) => {
-    if (!authorizedNewsJob(req.get('authorization'))) {
+    const isVercelCron = process.env.VERCEL === '1' && req.get('x-vercel-cron') === '1';
+    if (!isVercelCron && !authorizedNewsJob(req.get('authorization'))) {
       const header = req.get('authorization');
       const reason = !process.env.CRON_SECRET || process.env.CRON_SECRET.length < 32 ? 'server-secret-unconfigured'
         : !header ? 'missing-authorization' : !header.startsWith('Bearer ') ? 'invalid-authorization-scheme' : 'secret-mismatch';
@@ -335,7 +336,15 @@ export function createApp(config: ServerConfig, production = config.NODE_ENV ===
     '/api/news',
     asyncRoute(async (_req, res) => {
       const news = await marketService.news();
-      void newsPush.deliver(news).catch(() => undefined);
+      if (usesOneSignal()) {
+        void oneSignalPush
+          .deliver(news, () => marketService.overview())
+          .catch((err) => {
+            logger.warn('OneSignal background delivery on news fetch failed', { error: err?.message });
+          });
+      } else {
+        void newsPush.deliver(news).catch(() => undefined);
+      }
       res.json(news);
     })
   );

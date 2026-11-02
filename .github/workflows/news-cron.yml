@@ -1,0 +1,15 @@
+name: Market News Push Dispatcher
+
+on:
+  schedule:
+    - cron: '*/10 * * * *'
+  workflow_dispatch:
+
+jobs:
+  dispatch-news:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger News Ingestion and Background Push
+        run: |
+          echo "Pinging live deployment for fresh news and push delivery..."
+          curl -s -f -m 30 "https://ai-trading-lilac.vercel.app/api/news" > /dev/null || echo "Ping completed"

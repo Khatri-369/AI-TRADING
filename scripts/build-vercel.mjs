@@ -73,6 +73,12 @@ await writeFile(
   JSON.stringify(
     {
       version: 3,
+      crons: [
+        {
+          path: '/api/cron/news',
+          schedule: '*/5 * * * *',
+        },
+      ],
       routes: [
         {
           src: '/(.*)',
