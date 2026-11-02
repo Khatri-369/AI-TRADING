@@ -13,3 +13,4 @@ jobs:
         run: |
           echo "Pinging live deployment for fresh news and push delivery..."
           curl -s -f -m 30 "https://ai-trading-lilac.vercel.app/api/news" > /dev/null || echo "Ping completed"
+
